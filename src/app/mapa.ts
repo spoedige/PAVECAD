@@ -6,6 +6,7 @@ import { IND, Q5, Q5F, type IndKey } from '../dominio/indicadores';
 import { trColor, trLabel, trOrder, trShort } from '../dominio/solucoes';
 import type { Nota } from './estado';
 import { kmLabel, parseKmTexto } from '../formats/km';
+import { agendarRotulos, PRIO, prioDeEstaca, resolverRotulos } from './rotulos';
 import { E, H, NOTE_CATS, getP, projName, visibleProjects, type AppProj, type FocoPred } from './estado';
 import { $, cssv, esc, fmt, toast } from './ui';
 
@@ -191,6 +192,7 @@ function buildMarkers(p: AppProj) {
     const el = document.createElement('div');
     el.className = 'kmlabel ' + (km % 10 === 0 ? 'k10' : 'k1');
     el.textContent = 'km ' + km;
+    Object.assign(el.dataset, { rot: 'km', pid: p.id, prio: String(PRIO.km) });
     p.markers.push(new maplibregl.Marker({ element: el, offset: [0, -14] }).setLngLat(offsetLL(p, p, i, edgesOf(R[i], p.opts).e[0] - 2)).addTo(map));
   }
   let i = 0;
@@ -205,10 +207,12 @@ function buildMarkers(p: AppProj) {
       const el = document.createElement('div');
       el.className = 'poi' + (/ped/i.test(t) ? ' ped' : '');
       el.textContent = t;
+      Object.assign(el.dataset, { rot: 'poi', pid: p.id, prio: String(PRIO.poi) });
       p.markers.push(new maplibregl.Marker({ element: el }).setLngLat(offsetLL(p, p, mid, (Math.min(...e) + Math.max(...e)) / 2)).addTo(map));
     }
     i = j + 1;
   }
+  agendarReaplicar();
 }
 
 /* ---------------------------------------------------------------- */
@@ -386,8 +390,10 @@ function tipHtml(h: Exclude<Hit, { note: Nota }>): string {
 export function select(pid: string, row: number, lane: number, opt: { pan?: boolean; tab?: boolean } = {}) {
   const p = getP(pid);
   if (!p) return;
+  const refAntes = refProjeto()?.id;
   E.sel = { pid, row, lane };
   E.activeGroup = p.meta.uf;
+  if (refProjeto()?.id !== refAntes) updateStakes();
   updateSelLayer();
   if (opt.pan && E.mapReady) {
     const r = p.rows[row];
@@ -396,7 +402,7 @@ export function select(pid: string, row: number, lane: number, opt: { pan?: bool
   H.onSelect(opt);
 }
 
-export function clearSel() { E.sel = null; updateSelLayer(); H.onSelect({}); }
+export function clearSel() { const a = refProjeto()?.id; E.sel = null; updateSelLayer(); if (refProjeto()?.id !== a) updateStakes(); H.onSelect({}); }
 
 export function updateSelLayer() {
   if (!E.mapReady) return;
@@ -450,16 +456,34 @@ export const fitAll = (instant = false) => fitList(visibleProjects(), instant);
 
 let stakeMk: maplibregl.Marker[] = [];
 /** Estacas por zoom: 500 m a partir do zoom 14, 100 m a partir de 15,8 e 20 m a partir de 18,2. */
+/** Planilha de referência dos rótulos de texto: a selecionada; senão, a primeira do grupo ativo. */
+export function refProjeto(): AppProj | undefined {
+  const sel = E.sel ? getP(E.sel.pid) : undefined;
+  if (sel?.visible) return sel;
+  return grupoAtivo()[0] ?? visibleProjects()[0];
+}
+
+const estacasAtivas = () => E.mapReady && E.layers.km && map.getZoom() >= 14;
+
+/** Refaz só a resolução de colisão (painel mudou de tamanho, aba trocada, seleção mudou). */
+export function reaplicarRotulos() {
+  if (!E.mapReady) return;
+  resolverRotulos({ refId: refProjeto()?.id ?? null, estacasAtivas: estacasAtivas() });
+}
+export const agendarReaplicar = () => agendarRotulos(reaplicarRotulos);
+
+/** Estacas por zoom: 500 m a partir do zoom 14, 100 m a partir de 15,8 e 20 m a partir de 18,2.
+ *  O traço aparece em todas as planilhas; o rótulo de texto só na de referência, sem colisão. */
 export function updateStakes() {
   stakeMk.forEach((m) => m.remove());
   stakeMk = [];
   if (!E.mapReady) return;
   const z = map.getZoom(), step = z >= 18.2 ? 20 : z >= 15.8 ? 100 : z >= 14 ? 500 : 0, tk = src('ticks')!;
-  if (!step || !E.layers.km) { tk.setData(EMPTY as Expr); return; }
-  const bb = map.getBounds(), feats: Expr[] = [];
-  let n = 0;
+  if (!step || !E.layers.km) { tk.setData(EMPTY as Expr); reaplicarRotulos(); return; }
+  const bb = map.getBounds(), feats: Expr[] = [], ref = refProjeto();
   for (const p of visibleProjects()) {
     const vistos = new Set<number>(); // 9+1000 e 10+000 são o mesmo km: um rótulo só
+    let n = 0;
     for (let i = 0; i < p.rows.length && n < 200; i++) {
       if (!p.normals[i]) continue;
       const m = Math.round(p.kmNum[i] * 1000);
@@ -470,13 +494,16 @@ export function updateStakes() {
       n++;
       const e = edgesOf(r, p.opts).e, lo = Math.min(...e), hi = Math.max(...e), left = p.opts.travel > 0;
       feats.push({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [offsetLL(p, p, i, lo - 0.6), offsetLL(p, p, i, hi + 0.6)] } });
+      if (p !== ref) continue;
       const el = document.createElement('div');
       el.className = 'stake' + (m % 1000 === 0 ? ' km' : '');
       el.textContent = kmLabel(m / 1000);
+      Object.assign(el.dataset, { rot: 'estaca', pid: p.id, prio: String(prioDeEstaca(m)) });
       stakeMk.push(new maplibregl.Marker({ element: el, anchor: left ? 'right' : 'left', offset: [left ? -3 : 3, 0] }).setLngLat(offsetLL(p, p, i, left ? lo - 1 : hi + 1)).addTo(map));
     }
   }
   tk.setData({ type: 'FeatureCollection', features: feats } as Expr);
+  reaplicarRotulos();
 }
 
 export const rotate = (graus: number) => map.easeTo({ bearing: map.getBearing() + graus, duration: 250 });

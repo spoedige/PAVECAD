@@ -3,7 +3,7 @@ import './estilos/app.css';
 import './estilos/config.css';
 import { E, H } from './app/estado';
 import {
-  alignToRoad, applyLayers, clearSel, fitAll, goLabel, initMap, north, rotate, select, setBase, stepSel, updateStakes,
+  agendarReaplicar, alignToRoad, applyLayers, clearSel, fitAll, getMap, goLabel, initMap, north, rotate, select, setBase, stepSel, updateStakes,
 } from './app/mapa';
 import { MODE_KEYS, type ModeKey } from './dominio/indicadores';
 import { abrirDb } from './app/persist';
@@ -104,7 +104,7 @@ if (import.meta.env.DEV) {
   (window as unknown as { __pavecad: unknown }).__pavecad = {
     E,
     setField: (on: boolean, silencioso?: boolean) => { if (E.field !== on) setField(on); if (silencioso) $('#toast').classList.remove('on'); },
-    select, setTab,
+    select, setTab, map: getMap,
   };
 }
 
@@ -116,7 +116,7 @@ async function boot() {
   await initRevisao();
   initUnifilar();
   initConfig();
-  observarHud();
+  observarHud(agendarReaplicar);
   renderAll();
   initMap(() => {
     resolveProps();

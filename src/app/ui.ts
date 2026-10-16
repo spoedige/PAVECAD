@@ -26,10 +26,14 @@ window.addEventListener('resize', syncAllSegs);
 document.fonts?.ready.then(syncAllSegs);
 
 /** Publica a altura da coluna superior direita (--hudm-h) para o painel lateral não depender de um número fixo. */
-export function observarHud() {
+export function observarHud(aoMudar?: () => void) {
   const m = document.querySelector<HTMLElement>('.hud-main');
   if (!m) return;
-  const set = () => document.documentElement.style.setProperty('--hudm-h', Math.round(m.getBoundingClientRect().height) + 'px');
-  if (window.ResizeObserver) new ResizeObserver(set).observe(m);
+  const set = () => { document.documentElement.style.setProperty('--hudm-h', Math.round(m.getBoundingClientRect().height) + 'px'); aoMudar?.(); };
+  if (window.ResizeObserver) {
+    const ro = new ResizeObserver(set);
+    ro.observe(m);
+    for (const q of ['#inspector', '#legend', '#unicard', '.leftcol']) { const e = document.querySelector(q); if (e) ro.observe(e); }
+  }
   set();
 }

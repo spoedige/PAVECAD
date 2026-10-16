@@ -2,6 +2,7 @@ import { criticos, INDS_ANALISE, matriz, resumo, violacoes, REGRAS } from '../do
 import { IND, MODE_KEYS, Q5, Q5F, type IndKey, type ModeKey } from '../dominio/indicadores';
 import { trColor, trLabel, trOrder } from '../dominio/solucoes';
 import { edgesOf } from '../geometry/build';
+import { tituloDe } from '../dominio/titulo';
 import { E, getP, projName, visibleProjects, type AppProj } from './estado';
 import { regeometrar, removerProjeto } from './projetos';
 import { IC } from './icones';
@@ -27,18 +28,6 @@ export function setTab(t: typeof E.tab) {
   if (t === 'ana') renderAna();
   if (t === 'notas') renderNotes();
   syncAllSegs();
-}
-
-/** "BR-050 · MG". Com mais de um estado, "BR-050 · GO, MG". Com mais de uma rodovia, separadas por " + ". */
-export function tituloDe(lista: Pick<AppProj, 'meta'>[]): string {
-  if (!lista.length) return 'PaveCAD';
-  const por = new Map<string, Set<string>>();
-  for (const p of lista) {
-    const [via, uf] = p.meta.uf.split('/');
-    if (!por.has(via)) por.set(via, new Set());
-    if (uf) por.get(via)!.add(uf);
-  }
-  return [...por].map(([via, ufs]) => (ufs.size ? `${via} · ${[...ufs].sort().join(', ')}` : via)).join(' + ');
 }
 
 export function renderViews() {
