@@ -138,7 +138,7 @@ async function boot() {
   initGrupos(() => { drawUni(); agendarReaplicar(); });
   observarHud(agendarReaplicar);
   document.querySelectorAll<HTMLElement>('.tabbody').forEach(observarRolagem);
-  observarRolagemH($('#views'));
+  observarRolagemH($('#viewsIn'));
   renderAll();
   initMap(() => {
     resolveProps();

@@ -18,8 +18,10 @@
     if (b.width < 1 || b.height < 1) continue;
     // recorta pelos ancestrais com overflow (o que está cortado não aparece)
     let clip = { l: 0, t: -1e9, r: innerWidth, b: 1e9 };
+    let rolavelX = false; // o corte horizontal vem de um contêiner que rola (linha de chips, abas): o usuário alcança o texto rolando
     for (let a = el; a && a !== document.documentElement; a = a.parentElement) {
       const cs = getComputedStyle(a);
+      if (cs.overflowX === 'auto' || cs.overflowX === 'scroll') rolavelX = true;
       if (cs.overflowX !== 'visible' || cs.overflowY !== 'visible') {
         const ar = a.getBoundingClientRect();
         clip = { l: Math.max(clip.l, ar.left), t: Math.max(clip.t, ar.top), r: Math.min(clip.r, ar.right), b: Math.min(clip.b, ar.bottom) };
@@ -30,7 +32,7 @@
     // texto cortado na horizontal por um contêiner (sem reticências): o usuário não lê a palavra inteira
     if (b.left < rect.l - 2 || b.right > rect.r + 2) {
       const ell = getComputedStyle(el).textOverflow === 'ellipsis' || (el.parentElement && getComputedStyle(el.parentElement).textOverflow === 'ellipsis');
-      if (!ell) cortes.push({ tipo: 'cortado', mk: !!el.closest('.maplibregl-marker'), a: t.slice(0, 40), b: '', w: Math.round(Math.max(rect.l - b.left, b.right - rect.r)), h: 0, x: Math.round(b.left), y: Math.round(b.top) });
+      if (!ell && !rolavelX) cortes.push({ tipo: 'cortado', mk: !!el.closest('.maplibregl-marker'), a: t.slice(0, 40), b: '', w: Math.round(Math.max(rect.l - b.left, b.right - rect.r)), h: 0, x: Math.round(b.left), y: Math.round(b.top) });
     }
     nos.push({ t: t.slice(0, 40), rect, el, mk: !!el.closest('.maplibregl-marker') });
   }

@@ -42,14 +42,28 @@ function aplicar() {
   window.dispatchEvent(new Event('resize'));
 }
 
-/** Publica uma medida de um elemento numa variável CSS da raiz e a mantém atualizada (ResizeObserver mais resize da janela). */
-function publicar(seletor: string, nome: string, medida: (r: DOMRect) => number) {
-  const el = document.querySelector<HTMLElement>(seletor);
-  if (!el) return;
-  const set = () => document.documentElement.style.setProperty(nome, (el.checkVisibility() ? Math.round(medida(el.getBoundingClientRect())) : 0) + 'px');
-  if (window.ResizeObserver) new ResizeObserver(set).observe(el);
-  window.addEventListener('resize', set);
-  set();
+/** Medidas reais publicadas como variáveis CSS na raiz (sem valores fixos): o painel ancora na altura do unifilar, a folha inferior e
+ *  a coluna esquerda desviam da barra lateral. Uma leitura só, agrupada em requestAnimationFrame: escrever as variáveis dentro do
+ *  callback do ResizeObserver provocaria o aviso "ResizeObserver loop". */
+const MEDIDAS: [string, string, (r: DOMRect) => number][] = [
+  ['#unicard', '--uni-alt', (r) => r.height],
+  ['#inspector', '--painel-alt', (r) => r.height],
+  ['#tools', '--tools-alt', (r) => r.height],
+  ['#tools', '--tools-t', (r) => r.top],
+  ['.hud', '--hud-b', (r) => r.bottom],
+];
+let medidaPendente = false;
+function medir() {
+  const R = document.documentElement.style;
+  for (const [sel, nome, f] of MEDIDAS) {
+    const el = document.querySelector<HTMLElement>(sel);
+    if (el) R.setProperty(nome, (el.checkVisibility() ? Math.round(f(el.getBoundingClientRect())) : 0) + 'px');
+  }
+}
+export function agendarMedidas() {
+  if (medidaPendente) return;
+  medidaPendente = true;
+  requestAnimationFrame(() => { medidaPendente = false; medir(); });
 }
 
 export function initLayout() {
@@ -64,11 +78,12 @@ export function initLayout() {
   initPainel();
   mq.addEventListener('change', aplicar);
   aplicar();
-  // medidas reais publicadas como variáveis CSS (sem valor fixo): o painel ancora no unifilar e a folha inferior desvia da barra lateral
-  publicar('#unicard', '--uni-alt', (r) => r.height);
-  publicar('#inspector', '--painel-alt', (r) => r.height);
-  publicar('#tools', '--tools-alt', (r) => r.height);
-  publicar('.hud', '--hud-b', (r) => r.bottom);
+  if (window.ResizeObserver) {
+    const ro = new ResizeObserver(agendarMedidas);
+    for (const [sel] of MEDIDAS) { const e = document.querySelector(sel); if (e) ro.observe(e); }
+  }
+  window.addEventListener('resize', agendarMedidas);
+  medir();
   // a gaveta sobe junto com a altura do que está no dock (legenda ou barra de propor)
   const dock = document.querySelector<HTMLElement>('.dock');
   if (dock && window.ResizeObserver) {

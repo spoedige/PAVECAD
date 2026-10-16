@@ -2,7 +2,7 @@
 // Uso: node scripts/capturas/e2e.cjs [grupo ...]   (padrão: todos)
 // Requer o servidor de desenvolvimento em PAVECAD_URL (padrão http://localhost:5199).
 const assert = require('assert/strict');
-const { VPS, abrir, lancar } = require('./lib.cjs');
+const { VPS, abrir, lancar, tema } = require('./lib.cjs');
 const { irParaKm, escolherBase, aba, criarProposta, pontoLivre } = require('./scenarios.cjs');
 
 const vp = (nome) => VPS.find((v) => v.nome === nome);
@@ -327,7 +327,7 @@ const TESTES = {
   t06: [
     ['chips de projeto numa linha só, sem quebra e com rolagem horizontal', TODOS, async (pg) => {
       const m = () => pg.evaluate(() => {
-        const v = document.querySelector('#views'), cs = [...v.querySelectorAll('.chipbtn')], tops = cs.map((c) => Math.round(c.getBoundingClientRect().top));
+        const v = document.querySelector('#viewsIn'), cs = [...v.querySelectorAll('.chipbtn')], tops = cs.map((c) => Math.round(c.getBoundingClientRect().top));
         return { n: cs.length, mesmaLinha: new Set(tops).size === 1, wrap: getComputedStyle(v).flexWrap, ox: getComputedStyle(v).overflowX, sobra: v.scrollWidth - v.clientWidth, mais: v.classList.contains('mais'), h: v.getBoundingClientRect().height, vr: v.getBoundingClientRect().right, tr: document.querySelector('.leftcol').getBoundingClientRect().right };
       });
       const a = await m();
@@ -335,7 +335,7 @@ const TESTES = {
       assert.equal(a.wrap, 'nowrap'); assert.equal(a.ox, 'auto');
       assert.equal(a.mais, false, 'sem excesso não há fade');
       // com muitos grupos (050/GO, 050/MG, 040/MG...) a linha rola em vez de quebrar
-      await pg.evaluate(() => { const v = document.querySelector('#views'); for (const g of ['050/MG', '040/MG', '262/MG', '365/MG', '153/GO']) { const b = document.createElement('button'); b.className = 'chipbtn'; b.textContent = g; v.appendChild(b); } });
+      await pg.evaluate(() => { const v = document.querySelector('#viewsIn'); for (const g of ['050/MG', '040/MG', '262/MG', '365/MG', '153/GO']) { const b = document.createElement('button'); b.className = 'chipbtn'; b.textContent = g; v.appendChild(b); } });
       await pg.waitForTimeout(300);
       const b = await m();
       assert.ok(b.mesmaLinha, 'continua numa linha com muitos chips');
@@ -343,11 +343,11 @@ const TESTES = {
       assert.ok(b.sobra > 20, 'a linha rola na horizontal (+' + b.sobra + 'px)');
       assert.equal(b.mais, true, 'fade na borda direita enquanto há mais chips');
       assert.ok(b.vr <= b.tr + 1, 'a linha não ultrapassa a coluna esquerda');
-      await pg.evaluate(() => { const v = document.querySelector('#views'); v.scrollLeft = v.scrollWidth; });
+      await pg.evaluate(() => { const v = document.querySelector('#viewsIn'); v.scrollLeft = v.scrollWidth; });
       await pg.waitForTimeout(200);
       const c = await m();
       assert.equal(c.mais, false, 'no fim da rolagem o fade some');
-      const ult = await pg.evaluate(() => { const v = document.querySelector('#views'), u = v.lastElementChild.getBoundingClientRect(), r = v.getBoundingClientRect(); return u.right <= r.right + 1; });
+      const ult = await pg.evaluate(() => { const v = document.querySelector('#viewsIn'), u = v.lastElementChild.getBoundingClientRect(), r = v.getBoundingClientRect(); return u.right <= r.right + 1; });
       assert.ok(ult, 'o último chip fica inteiro e alcançável');
     }],
   ],
@@ -457,6 +457,65 @@ const TESTES = {
       });
       assert.equal(r.ruim, false); assert.equal(r.ox, true, 'alinhados'); assert.ok(r.dentro);
       assert.ok(r.h >= 43.5 && r.w >= 43.5, 'o botão de olho tem 44 px');
+    }],
+  ],
+  t08: [
+    ['coluna esquerda (4 planilhas, satélite): título, busca e chips sem corte nem sobreposição, nos três temas', ['1568x760', '1366x768', 'tablet-h-1024x768'], async (pg) => {
+      assert.ok((await pg.evaluate(() => window.__pavecad.E.P.length)) >= 4, 'quatro planilhas carregadas');
+      await escolherBase(pg, 'esri'); await irParaKm(pg, '34+780', 3000); await pg.waitForTimeout(500);
+      assert.equal(await pg.evaluate(() => window.__pavecad.E.base), 'esri');
+      const caixas = () => pg.evaluate(() => {
+        const R = (s) => { const r = document.querySelector(s).getBoundingClientRect(); return { t: r.top, b: r.bottom, l: r.left, r: r.right, h: r.height }; };
+        const cs = (s) => getComputedStyle(document.querySelector(s));
+        const vidro = (s) => { const c = cs(s); return { bg: c.backgroundColor, borda: c.borderTopWidth + ' ' + c.borderTopColor, blur: c.backdropFilter || c.webkitBackdropFilter, raio: c.borderTopLeftRadius }; };
+        return {
+          titulo: R('#titlebox'), busca: R('.leftcol .search'), chips: R('#views'), coluna: R('.leftcol'), tools: R('#tools'),
+          shrink: ['#titlebox', '.leftcol .search', '#views'].map((s) => cs(s).flexShrink),
+          vidroTitulo: vidro('#titlebox'), vidroBusca: vidro('.leftcol .search'), vidroChips: vidro('#views'),
+          pad: cs('#views').padding, maskCartao: cs('#views').maskImage || cs('#views').webkitMaskImage, maskInterno: cs('#viewsIn').maskImage || cs('#viewsIn').webkitMaskImage,
+          interno: (() => { const v = document.querySelector('#viewsIn'), c = v.querySelector('.chipbtn'), cc = getComputedStyle(c); return { sobra: v.scrollWidth - v.clientWidth, bd: cc.backdropFilter, bg: cc.backgroundColor }; })(),
+        };
+      });
+      for (const t of ['claro', 'escuro', 'campo']) {
+        await tema(pg, t);
+        const m = await caixas();
+        assert.ok(m.busca.t >= m.titulo.b - 0.5, `${t}: a busca não pode entrar no título (${m.busca.t} x ${m.titulo.b})`);
+        assert.ok(m.chips.t >= m.busca.b - 0.5, `${t}: os chips não podem cobrir a busca (chips ${m.chips.t} x busca ${m.busca.b})`);
+        assert.ok(Math.abs(m.busca.h - 44) <= 0.5, `${t}: a busca tem 44 px: ${m.busca.h}`);
+        assert.deepEqual(m.shrink, ['0', '0', '0'], `${t}: título, busca e chips não encolhem`);
+        assert.ok(m.chips.t - m.busca.b >= 4 && m.busca.t - m.titulo.b >= 4, `${t}: espaço entre os cartões`);
+        // cartão de vidro próprio, igual aos outros
+        for (const k of ['bg', 'borda', 'blur', 'raio']) if (k !== 'raio') assert.equal(m.vidroChips[k], m.vidroTitulo[k], `${t}: ${k} do cartão de chips igual ao do título`);
+        assert.ok(!/rgba?\(\s*\d+,\s*\d+,\s*\d+,\s*0\s*\)/.test(m.vidroChips.bg) && m.vidroChips.bg !== 'rgba(0, 0, 0, 0)', `${t}: o cartão de chips tem fundo`);
+        if (t !== 'campo') assert.notEqual(m.vidroChips.blur, 'none', `${t}: com desfoque`);
+        assert.equal(m.pad, '6px', `${t}: padding de 6 px`);
+        assert.ok(!m.maskCartao || m.maskCartao === 'none', `${t}: o fade não pode estar no cartão`);
+        assert.ok(m.interno.bd === 'none', `${t}: os chips de dentro não têm desfoque próprio`);
+        assert.ok(m.coluna.b <= m.tools.t, `${t}: a coluna não encosta na barra lateral (${m.coluna.b} x ${m.tools.t})`);
+      }
+      // o fade só vale no elemento interno e só se houver o que rolar
+      await pg.evaluate(() => { const v = document.querySelector('#viewsIn'); for (const g of ['040/MG', '262/MG', '365/MG']) { const b = document.createElement('button'); b.className = 'chipbtn'; b.textContent = g; v.appendChild(b); } });
+      await pg.waitForTimeout(300);
+      const m2 = await caixas();
+      assert.ok(m2.interno.sobra > 10, 'a linha rola');
+      assert.ok(m2.maskInterno && m2.maskInterno !== 'none', 'o fade fica no elemento interno que rola');
+      assert.ok(!m2.maskCartao || m2.maskCartao === 'none', 'e nunca no cartão');
+    }, { exemplos: true }],
+    ['coluna esquerda mais alta que a tela: rola sozinha e nada fica cortado nem sobreposto à barra lateral', ['1366x768'], async (pg) => {
+      await pg.setViewportSize({ width: 1366, height: 520 }); await pg.waitForTimeout(700);
+      const m = await pg.evaluate(() => {
+        const c = document.querySelector('.leftcol'), t = document.querySelector('#tools').getBoundingClientRect(), cr = c.getBoundingClientRect();
+        const antes = { rola: c.scrollHeight > c.clientHeight + 1, fim: false };
+        c.scrollTop = c.scrollHeight;
+        const ult = document.querySelector('#views').getBoundingClientRect();
+        return { antes, colB: cr.bottom, toolsT: t.top, ultB: ult.bottom, cB: c.getBoundingClientRect().bottom, padB: parseFloat(getComputedStyle(c).paddingBottom), ox: getComputedStyle(c).overflowY };
+      });
+      assert.ok(m.colB - m.padB <= m.toolsT + 1, `a coluna (sem a folga de sombra) termina antes da barra lateral: ${m.colB - m.padB} x ${m.toolsT}`);
+      assert.ok(m.antes.rola, 'em tela baixa a coluna rola');
+      assert.ok(m.ultB <= m.cB - m.padB + 1, 'rolada até o fim, o cartão de chips aparece inteiro');
+      // com o botão de ocultar o grupo some e libera a tela
+      await pg.click('[data-ocultar=titulo]'); await pg.waitForTimeout(300);
+      assert.equal(await pg.evaluate(() => document.querySelector('.leftcol .search').checkVisibility()), false);
     }],
   ],
   g03: [
@@ -880,11 +939,11 @@ const TESTES = {
   const browser = await lancar();
   let falhas = 0, total = 0;
   for (const g of grupos) {
-    for (const [nome, vpn, fn] of TESTES[g] || []) {
+    for (const [nome, vpn, fn, opts] of TESTES[g] || []) {
       for (const v of Array.isArray(vpn) ? vpn : [vpn]) {
         total++;
         const rotulo = Array.isArray(vpn) ? `${nome} [${v}]` : nome;
-        const { ctx, pg, log } = await abrir(browser, vp(v));
+        const { ctx, pg, log } = await abrir(browser, vp(v), opts || {});
         try {
           await fn(pg, { log, ctx });
           console.log(`ok   ${g}: ${rotulo}`);
