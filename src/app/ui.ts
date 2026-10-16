@@ -24,3 +24,12 @@ export function syncSeg(el: HTMLElement | null) {
 export const syncAllSegs = () => document.querySelectorAll<HTMLElement>('.seg').forEach(syncSeg);
 window.addEventListener('resize', syncAllSegs);
 document.fonts?.ready.then(syncAllSegs);
+
+/** Publica a altura da coluna superior direita (--hudm-h) para o painel lateral não depender de um número fixo. */
+export function observarHud() {
+  const m = document.querySelector<HTMLElement>('.hud-main');
+  if (!m) return;
+  const set = () => document.documentElement.style.setProperty('--hudm-h', Math.round(m.getBoundingClientRect().height) + 'px');
+  if (window.ResizeObserver) new ResizeObserver(set).observe(m);
+  set();
+}

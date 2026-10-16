@@ -3,7 +3,7 @@ import './estilos/app.css';
 import './estilos/config.css';
 import { E, H } from './app/estado';
 import {
-  alignToRoad, applyLayers, clearSel, fitAll, goLabel, initMap, north, rotate, setBase, stepSel, updateStakes,
+  alignToRoad, applyLayers, clearSel, fitAll, goLabel, initMap, north, rotate, select, setBase, stepSel, updateStakes,
 } from './app/mapa';
 import { MODE_KEYS, type ModeKey } from './dominio/indicadores';
 import { abrirDb } from './app/persist';
@@ -14,7 +14,7 @@ import { abrirConfig, atualizarAviso, configAberta, initConfig } from './app/con
 import { renderAll, renderSeg, setField, setMode, setTab, syncBaseSeg } from './app/paineis';
 import { drawUni, initUnifilar } from './app/unifilar';
 import { clearFocus } from './app/mapa';
-import { $, syncAllSegs, syncSeg, toast } from './app/ui';
+import { $, observarHud, syncAllSegs, syncSeg, toast } from './app/ui';
 
 async function carregarExemplos() {
   const { nomesExemplo, lerExemplo } = await import('./app/exemplo');
@@ -99,6 +99,15 @@ H.onSelect = (opt) => {
 };
 H.onClick = onToolClick;
 
+/** Só em desenvolvimento: gancho para os testes de interface (Playwright). Não existe no build. */
+if (import.meta.env.DEV) {
+  (window as unknown as { __pavecad: unknown }).__pavecad = {
+    E,
+    setField: (on: boolean, silencioso?: boolean) => { if (E.field !== on) setField(on); if (silencioso) $('#toast').classList.remove('on'); },
+    select, setTab,
+  };
+}
+
 async function boot() {
   try { E.field = localStorage.getItem('pavecad-field') === '1'; } catch { /* sem storage */ }
   if (E.field) { document.documentElement.setAttribute('data-contrast', 'field'); $('#btnField').setAttribute('aria-pressed', 'true'); }
@@ -107,6 +116,7 @@ async function boot() {
   await initRevisao();
   initUnifilar();
   initConfig();
+  observarHud();
   renderAll();
   initMap(() => {
     resolveProps();
