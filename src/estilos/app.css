@@ -398,7 +398,19 @@ textarea:focus{box-shadow:inset 0 0 0 2px var(--accent)}
 .unico .legend .legtog{min-height:44px;padding:0 10px}
 .unico .legend .legtog.sm{width:44px;padding:0}
 
-/* Painel direito ancorado embaixo, a 8 px do topo do unifilar. Aberto, ocupa a altura disponível; recolhido, vira só o cabeçalho
-   (abas e km), na mesma base, e abre para cima. Nunca flutua no meio da tela. */
-.unico .inspector,.unico .inspector.collapsed{bottom:calc(var(--uni-h) + 12px + 8px)}
-.unico .inspector.collapsed{top:auto}
+/* Painel direito ancorado embaixo, acima do unifilar. A base vem da altura real do unifilar (--uni-alt, medida por ResizeObserver em
+   layout.ts), com 12 px de folga, e o painel cresce para cima até logo abaixo da barra superior (max-height). Recolhido, vira só o
+   cabeçalho (abas e km) na mesma base e abre para cima. Nada do painel fica no topo. */
+.unico .inspector,.unico .inspector.collapsed{top:auto;right:var(--gr);bottom:calc(var(--uni-alt,190px) + 12px + 12px);height:auto}
+.unico .inspector{max-height:calc(100% - var(--hudm-h,96px) - 24px - var(--uni-alt,190px) - 24px)}
+.unico .inspector.collapsed{max-height:none}
+/* Menos de 900 px (retrato ou janela estreita): folha inferior em largura total acima do unifilar. A barra lateral, a legenda e a gaveta
+   sobem junto, para ficar acima da folha, e a folha respeita a altura da barra lateral e do topo. */
+@media (max-width:899px){
+  .unico .inspector,.unico .inspector.collapsed{left:var(--g);width:auto}
+  .unico .inspector{max-height:calc(100% - var(--hud-b,170px) - 24px - var(--tools-alt,200px) - 12px - var(--uni-alt,190px) - 24px - 12px)}
+  .unico .inspector.collapsed{max-height:none}
+  .unico .tools{bottom:calc(var(--uni-alt,190px) + 24px + var(--painel-alt,0px) + 12px)}
+  .unico .dock{right:var(--gr);bottom:calc(var(--uni-alt,190px) + 24px + var(--painel-alt,0px) + 12px)}
+  .unico .drawer{bottom:calc(var(--uni-alt,190px) + 24px + var(--painel-alt,0px) + 12px + var(--dock-h,0px) + 8px)}
+}
