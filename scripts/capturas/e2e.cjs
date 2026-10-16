@@ -63,6 +63,38 @@ const TESTES = {
       assert.ok(r.max <= 0, `há rolagem em ${r.piores.join('; ')} (altura útil ${r.altura}px, ${r.n} casos)`);
     }],
   ],
+  g12: [
+    ['configurações: fundo do app (não preto puro), 960 px centralizado, margem de 16 px e cabeçalho com folga', '1366x768', async (pg) => {
+      await pg.emulateMedia({ colorScheme: 'dark' });
+      await pg.click('#btnCfg');
+      await pg.waitForTimeout(300);
+      const fundo = await pg.evaluate(() => ({ bg: getComputedStyle(document.querySelector('#cfg')).backgroundColor, mapa: getComputedStyle(document.documentElement).getPropertyValue('--map').trim() }));
+      assert.notEqual(fundo.bg, 'rgb(0, 0, 0)', 'o fundo não pode ser preto puro no tema escuro');
+      assert.equal(fundo.bg, 'rgb(23, 24, 27)', 'usa o token de fundo do app (--map ' + fundo.mapa + ')');
+      const medir = () => pg.evaluate(() => {
+        const vw = innerWidth, r = (s) => { const e = document.querySelector(s), b = e.getBoundingClientRect(), cs = getComputedStyle(e); return { l: b.left + parseFloat(cs.paddingLeft), r: b.right - parseFloat(cs.paddingRight), w: b.width - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) }; };
+        const bt = document.querySelector('#cfgClose').getBoundingClientRect(), tabs = r('#cfgTabs'), wrap = r('#cfgBody'), head = r('.cfg-head-in');
+        return { vw, wrap, head, btnDir: vw - bt.right, tabsL: tabs.l, titulo: document.querySelector('#cfgTitle').getBoundingClientRect().left };
+      });
+      for (const [w, h] of [[1920, 1080], [1366, 768], [1024, 768], [820, 1180], [480, 900]]) {
+        await pg.setViewportSize({ width: w, height: h });
+        await pg.waitForTimeout(150);
+        const m = await medir();
+        assert.ok(m.wrap.w <= 960.5, `${w}px: conteúdo com ${m.wrap.w}px (máximo 960)`);
+        assert.ok(Math.abs(m.wrap.l - (m.vw - m.wrap.r)) <= 1, `${w}px: conteúdo centralizado (${m.wrap.l} / ${m.vw - m.wrap.r})`);
+        assert.ok(m.wrap.l >= 16 - 0.5, `${w}px: margem esquerda do conteúdo ${m.wrap.l}`);
+        assert.ok(m.vw - m.wrap.r >= 16 - 0.5, `${w}px: margem direita do conteúdo ${m.vw - m.wrap.r}`);
+        assert.ok(m.btnDir >= 16 - 0.5, `${w}px: o botão do cabeçalho encosta na borda direita (folga ${m.btnDir}px)`);
+        assert.ok(m.titulo >= 16 - 0.5, `${w}px: o título encosta na borda esquerda (${m.titulo}px)`);
+        assert.ok(m.head.w <= 960.5, `${w}px: cabeçalho com ${m.head.w}px`);
+        assert.ok(Math.abs(m.head.l - m.wrap.l) <= 1, `${w}px: cabeçalho alinhado ao conteúdo`);
+      }
+      // claro e campo também usam o fundo do app
+      await pg.emulateMedia({ colorScheme: 'light' });
+      const claro = await pg.evaluate(() => [getComputedStyle(document.querySelector('#cfg')).backgroundColor, getComputedStyle(document.documentElement).getPropertyValue('--map').trim()]);
+      assert.equal(claro[0], 'rgb(236, 238, 242)');
+    }],
+  ],
   g11: [
     ['Baixar CSV: nome, BOM UTF-8, ";" e vírgula decimal, colunas de coordenadas', '1366x768', async (pg) => {
       await criarProposta(pg, 'FSE', 'obs; com ponto e vírgula');

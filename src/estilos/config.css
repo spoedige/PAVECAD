@@ -1,10 +1,11 @@
 /* Tela de configurações: separada do mapa, em tela cheia. Usa os tokens de app.css. */
-.cfg{position:fixed;inset:0;z-index:30;background:var(--bg);color:var(--fg);display:flex;flex-direction:column;font-size:var(--fs)}
+.cfg{position:fixed;inset:0;z-index:30;background:var(--map);color:var(--fg);display:flex;flex-direction:column;font-size:var(--fs)}
 .cfg[hidden]{display:none}
-.cfg-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px max(16px,env(safe-area-inset-right,0px)) 12px max(16px,env(safe-area-inset-left,0px));border-bottom:var(--bw) solid var(--hair);background:var(--solid)}
+.cfg-head{border-bottom:var(--bw) solid var(--hair);background:var(--solid)}
+.cfg-head-in{display:flex;align-items:center;gap:12px;flex-wrap:wrap;box-sizing:border-box;width:100%;max-width:960px;margin:0 auto;padding:12px max(16px,env(safe-area-inset-right,0px)) 12px max(16px,env(safe-area-inset-left,0px))}
 .cfg-head h1{font-size:17px;margin:0;font-weight:700;letter-spacing:-.01em;margin-right:auto}
-.cfg-body{flex:1;overflow:auto;padding:18px max(16px,env(safe-area-inset-right,0px)) 40px max(16px,env(safe-area-inset-left,0px))}
-.cfg-wrap{max-width:1040px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+.cfg-body{flex:1;overflow:auto;padding:18px 0 40px}
+.cfg-wrap{box-sizing:border-box;width:100%;max-width:960px;margin:0 auto;padding:0 max(16px,env(safe-area-inset-right,0px)) 0 max(16px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:18px}
 .cfg-warn{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:rgba(255,149,0,.16);border:var(--bw) solid rgba(255,149,0,.5);border-radius:12px;padding:10px 12px}
 .cfg-warn b{font-weight:600}
 .cfg-warn[hidden]{display:none}
