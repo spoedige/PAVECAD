@@ -259,38 +259,65 @@ const TESTES = {
     }],
   ],
   t05: [
-    ['painel ancorado embaixo: aberto e recolhido ficam a 8 px do topo do unifilar e abrem para cima', TODOS, async (pg) => {
+    ['painel ancorado embaixo: a 12 px do topo do unifilar, aberto ou recolhido, e a altura vem da medida real (--uni-alt)', TODOS, async (pg) => {
       await irParaKm(pg, '170+500'); await aba(pg, 'seg');
       const m = () => pg.evaluate(() => {
         const i = document.querySelector('#inspector').getBoundingClientRect(), u = document.querySelector('#unicard').getBoundingClientRect();
-        return { i: { t: i.top, b: i.bottom, h: i.height }, uniTopo: u.top, vh: innerHeight, colapsado: document.querySelector('#inspector').classList.contains('collapsed') };
+        return { i: { t: i.top, b: i.bottom, h: i.height, l: i.left, r: i.right }, uniTopo: u.top, uniH: u.height, uniAlt: parseFloat(document.documentElement.style.getPropertyValue('--uni-alt')), vh: innerHeight, vw: innerWidth };
       });
       const a = await m();
-      assert.ok(Math.abs(a.uniTopo - a.i.b - 8) <= 1.5, `aberto: base do painel a ${a.uniTopo - a.i.b}px do unifilar`);
+      assert.ok(Math.abs(a.uniTopo - a.i.b - 12) <= 1.5, `aberto: base do painel a ${a.uniTopo - a.i.b}px do unifilar`);
+      assert.ok(Math.abs(a.uniAlt - a.uniH) <= 1, `--uni-alt (${a.uniAlt}) deve ser a altura real do unifilar (${a.uniH})`);
+      assert.ok(Math.abs(a.vw - a.i.r - 16) <= 1, 'right: 16px, medido ' + (a.vw - a.i.r));
       await pg.click('#collapse'); await pg.waitForTimeout(300);
       const r = await m();
-      assert.equal(r.colapsado, true);
-      assert.ok(Math.abs(r.uniTopo - r.i.b - 8) <= 1.5, `recolhido: a faixa deve encostar no unifilar (${r.uniTopo - r.i.b}px)`);
-      assert.ok(r.i.t > r.vh / 2, `a faixa não pode flutuar no meio ou no topo (topo em ${r.i.t} de ${r.vh})`);
+      assert.ok(Math.abs(r.uniTopo - r.i.b - 12) <= 1.5, `recolhido: a faixa encosta no unifilar (${r.uniTopo - r.i.b}px)`);
+      assert.ok(r.i.t > r.vh / 2, `a faixa não flutua no meio nem no topo (topo em ${r.i.t} de ${r.vh})`);
       assert.ok(r.i.h < 140, 'faixa baixa: ' + r.i.h);
       assert.ok(Math.abs(r.i.b - a.i.b) <= 1.5, 'a base não muda ao recolher: abre para cima');
       assert.ok(a.i.h > r.i.h + 100, 'aberto cresce para cima: ' + a.i.h + ' x ' + r.i.h);
-      // com o unifilar recolhido a faixa desce junto e continua encostada
-      await pg.click('#uniToggle'); await pg.waitForTimeout(400);
+      // o unifilar recolhe e expande: o painel acompanha pela variável, sem valor fixo
+      await pg.click('#uniToggle'); await pg.waitForTimeout(500);
       const u = await m();
-      assert.ok(Math.abs(u.uniTopo - u.i.b - 8) <= 1.5, `com o unifilar recolhido (${u.uniTopo - u.i.b}px)`);
-      assert.ok(u.i.t > u.vh / 2);
+      assert.ok(u.uniH < a.uniH - 50, 'o unifilar recolheu');
+      assert.ok(Math.abs(u.uniAlt - u.uniH) <= 1, `--uni-alt segue o unifilar recolhido (${u.uniAlt} x ${u.uniH})`);
+      assert.ok(Math.abs(u.uniTopo - u.i.b - 12) <= 1.5, `com o unifilar recolhido o painel desce junto (${u.uniTopo - u.i.b}px)`);
       await pg.click('#collapse'); await pg.waitForTimeout(300);
+      await pg.click('#uniToggle'); await pg.waitForTimeout(500);
       const f = await m();
-      assert.ok(Math.abs(f.uniTopo - f.i.b - 8) <= 1.5, 'reaberto continua ancorado');
+      assert.ok(Math.abs(f.uniTopo - f.i.b - 12) <= 1.5, 'unifilar reaberto: o painel sobe junto (' + (f.uniTopo - f.i.b) + 'px)');
+      assert.ok(Math.abs(f.uniAlt - f.uniH) <= 1);
     }],
-    ['painel ancorado: o topo do painel aberto fica abaixo do cluster do canto superior direito e nada se sobrepõe', TODOS, async (pg) => {
-      await irParaKm(pg, '170+500'); await aba(pg, 'seg');
+    ['painel não está no topo: cresce para cima com max-height logo abaixo da barra superior', TODOS, async (pg) => {
+      // sem segmento selecionado a aba Segmento é curta: um painel preso ao topo esticaria até o unifilar; o ancorado fica baixo
+      await aba(pg, 'seg');
+      const curto = await pg.evaluate(() => { const i = document.querySelector('#inspector').getBoundingClientRect(), u = document.querySelector('#unicard').getBoundingClientRect(); return { t: i.top, h: i.height, b: i.bottom, uni: u.top, hud: document.querySelector('.hud').getBoundingClientRect().bottom }; });
+      assert.ok(curto.h < 260, 'o painel com conteúdo curto não estica até o topo: ' + curto.h);
+      assert.ok(curto.t > curto.hud + 60, `o topo do painel curto fica longe da barra superior (topo ${curto.t}, barra até ${curto.hud})`);
+      assert.ok(Math.abs(curto.uni - curto.b - 12) <= 1.5, 'e a base continua a 12 px do unifilar');
+      await irParaKm(pg, '170+500'); await aba(pg, 'resumo');
       const r = await pg.evaluate(() => {
-        const i = document.querySelector('#inspector').getBoundingClientRect(), t = document.querySelector('.topbar > .topright').getBoundingClientRect();
-        return { gap: i.top - t.bottom };
+        const i = document.querySelector('#inspector').getBoundingClientRect(), hud = document.querySelector('.hud').getBoundingClientRect(), t = document.querySelector('.topright'), tr = t.getBoundingClientRect();
+        const lado = innerWidth >= 900;
+        const topo = lado ? tr.bottom : hud.bottom;
+        return { gap: i.top - topo, lado, max: getComputedStyle(document.querySelector('#inspector')).maxHeight, h: i.height };
       });
-      assert.ok(r.gap >= 8, 'o painel aberto não cobre Planilhas e engrenagem: ' + r.gap);
+      assert.ok(r.gap >= 8, 'o painel mais alto (Resumo longo) para logo abaixo da barra superior, sem cobri-la: ' + r.gap);
+      assert.notEqual(r.max, 'none');
+    }],
+    ['menos de 900 px: folha inferior em largura total acima do unifilar, sem cobrir a barra lateral nem a legenda', ['tablet-v-820x1180'], async (pg) => {
+      await irParaKm(pg, '170+500'); await aba(pg, 'resumo');
+      const m = await pg.evaluate(() => {
+        const R = (s) => document.querySelector(s).getBoundingClientRect(), i = R('#inspector');
+        return { l: i.left, r: innerWidth - i.right, t: i.top, tools: R('#tools').bottom, toolsTop: R('#tools').top, leg: R('#legend').bottom, hud: R('.hud').bottom, dockL: R('#legend').left };
+      });
+      assert.ok(Math.abs(m.l - 16) <= 1 && Math.abs(m.r - 16) <= 1, `largura total (esq ${m.l}, dir ${m.r})`);
+      assert.ok(m.tools <= m.t - 8, `a barra lateral fica acima da folha (${m.tools} x ${m.t})`);
+      assert.ok(m.leg <= m.t - 8, `a legenda fica acima da folha (${m.leg} x ${m.t})`);
+      assert.ok(m.toolsTop >= m.hud + 8, `a barra lateral não sobe até o topo (${m.toolsTop} x ${m.hud})`);
+      await pg.click('#collapse'); await pg.waitForTimeout(400);
+      const c = await pg.evaluate(() => { const i = document.querySelector('#inspector').getBoundingClientRect(), t = document.querySelector('#tools').getBoundingClientRect(); return { tb: t.bottom, it: i.top }; });
+      assert.ok(c.tb <= c.it - 8, 'recolhida, a barra lateral desce junto e continua acima da faixa');
     }],
   ],
   g03: [
@@ -416,7 +443,11 @@ const TESTES = {
         assert.equal(m.sobreInsp, false, `${w}px: a barra cobre o painel direito`);
         assert.ok(m.bar.l >= 16 - 0.5, `${w}px: margem esquerda ${m.bar.l}`);
         assert.ok(m.vw - m.bar.r >= 16 - 0.5, `${w}px: margem direita ${m.vw - m.bar.r}`);
-        if (w > 600) {
+        if (w > 600 && w < 900) {
+          // folha inferior em largura total: a barra de propor sobe para ficar acima dela
+          assert.ok(m.uni && m.insp && m.bar.b <= m.insp.t - 4, `${w}px: a barra deve ficar acima da folha inferior (barra ${m.bar.b} / folha ${m.insp && m.insp.t})`);
+          if (m.leg) assert.ok(m.leg.b <= m.bar.t, `${w}px: a legenda sobe para não ficar sob a barra`);
+        } else if (w >= 900) {
           assert.ok(m.uni && m.bar.b <= m.uni.t, `${w}px: a barra deve ficar acima do unifilar (barra ${m.bar.b} / unifilar ${m.uni && m.uni.t})`);
           assert.ok(m.uni.t - m.bar.b <= 40, `${w}px: a barra deve ficar logo acima do unifilar (${m.uni.t - m.bar.b}px)`);
           assert.ok(m.insp && m.bar.r <= m.insp.l - 8, `${w}px: a barra deve terminar antes do painel direito`);

@@ -43,6 +43,16 @@ function aplicar() {
   window.dispatchEvent(new Event('resize'));
 }
 
+/** Publica uma medida de um elemento numa variável CSS da raiz e a mantém atualizada (ResizeObserver mais resize da janela). */
+function publicar(seletor: string, nome: string, medida: (r: DOMRect) => number) {
+  const el = document.querySelector<HTMLElement>(seletor);
+  if (!el) return;
+  const set = () => document.documentElement.style.setProperty(nome, (el.checkVisibility() ? Math.round(medida(el.getBoundingClientRect())) : 0) + 'px');
+  if (window.ResizeObserver) new ResizeObserver(set).observe(el);
+  window.addEventListener('resize', set);
+  set();
+}
+
 export function initLayout() {
   for (const m of MOVEIS) {
     const el = document.getElementById(m.id);
@@ -55,6 +65,11 @@ export function initLayout() {
   initPainel();
   mq.addEventListener('change', aplicar);
   aplicar();
+  // medidas reais publicadas como variáveis CSS (sem valor fixo): o painel ancora no unifilar e a folha inferior desvia da barra lateral
+  publicar('#unicard', '--uni-alt', (r) => r.height);
+  publicar('#inspector', '--painel-alt', (r) => r.height);
+  publicar('#tools', '--tools-alt', (r) => r.height);
+  publicar('.hud', '--hud-b', (r) => r.bottom);
   // a gaveta sobe junto com a altura do que está no dock (legenda ou barra de propor)
   const dock = document.querySelector<HTMLElement>('.dock');
   if (dock && window.ResizeObserver) {
