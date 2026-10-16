@@ -4,13 +4,32 @@ import type { GeoJSONSource, MapMouseEvent, PointLike } from 'maplibre-gl';
 import { edgesOf, offsetLL } from '../geometry/build';
 import { IND, Q5, Q5F, type IndKey } from '../dominio/indicadores';
 import { TR, TR_ORDER, trColor, trLabel } from '../dominio/solucoes';
+import type { Nota } from './estado';
 import { kmLabel } from '../formats/km';
-import { E, getP, projName, visibleProjects, type AppProj } from './estado';
+import { E, H, NOTE_CATS, getP, projName, visibleProjects, type AppProj, type FocoPred } from './estado';
 import { $, cssv, esc, fmt, toast } from './ui';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Expr = any;
 const EMPTY: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] };
+
+/** Chave do MapTiler vem do ambiente (VITE_MAPTILER_KEY) e nunca do repositório.
+ *  Sem chave, a base cai no OpenStreetMap (ruas) e na Esri (satélite). */
+const MT_KEY: string = (import.meta.env.VITE_MAPTILER_KEY ?? '').trim();
+export const temMapTiler = () => !!MT_KEY;
+
+function baseSources(): Record<string, maplibregl.RasterSourceSpecification> {
+  const src: Record<string, maplibregl.RasterSourceSpecification> = {
+    osm: { type: 'raster', tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'], tileSize: 256, maxzoom: 19, attribution: '© OpenStreetMap' },
+    esri: { type: 'raster', tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'], tileSize: 256, maxzoom: 19, attribution: 'Esri' },
+  };
+  if (MT_KEY) {
+    const attr = '© MapTiler © OpenStreetMap contributors';
+    src['mt-ruas'] = { type: 'raster', tiles: [`https://api.maptiler.com/maps/streets-v2/256/{z}/{x}/{y}.png?key=${MT_KEY}`], tileSize: 256, maxzoom: 21, attribution: attr };
+    src['mt-sat'] = { type: 'raster', tiles: [`https://api.maptiler.com/tiles/satellite-v2/{z}/{x}/{y}.jpg?key=${MT_KEY}`], tileSize: 256, maxzoom: 20, attribution: attr };
+  }
+  return src;
+}
 
 let map: maplibregl.Map;
 export const getMap = () => map;
@@ -26,14 +45,15 @@ export function initMap(onReady: () => void) {
     container: 'map',
     style: {
       version: 8,
-      sources: {
-        osm: { type: 'raster', tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'], tileSize: 256, maxzoom: 19, attribution: '© OpenStreetMap' },
-        esri: { type: 'raster', tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'], tileSize: 256, maxzoom: 19, attribution: 'Esri' },
-      },
+      sources: baseSources(),
       layers: [
         { id: 'bg', type: 'background', paint: { 'background-color': cssv('--map') } },
         { id: 'osm', type: 'raster', source: 'osm', layout: { visibility: 'none' } },
         { id: 'esri', type: 'raster', source: 'esri', layout: { visibility: 'none' } },
+        ...(MT_KEY ? [
+          { id: 'mt-ruas', type: 'raster' as const, source: 'mt-ruas', layout: { visibility: 'none' as const } },
+          { id: 'mt-sat', type: 'raster' as const, source: 'mt-sat', layout: { visibility: 'none' as const } },
+        ] : []),
       ],
     },
     center: [-48.1, -18.4], zoom: 6, maxZoom: 21, attributionControl: { compact: true },
@@ -51,6 +71,24 @@ export function initMap(onReady: () => void) {
     map.addLayer({ id: 'sel-l', type: 'line', source: 'sel', filter: ['==', ['get', 'kind'], 'line'], paint: { 'line-color': '#07f', 'line-width': 5, 'line-opacity': ['interpolate', ['linear'], ['zoom'], 15.6, 1, 16.6, 0], 'line-offset': offs } });
     map.addSource('ticks', { type: 'geojson', data: EMPTY });
     map.addLayer({ id: 'ticks', type: 'line', source: 'ticks', paint: { 'line-color': '#000', 'line-width': 1.2, 'line-opacity': 0.7 } }, 'sel-halo');
+    const catc: Expr = ['match', ['get', 'cat'], ...Object.entries(NOTE_CATS).flatMap(([k, v]) => [k, v.c]), '#5e5ce6'];
+    map.addSource('notes', { type: 'geojson', data: EMPTY });
+    map.addSource('draft', { type: 'geojson', data: EMPTY });
+    map.addLayer({ id: 'notes-fill', type: 'fill', source: 'notes', filter: ['==', ['geometry-type'], 'Polygon'], paint: { 'fill-color': catc, 'fill-opacity': 0.22 } });
+    map.addLayer({ id: 'notes-line', type: 'line', source: 'notes', filter: ['!=', ['geometry-type'], 'Point'], paint: { 'line-color': catc, 'line-width': 3.5 } });
+    map.addLayer({ id: 'notes-pt', type: 'circle', source: 'notes', filter: ['==', ['geometry-type'], 'Point'], paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 8, 6, 18, 10], 'circle-color': catc, 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 2.5 } });
+    map.addSource('props', { type: 'geojson', data: EMPTY });
+    map.addSource('psel', { type: 'geojson', data: EMPTY });
+    map.addLayer({ id: 'props-fill', type: 'fill', source: 'props', minzoom: 11, paint: { 'fill-color': '#888', 'fill-opacity': 0.94 } }, 'notes-fill');
+    map.addLayer({ id: 'props-line', type: 'line', source: 'props', minzoom: 11, paint: { 'line-color': '#000', 'line-width': 1.4, 'line-dasharray': [2, 1.2] } }, 'notes-fill');
+    map.addLayer({ id: 'psel-fill', type: 'fill', source: 'psel', paint: { 'fill-color': '#07f', 'fill-opacity': 0.4 } }, 'notes-fill');
+    map.addLayer({ id: 'psel-line', type: 'line', source: 'psel', paint: { 'line-color': '#07f', 'line-width': 2.4 } }, 'notes-fill');
+    map.addLayer({ id: 'draft-fill', type: 'fill', source: 'draft', filter: ['==', ['geometry-type'], 'Polygon'], paint: { 'fill-color': '#0a84ff', 'fill-opacity': 0.18 } });
+    map.addLayer({ id: 'draft-line', type: 'line', source: 'draft', filter: ['!=', ['geometry-type'], 'Point'], paint: { 'line-color': '#0a84ff', 'line-width': 3, 'line-dasharray': [2, 1.5] } });
+    map.addLayer({ id: 'draft-pt', type: 'circle', source: 'draft', filter: ['==', ['geometry-type'], 'Point'], paint: { 'circle-radius': 5, 'circle-color': '#ffffff', 'circle-stroke-color': '#0a84ff', 'circle-stroke-width': 2.5 } });
+    map.addSource('gps', { type: 'geojson', data: EMPTY });
+    map.addLayer({ id: 'gps-acc', type: 'fill', source: 'gps', filter: ['==', ['geometry-type'], 'Polygon'], paint: { 'fill-color': '#0a84ff', 'fill-opacity': 0.15 } });
+    map.addLayer({ id: 'gps-pt', type: 'circle', source: 'gps', filter: ['==', ['geometry-type'], 'Point'], paint: { 'circle-radius': 8, 'circle-color': '#0a84ff', 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 3 } });
     E.mapReady = true;
     E.P.forEach(addProjectToMap);
     applyPaint();
@@ -60,10 +98,11 @@ export function initMap(onReady: () => void) {
   map.on('click', onMapClick);
   const tip = $('#tip');
   map.on('mousemove', (e) => {
+    if (E.tool === 'pin') { map.getCanvas().style.cursor = 'crosshair'; return; }
     const h = hitAt(e.point);
-    map.getCanvas().style.cursor = h ? 'pointer' : '';
+    map.getCanvas().style.cursor = E.tool === 'prop' ? 'crosshair' : h ? 'pointer' : '';
     if (!h) { tip.style.display = 'none'; return; }
-    tip.innerHTML = tipHtml(h);
+    tip.innerHTML = 'note' in h ? `<b>${esc(NOTE_CATS[h.note.cat].l)}</b><br>${esc((h.note.text || 'Sem texto').slice(0, 80))}` : tipHtml(h);
     tip.style.display = 'block';
     const w = $('.stage').getBoundingClientRect();
     let x = e.originalEvent.clientX - w.left + 14, y = e.originalEvent.clientY - w.top + 14;
@@ -83,6 +122,7 @@ export function initMap(onReady: () => void) {
   onZ();
   map.on('rotate', () => { $('#compass').style.transform = `rotate(${-map.getBearing()}deg)`; });
   map.on('moveend', updateStakes);
+  map.on('move', () => H.onView());
   new MutationObserver(() => setTimeout(applyPaint, 20)).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => setTimeout(applyPaint, 40));
 }
@@ -90,8 +130,9 @@ export function initMap(onReady: () => void) {
 export function setBase(b: typeof E.base) {
   E.base = b;
   if (!E.mapReady) return;
-  map.setLayoutProperty('osm', 'visibility', b === 'osm' ? 'visible' : 'none');
-  map.setLayoutProperty('esri', 'visibility', b === 'esri' ? 'visible' : 'none');
+  const ruas = MT_KEY ? 'mt-ruas' : 'osm', sat = MT_KEY ? 'mt-sat' : 'esri';
+  const on = b === 'osm' ? ruas : b === 'esri' ? sat : null;
+  for (const l of ['osm', 'esri', 'mt-ruas', 'mt-sat']) if (map.getLayer(l)) map.setLayoutProperty(l, 'visibility', l === on ? 'visible' : 'none');
 }
 
 /* ---------------------------------------------------------------- */
@@ -197,9 +238,12 @@ function dimCond(): Expr | null {
 export function paintProject(p: AppProj) {
   const id = p.id, ce = colorExpr(), dc = dimCond(), f = E.field;
   let op: Expr = E.mode === 'sol' ? ['case', ['<', ['get', 'pct'], 100], f ? 0.72 : 0.62, f ? 1 : 0.94] : f ? 1 : 0.94;
+  const hit: Expr = ['boolean', ['feature-state', 'hit'], false];
   if (dc) op = ['case', dc, 0.07, op];
+  if (E.focus) op = ['case', hit, op, 0.07];
   let lop: Expr = 1;
   if (dc) lop = ['case', dc, 0.1, 1];
+  if (E.focus) lop = ['case', hit, lop, 0.1];
   const S = (l: string, k: string, v: Expr) => { if (map.getLayer(l)) map.setPaintProperty(l, k, v); };
   S('poly-' + id, 'fill-color', ce);
   S('poly-' + id, 'fill-opacity', ['interpolate', ['linear'], ['zoom'], 15.2, 0, 16.6, op]);
@@ -215,13 +259,25 @@ export function paintProject(p: AppProj) {
   }
 }
 
+export function propColorExpr(): Expr {
+  const m: Expr[] = ['match', ['get', 'to']];
+  for (const k of Object.keys(TR)) m.push(k, trColor(k, E.field, cssv('--none')));
+  m.push(cssv('--none'));
+  return m;
+}
+
 export function applyPaint() {
   if (!E.mapReady) return;
   E.P.forEach(paintProject);
   map.setPaintProperty('bg', 'background-color', cssv('--map'));
   map.setPaintProperty('ticks', 'line-color', cssv('--fg'));
   for (const l of ['sel', 'sel-l', 'sel-halo']) map.setPaintProperty(l, 'line-color', cssv('--focus'));
+  map.setPaintProperty('props-fill', 'fill-color', propColorExpr());
+  map.setPaintProperty('props-line', 'line-color', cssv('--fg'));
+  map.setPaintProperty('psel-fill', 'fill-color', cssv('--accent'));
+  map.setPaintProperty('psel-line', 'line-color', cssv('--accent'));
   renderLegend();
+  H.onView();
 }
 
 /* ---------------------------------------------------------------- */
@@ -268,15 +324,23 @@ export function renderLegend() {
 /* ---------------------------------------------------------------- */
 /* Feição sob o cursor, dica e seleção                               */
 /* ---------------------------------------------------------------- */
-type Hit =
+export type Hit =
+  | { note: Nota }
   | { drain: { p: AppProj; t: string; r0: number; r1: number } }
   | { p: AppProj; row: number; lane: number };
 
-function hitAt(pt: PointLike & { x: number; y: number }): Hit | null {
+export function hitAt(pt: PointLike & { x: number; y: number }): Hit | null {
   const b: [PointLike, PointLike] = [[pt.x - 6, pt.y - 6], [pt.x + 6, pt.y + 6]];
   const vis = visibleProjects();
   const has = (l: string) => map.getLayer(l);
-  if (E.layers.drain) {
+  if (E.layers.notes) {
+    const n = map.queryRenderedFeatures(b, { layers: ['notes-pt', 'notes-line', 'notes-fill'].filter(has) });
+    if (n.length) {
+      const nt = E.notes.find((x) => x.id === n[0].properties.id) ?? (E.editing?.id === n[0].properties.id ? E.editing : undefined);
+      if (nt) return { note: nt };
+    }
+  }
+  if (E.layers.drain && E.tool !== 'prop') {
     const dl = vis.flatMap((p) => ['drainR-' + p.id, 'drainP-' + p.id]).filter(has);
     const d = dl.length ? map.queryRenderedFeatures(b, { layers: dl }) : [];
     if (d.length) {
@@ -301,7 +365,7 @@ function hitAt(pt: PointLike & { x: number; y: number }): Hit | null {
   return { p, row, lane: +pr.lane };
 }
 
-function tipHtml(h: Hit): string {
+function tipHtml(h: Exclude<Hit, { note: Nota }>): string {
   const multi = E.P.length > 1;
   if ('drain' in h) {
     const { p, t, r0, r1 } = h.drain;
@@ -319,7 +383,7 @@ function tipHtml(h: Hit): string {
   return `<b>km ${p.kmLab[row]}</b> <span>· ${lane ? 'Faixa ' + lane : 'Acostamento'}${multi ? ' · ' + esc(projName(p)) : ''}</span><br>${esc(l2)}`;
 }
 
-export function select(pid: string, row: number, lane: number, opt: { pan?: boolean } = {}) {
+export function select(pid: string, row: number, lane: number, opt: { pan?: boolean; tab?: boolean } = {}) {
   const p = getP(pid);
   if (!p) return;
   E.sel = { pid, row, lane };
@@ -329,9 +393,10 @@ export function select(pid: string, row: number, lane: number, opt: { pan?: bool
     const r = p.rows[row];
     if (!map.getBounds().contains([r.lon, r.lat])) map.easeTo({ center: [r.lon, r.lat], duration: 500 });
   }
+  H.onSelect(opt);
 }
 
-export function clearSel() { E.sel = null; updateSelLayer(); }
+export function clearSel() { E.sel = null; updateSelLayer(); H.onSelect({}); }
 
 export function updateSelLayer() {
   if (!E.mapReady) return;
@@ -356,20 +421,15 @@ export function stepSel(dr: number, dl: number) {
   let li = (s.lane === 0 ? N : s.lane - 1) + dl;
   li = Math.max(0, Math.min(N2, li));
   select(s.pid, row, li >= N2 ? 0 : li + 1, { pan: true });
-  showSel();
-}
-
-function showSel() {
-  const s = E.sel, p = s && getP(s.pid);
-  if (!s || !p) return;
-  toast(tipHtml({ p, row: s.row, lane: s.lane }).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(), 2400);
 }
 
 function onMapClick(e: MapMouseEvent) {
+  if (H.onClick(e)) return;
   const h = hitAt(e.point);
-  if (!h || 'drain' in h) return;
-  select(h.p.id, h.row, h.lane);
-  showSel();
+  if (!h) return;
+  if ('note' in h) { H.onNoteHit(h.note.id); return; }
+  if ('drain' in h) { select(h.drain.p.id, Math.round((h.drain.r0 + h.drain.r1) / 2), 1, { tab: true }); return; }
+  select(h.p.id, h.row, h.lane, { tab: true });
 }
 
 /* ---------------------------------------------------------------- */
@@ -455,16 +515,20 @@ export function goLabel(text: string) {
     t = parseFloat(text.trim().replace(',', '.'));
     if (isNaN(t)) { toast('Use o formato 59+740 ou 59,74'); return; }
   }
-  let best: { p: AppProj; i: number; d: number } | null = null;
-  for (const p of grupoAtivo()) for (let i = 0; i < p.rows.length; i++) {
-    const d = Math.abs(p.kmNum[i] - t);
-    if (!best || d < best.d) best = { p, i, d };
-  }
-  if (!best || best.d > 0.5) { toast('Esse km está fora dos trechos visíveis'); return; }
+  // Procura primeiro no grupo ativo; se o km não existir lá, nos demais visíveis.
+  const procurar = (lista: AppProj[]) => {
+    let best: { p: AppProj; i: number; d: number } | null = null;
+    for (const p of lista) for (let i = 0; i < p.rows.length; i++) {
+      const d = Math.abs(p.kmNum[i] - t);
+      if (!best || d < best.d) best = { p, i, d };
+    }
+    return best && best.d <= 0.5 ? best : null;
+  };
+  const best = procurar(grupoAtivo()) ?? procurar(visibleProjects());
+  if (!best) { toast('Esse km está fora dos trechos visíveis'); return; }
   const r = best.p.rows[best.i];
   map.flyTo({ center: [r.lon, r.lat], zoom: Math.max(map.getZoom(), 17.2), duration: 900 });
-  select(best.p.id, best.i, 1);
-  showSel();
+  select(best.p.id, best.i, 1, { tab: true });
 }
 
 /** Projetos visíveis do mesmo rodovia/UF ativo, crescente antes de decrescente. */
@@ -474,3 +538,68 @@ export function grupoAtivo(): AppProj[] {
   if (!E.activeGroup || !v.some((p) => p.meta.uf === E.activeGroup)) E.activeGroup = v[0].meta.uf;
   return v.filter((p) => p.meta.uf === E.activeGroup).sort((a, b) => b.meta.travel - a.meta.travel || a.meta.name.localeCompare(b.meta.name));
 }
+
+/* ---------------------------------------------------------------- */
+/* Foco (filtro vindo da Análise) e camadas                          */
+/* ---------------------------------------------------------------- */
+const winStart = (p: AppProj, i: number) => {
+  const s = p.segs[p.segOf[i]];
+  return s.a + Math.floor((i - s.a) / 5) * 5;
+};
+
+function clearFocusStates() {
+  if (!E.mapReady) return;
+  for (const p of E.P) for (const s of ['poly-', 'lines-']) if (map.getSource(s + p.id)) map.removeFeatureState({ source: s + p.id });
+}
+
+export function clearFocus() {
+  if (!E.focus) return;
+  clearFocusStates();
+  E.focus = null;
+  applyPaint();
+}
+
+/** Destaca no mapa só as faixas que atendem ao critério. Devolve false quando nenhuma atende. */
+export function setFocus(label: string, pred: FocoPred): boolean {
+  clearFocusStates();
+  E.focus = { label, n: 0, pred };
+  for (const p of visibleProjects()) {
+    p.rows.forEach((r, i) => {
+      for (let k = 0; k < r.widths.length; k++) {
+        if (!pred(r.lanes[k], p.model[i].tr[k], r, p)) continue;
+        E.focus!.n++;
+        map.setFeatureState({ source: 'poly-' + p.id, id: i * 8 + k + 1 }, { hit: true });
+        map.setFeatureState({ source: 'lines-' + p.id, id: winStart(p, i) * 8 + k + 1 }, { hit: true });
+      }
+    });
+  }
+  if (!E.focus.n) { E.focus = null; toast('Nenhum segmento atende a esse filtro'); return false; }
+  applyPaint();
+  return true;
+}
+
+export function fitFocus() {
+  const f = E.focus;
+  if (!f) return;
+  let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9, any = false;
+  for (const p of visibleProjects()) p.rows.forEach((r, i) => {
+    for (let k = 0; k < r.widths.length; k++) {
+      if (f.pred(r.lanes[k], p.model[i].tr[k], r, p)) {
+        any = true;
+        x0 = Math.min(x0, r.lon); x1 = Math.max(x1, r.lon); y0 = Math.min(y0, r.lat); y1 = Math.max(y1, r.lat);
+        break;
+      }
+    }
+  });
+  if (any) map.fitBounds([[x0, y0], [x1, y1]], { padding: fitPad(), duration: 700, maxZoom: 15 });
+}
+
+export function applyLayers() {
+  E.P.forEach(applyVisibility);
+  updateStakes();
+  $('.stage').classList.toggle('hide-km', !E.layers.km);
+  $('.stage').classList.toggle('hide-poi', !E.layers.poi);
+  if (E.mapReady) for (const l of ['notes-fill', 'notes-line', 'notes-pt']) map.setLayoutProperty(l, 'visibility', E.layers.notes ? 'visible' : 'none');
+}
+
+export function setData(id: string, data: GeoJSON.FeatureCollection) { src(id)?.setData(data); }
