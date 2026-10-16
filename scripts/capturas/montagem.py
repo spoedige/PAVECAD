@@ -6,6 +6,7 @@ from PIL import Image, ImageDraw
 pasta, cen, saida = sys.argv[1:4]
 VPS = ['1366x768', '1920x1080', 'tablet-h-1024x768', 'tablet-v-820x1180']
 TEMAS = ['claro', 'escuro', 'campo']
+VPS = [v for v in VPS if os.path.exists(os.path.join(pasta, f'{cen}_{v}_claro.png'))] or VPS
 CW, CH, PAD, TOP = 560, 340, 10, 22
 W = len(TEMAS) * (CW + PAD) + PAD
 H = len(VPS) * (CH + TOP + PAD) + PAD + 26

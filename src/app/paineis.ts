@@ -198,7 +198,7 @@ export function renderSeg() {
     : '';
   el.innerHTML = `
     <div class="shead"><div><h2 class="h1 num">km ${esc(p.kmLab[s.row])}</h2>
-        <p class="lead num" title="${esc(projName(p))} · hod. ${fmt(r.hod, 3)} km${r.obs || r.platform ? ' · ' + [r.obs, r.platform].filter(Boolean).map(esc).join(' · ') : ''}">${esc(projName(p))} · hod. ${fmt(r.hod, 3)} km${r.obs || r.platform ? ' · ' + [r.obs, r.platform].filter(Boolean).map(esc).join(' · ') : ''}</p></div>
+        <p class="lead num"><span>${esc(projName(p))}</span><span>hod. ${fmt(r.hod, 3)} km${r.obs || r.platform ? ' · ' + [r.obs, r.platform].filter(Boolean).map(esc).join(' · ') : ''}</span></p></div>
       <div class="sbtns"><button class="iconbtn" id="sPrev" aria-label="Segmento anterior" title="Anterior (←)">${IC.prev}</button><button class="iconbtn" id="sNext" aria-label="Próximo segmento" title="Próximo (→)">${IC.next}</button><button class="iconbtn" id="sCopy" aria-label="Copiar localização" title="Copiar localização">${IC.copy}</button><button class="iconbtn" id="sNote" aria-label="Nota neste segmento" title="Nota neste segmento">${IC.pin}</button></div></div>
     <div class="chips" aria-label="Solução">${chips.join('')}</div>
     <div><div class="xs" role="group" aria-label="Seção a partir da coordenada: escolha a faixa" title="Seção a partir da coordenada. Setas para cima e para baixo trocam de faixa">${xs}</div><div class="xsticks num">${xt}</div></div>

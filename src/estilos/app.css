@@ -150,16 +150,18 @@ svg.i{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.8;stro
 .inspector.collapsed{bottom:auto}
 .inspector.collapsed .tabbody{display:none}
 .ihead{display:flex;align-items:center;gap:8px;padding:10px 10px 8px 12px}
-.ihead .seg{flex:1}
-.ihead .seg button{flex:1;padding:6px 3px;font-size:12px}
+.ihead .seg{flex:1;overflow:visible}
+.ihead .seg button{flex:1 1 auto;padding:6px 2px;font-size:12px}
 .iconbtn{width:max(30px,var(--tap));height:max(30px,var(--tap));border-radius:50%;border:0;background:var(--fill);display:grid;place-items:center;color:var(--muted);flex:none;transition:background .15s,color .15s}
 .iconbtn:hover{background:var(--fill2);color:var(--fg)}
 .iconbtn[disabled]{opacity:.35;cursor:default}
 .tabbody{padding:6px 14px 14px;overflow-y:auto;min-height:0;display:flex;flex-direction:column;gap:18px;scrollbar-width:thin}
 .tabbody>*{flex:none}
+/* Fade no rodapé só enquanto há mais conteúdo abaixo (classe .mais, ligada por observarRolagem). No fim da rolagem o último item aparece inteiro. */
+.inspector .tabbody.mais{-webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 28px),transparent);mask-image:linear-gradient(to bottom,#000 calc(100% - 28px),transparent)}
 .tabbody[hidden]{display:none}
 #t-seg{gap:10px;padding-bottom:8px}
-#t-seg .lead{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#t-seg .lead span{display:block;overflow-wrap:anywhere}
 #t-seg .h1{font-size:22px}
 #t-seg .xsticks{height:14px}
 .kv{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;margin-top:8px}

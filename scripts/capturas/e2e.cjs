@@ -9,6 +9,41 @@ const vp = (nome) => VPS.find((v) => v.nome === nome);
 const estado = (pg, expr) => pg.evaluate(`(${expr})(window.__pavecad.E)`);
 
 const TESTES = {
+  t01: [
+    ['abas do painel inteiras e subtítulo em duas linhas, nos dois tablets', 'tablet-h-1024x768', async (pg, { ctx }) => {
+      await irParaKm(pg, '170+500'); await aba(pg, 'seg');
+      for (const [w, h] of [[1024, 768], [820, 1180]]) {
+        await pg.setViewportSize({ width: w, height: h }); await pg.waitForTimeout(500);
+        const m = await pg.evaluate(() => {
+          const tabs = document.querySelector('#tabs'), tr = tabs.getBoundingClientRect();
+          const fora = [...tabs.querySelectorAll('button')].filter((b) => { const r = b.getBoundingClientRect(); return r.left < tr.left - 1 || r.right > tr.right + 1 || b.scrollWidth > b.clientWidth + 1; }).map((b) => b.textContent);
+          const spans = [...document.querySelectorAll('#t-seg .lead span')];
+          return { fora, sobra: tabs.scrollWidth - tabs.clientWidth, linhas: spans.length, cortado: spans.filter((x) => x.scrollWidth > x.clientWidth + 1).map((x) => x.textContent), txt: spans.map((x) => x.textContent) };
+        });
+        assert.deepEqual(m.fora, [], `${w}: abas cortadas`);
+        assert.ok(m.sobra <= 1, `${w}: as abas rolam na horizontal (+${m.sobra}px)`);
+        assert.equal(m.linhas, 2, 'o subtítulo deve ter duas linhas');
+        assert.deepEqual(m.cortado, [], `${w}: subtítulo cortado`);
+        assert.match(m.txt[1], /^hod\. /);
+      }
+    }],
+    ['gradiente de rolagem só enquanto há mais conteúdo; o último cartão fica inteiro', 'tablet-h-1024x768', async (pg) => {
+      await irParaKm(pg, '170+500'); await aba(pg, 'seg');
+      await pg.click('#segDet summary'); await pg.waitForTimeout(300);
+      const r = await pg.evaluate(async () => {
+        const b = document.querySelector('#t-seg'), det = document.querySelector('#segDet');
+        const antes = { rola: b.scrollHeight > b.clientHeight + 2, mais: b.classList.contains('mais') };
+        b.scrollTop = b.scrollHeight; await new Promise((r) => setTimeout(r, 200));
+        const bb = b.getBoundingClientRect(), dd = det.getBoundingClientRect();
+        return { antes, fimMais: b.classList.contains('mais'), folga: Math.round((bb.bottom - dd.bottom) * 10) / 10, fim: b.scrollTop + b.clientHeight >= b.scrollHeight - 1 };
+      });
+      assert.equal(r.antes.rola, true, 'com os detalhes abertos o painel deve rolar neste tamanho');
+      assert.equal(r.antes.mais, true, 'o gradiente deve aparecer no topo da rolagem');
+      assert.equal(r.fim, true);
+      assert.equal(r.fimMais, false, 'no fim da rolagem o gradiente deve sumir');
+      assert.ok(r.folga >= 0, 'o cartão Detalhes e tratamentos ficou cortado no fim: ' + r.folga);
+    }],
+  ],
   g03: [
     ['a seção é o seletor de faixa (clique, aria-pressed, teclado)', '1366x768', async (pg) => {
       await irParaKm(pg, '170+500'); await aba(pg, 'seg');

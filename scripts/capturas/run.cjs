@@ -20,7 +20,7 @@ const { RAIZ, VPS, TEMAS, abrir, tema, lancar } = require('./lib.cjs');
   for (const cen of cenarios) {
     const fn = CENARIOS[cen];
     if (!fn) throw new Error('cenário desconhecido: ' + cen);
-    for (const vp of VPS) {
+    for (const vp of VPS.filter((v) => !process.env.PAVECAD_VPS || process.env.PAVECAD_VPS.split(',').includes(v.nome))) {
       const { ctx, pg, log } = await abrir(browser, vp);
       await fn(pg, { vp, log });
       await pg.waitForTimeout(700);
