@@ -50,6 +50,7 @@
           <button data-b="esri" aria-pressed="false">Satélite</button>
         </div>
         <input id="file" type="file" accept=".xlsx,.xlsm" multiple hidden>
+        <button class="iconbtn" id="btnAjuda" type="button" aria-label="Atalhos de teclado" aria-haspopup="dialog" title="Atalhos de teclado (?)" style="background:var(--glass);font-weight:700;font-size:15px">?</button>
         <button class="iconbtn" id="btnCfg" aria-label="Configurações" title="Configurações (,)" style="position:relative;background:var(--glass)"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span class="dot" id="cfgDot" style="display:none;position:absolute;top:4px;right:4px;width:9px;height:9px;border-radius:50%;background:#ff9500"></span></button>
         <button class="pillbtn" id="btnExample" type="button" hidden title="Só em desenvolvimento: lê referencia/dados">Carregar exemplo</button>
         <button class="pillbtn primary" id="btnFile" type="button"><svg class="i" viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></svg>Planilhas</button>
@@ -88,7 +89,6 @@
     <div class="tabbody" id="t-ana" hidden></div>
     <div class="tabbody" id="t-notas" hidden></div>
     <div class="tabbody" id="t-aj" hidden></div>
-    <div class="foot"><span><kbd>←</kbd> <kbd>→</kbd> segmento</span><span><kbd>↑</kbd> <kbd>↓</kbd> faixa</span><span><kbd>1</kbd> a <kbd>6</kbd> cor</span><span><kbd>/</kbd> km</span><span><kbd>P</kbd> nota</span><span><kbd>N</kbd> propor</span><span><kbd>Q</kbd> <kbd>E</kbd> <kbd>R</kbd> girar</span><span><kbd>G</kbd> GPS</span><span><kbd>S</kbd> campo</span><span><kbd>Esc</kbd> limpar</span></div>
   </aside>
 
   <section class="glass uni" id="unicard" aria-label="Unifilar">
@@ -97,6 +97,25 @@
     <div class="uni-wrap" id="uniwrap"><canvas id="uni"></canvas><div id="unihover"><span></span></div></div>
   </section>
 </div>
+<div class="ajuda-fundo" id="ajudaFundo" hidden></div>
+<section class="glass ajuda" id="ajuda" hidden role="dialog" aria-modal="true" aria-labelledby="ajudaTitulo" tabindex="-1">
+  <div class="ajuda-h"><h2 id="ajudaTitulo">Atalhos de teclado</h2><button class="iconbtn" id="ajudaFechar" type="button" aria-label="Fechar">×</button></div>
+  <dl class="ajuda-l">
+    <div><dt><kbd>←</kbd> <kbd>→</kbd></dt><dd>Segmento anterior e próximo (Shift pula 200 m)</dd></div>
+    <div><dt><kbd>↑</kbd> <kbd>↓</kbd></dt><dd>Troca de faixa</dd></div>
+    <div><dt><kbd>1</kbd> a <kbd>6</kbd></dt><dd>Cor por solução, IRI, ATR, D0, Rc e defeitos</dd></div>
+    <div><dt><kbd>/</kbd></dt><dd>Ir para km</dd></div>
+    <div><dt><kbd>P</kbd></dt><dd>Nota em um ponto</dd></div>
+    <div><dt><kbd>N</kbd></dt><dd>Propor solução</dd></div>
+    <div><dt><kbd>Q</kbd> <kbd>E</kbd></dt><dd>Girar o mapa 15 graus</dd></div>
+    <div><dt><kbd>R</kbd></dt><dd>Alinhar à pista</dd></div>
+    <div><dt><kbd>G</kbd></dt><dd>Minha posição (GPS)</dd></div>
+    <div><dt><kbd>S</kbd></dt><dd>Modo campo (sol)</dd></div>
+    <div><dt><kbd>,</kbd></dt><dd>Configurações</dd></div>
+    <div><dt><kbd>?</kbd></dt><dd>Esta lista</dd></div>
+    <div><dt><kbd>Esc</kbd></dt><dd>Limpar seleção, filtro ou ferramenta; fechar esta lista</dd></div>
+  </dl>
+</section>
 <section class="cfg" id="cfg" hidden role="dialog" aria-modal="true" aria-labelledby="cfgTitle">
   <div class="cfg-head">
     <h1 id="cfgTitle">Configurações</h1>
