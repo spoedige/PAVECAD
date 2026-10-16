@@ -207,6 +207,68 @@ const TESTES = {
       assert.equal(await pg.evaluate(() => document.querySelector('#inspector').classList.contains('collapsed')), true);
     }],
   ],
+  t04: [
+    ['toque: legenda começa recolhida, em botão de 44 px; tocar expande e lembra a escolha', 'tablet-h-1024x768', async (pg) => {
+      assert.equal(await pg.getAttribute('#legTog', 'aria-expanded'), 'false', 'a legenda deve começar recolhida em toque');
+      const m = await pg.evaluate(() => { const r = document.querySelector('#legend').getBoundingClientRect(), t = document.querySelector('#legTog').getBoundingClientRect(), b = document.querySelector('#toolbar').getBoundingClientRect(); return { w: r.width, h: t.height, aoLado: r.left >= b.right, naoSobre: r.right <= document.querySelector('#inspector').getBoundingClientRect().left }; });
+      assert.ok(m.h >= 43.5, 'botão da legenda com 44 px: ' + m.h);
+      assert.ok(m.w < 200, 'botão pequeno: ' + m.w);
+      assert.ok(m.aoLado, 'ao lado da barra de ferramentas');
+      await pg.click('#legTog'); await pg.waitForTimeout(300);
+      assert.equal(await pg.getAttribute('#legTog', 'aria-expanded'), 'true');
+      assert.equal(await pg.evaluate(() => localStorage.getItem('pavecad-leg')), '1');
+      assert.ok(await pg.evaluate(() => document.querySelectorAll('#legend li button').length) > 2, 'itens da legenda visíveis');
+      await pg.click('#legTog'); await pg.waitForTimeout(300);
+      assert.equal(await pg.getAttribute('#legTog', 'aria-expanded'), 'false');
+    }],
+    ['desktop: a legenda continua começando aberta', '1366x768', async (pg) => {
+      assert.equal(await pg.getAttribute('#legTog', 'aria-expanded'), 'true');
+    }],
+    ['unifilar: arrastar o cabeçalho para baixo recolhe até a barra de posição; para cima ou um toque reabre', 'tablet-h-1024x768', async (pg) => {
+      await irParaKm(pg, '170+500');
+      const cab = () => pg.evaluate(() => { const r = document.querySelector('#unicard .uni-h b').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
+      const arrastar = async (de, dy) => { await pg.mouse.move(de.x, de.y); await pg.mouse.down(); for (let i = 1; i <= 6; i++) await pg.mouse.move(de.x, de.y + (dy * i) / 6); await pg.mouse.up(); await pg.waitForTimeout(300); };
+      const rec = () => pg.evaluate(() => document.querySelector('#unicard').classList.contains('collapsed'));
+      await arrastar(await cab(), 30);
+      assert.equal(await rec(), false, '30 px não chega a 40');
+      await arrastar(await cab(), 60);
+      assert.equal(await rec(), true, 'recolhe');
+      assert.equal(await estado(pg, 'E => E.uniCollapsed'), true);
+      const f = await pg.evaluate(() => { const c = document.querySelector('#unicard').getBoundingClientRect(), h = document.querySelector('#unicard .uni-h').getBoundingClientRect(), sub = document.querySelector('#unisub'); return { cartao: c.height, cabBase: h.bottom, cartaoBase: c.bottom, canvas: document.querySelector('#uniwrap').checkVisibility(), sub: sub.checkVisibility() && sub.scrollWidth <= sub.clientWidth + 1 && sub.textContent.length > 0 }; });
+      assert.equal(f.canvas, false, 'canvas escondido');
+      assert.ok(f.cabBase <= f.cartaoBase + 0.5, `a barra de posição não pode ficar cortada (cabeçalho ${f.cabBase} x cartão ${f.cartaoBase})`);
+      assert.ok(f.sub, 'a posição atual aparece na barra');
+      await arrastar(await cab(), -60);
+      assert.equal(await rec(), false, 'para cima reabre');
+      await arrastar(await cab(), 60); assert.equal(await rec(), true);
+      const p = await cab(); await pg.mouse.click(p.x, p.y); await pg.waitForTimeout(300);
+      assert.equal(await rec(), false, 'um toque na barra reabre');
+      await pg.click('#uniToggle'); assert.equal(await rec(), true, 'o botão continua como alternativa');
+      await pg.click('#uniToggle'); assert.equal(await rec(), false);
+    }],
+    ['unifilar: gesto de toque real (CDP) e nada sobreposto com legenda e unifilar recolhidos', 'tablet-v-820x1180', async (pg, { ctx }) => {
+      const cdp = await ctx.newCDPSession(pg);
+      const r = await pg.evaluate(() => { const b = document.querySelector('#unicard .uni-h b').getBoundingClientRect(); return { x: Math.round(b.left + b.width / 2), y: Math.round(b.top + b.height / 2) }; });
+      const toque = (type, y) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x: r.x, y }] });
+      await toque('touchStart', r.y); for (let i = 1; i <= 6; i++) await toque('touchMove', r.y + i * 12); await toque('touchEnd', r.y + 72); await pg.waitForTimeout(400);
+      assert.equal(await estado(pg, 'E => E.uniCollapsed'), true, 'o toque arrastado recolhe');
+      const ruins = await pg.evaluate(() => {
+        const sel = ['.leftcol > .title', '.leftcol > .search', '.leftcol > .views', '.topbar > .modes', '.topbar > .topright', '#zoomhost .maplibregl-ctrl-group', '#toolbar', '#legend', '#inspector', '#unicard'];
+        const cx = sel.map((s) => [s, document.querySelector(s)]).filter(([, e]) => e && e.checkVisibility()).map(([s, e]) => [s, e.getBoundingClientRect()]);
+        const out = [];
+        for (let i = 0; i < cx.length; i++) for (let j = i + 1; j < cx.length; j++) { const a = cx[i][1], b = cx[j][1]; if (Math.min(a.right, b.right) - Math.max(a.left, b.left) > 1 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 1) out.push(cx[i][0] + ' x ' + cx[j][0]); }
+        return out;
+      });
+      assert.deepEqual(ruins, []);
+      await pg.reload(); await pg.waitForTimeout(1500);
+      assert.equal(await estado(pg, 'E => E.uniCollapsed'), true, 'recolhido volta recolhido');
+    }],
+    ['desktop: arrastar o cabeçalho do unifilar não recolhe', '1366x768', async (pg) => {
+      const r = await pg.evaluate(() => { const b = document.querySelector('#unicard .uni-h b').getBoundingClientRect(); return { x: b.left + 10, y: b.top + 6 }; });
+      await pg.mouse.move(r.x, r.y); await pg.mouse.down(); await pg.mouse.move(r.x, r.y + 80, { steps: 6 }); await pg.mouse.up();
+      assert.equal(await estado(pg, 'E => E.uniCollapsed'), false);
+    }],
+  ],
   g03: [
     ['a seção é o seletor de faixa (clique, aria-pressed, teclado)', '1366x768', async (pg) => {
       await irParaKm(pg, '170+500'); await aba(pg, 'seg');

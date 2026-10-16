@@ -344,6 +344,8 @@ textarea:focus{box-shadow:inset 0 0 0 2px var(--accent)}
   .matrix .cell{min-height:44px;min-width:44px!important}
   .matrix td.nm{font-size:11px;word-break:normal;overflow-wrap:anywhere}
   .tbtn{width:44px;height:44px}
+  .legend .legtog{min-height:44px;padding:0 10px}
+  .legend .legtog.sm{width:44px;padding:0}
 }
 
 /* ---------------------------------------------------------------- */
@@ -383,3 +385,8 @@ textarea:focus{box-shadow:inset 0 0 0 2px var(--accent)}
 .tablet .ikm{display:block;grid-area:km;min-width:0;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tablet #collapse{grid-area:chev}
 .tablet .inspector.collapsed .ihead{cursor:pointer}
+
+/* Unifilar no tablet: o cabeçalho é o puxador (mesmo gesto do painel direito). */
+.tablet .uni-h{position:relative;touch-action:pan-x;user-select:none;-webkit-user-select:none}
+.tablet .uni-h::before{content:'';position:absolute;left:50%;top:-8px;width:44px;height:5px;margin-left:-22px;border-radius:3px;background:var(--faint);pointer-events:none}
+.tablet .uni.collapsed .uni-h{cursor:pointer}
