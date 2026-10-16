@@ -20,6 +20,8 @@ const CENARIOS = {
   ajuda: async (pg, { vp }) => { await irParaKm(pg, '170+500'); await aba(pg, 'seg'); if (!vp.toque) { await pg.click('#btnAjuda'); await pg.waitForTimeout(300); } },
   zoom21ruas: async (pg) => { await irParaKm(pg, '170+500'); await pg.click('#base [data-b=osm]'); await pg.evaluate(() => window.__pavecad.map().jumpTo({ zoom: 21 })); await pg.waitForTimeout(1500); },
   zoom21sat: async (pg) => { await irParaKm(pg, '170+500'); await pg.click('#base [data-b=esri]'); await pg.evaluate(() => window.__pavecad.map().jumpTo({ zoom: 21 })); await pg.waitForTimeout(1500); },
+  limiares: async (pg) => { await pg.click('#btnCfg'); await pg.waitForTimeout(300); await pg.click('#cfgTabs [data-ct=lim]'); await pg.waitForTimeout(400); },
+  config: async (pg) => { await pg.click('#btnCfg'); await pg.waitForTimeout(500); },
   toque: async (pg) => { await irParaKm(pg, '170+500'); await aba(pg, 'seg'); },
   segmento: async (pg) => { await irParaKm(pg, '170+500'); await aba(pg, 'seg'); },
 };
@@ -33,6 +35,8 @@ const GRUPOS = {
   g06: ['inicio'],
   g07: ['toque'],
   g08: ['zoom21ruas', 'zoom21sat'],
+  g09: ['limiares'],
+  g12: ['config'],
 };
 
 module.exports = { CENARIOS, GRUPOS, irParaKm, aba };
