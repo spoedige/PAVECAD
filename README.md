@@ -18,6 +18,8 @@ npm run e2e                       # testes de interface (Playwright) por grupo d
 npm run capturas -- g01 antes     # 4 viewports x 3 temas, 2 planilhas; folha de contato em capturas/ (fora do git)
 ```
 
+No GitHub Actions, o `npm run e2e` roda como etapa separada (job `e2e`), só com o Chromium do Playwright e cache em `~/.cache/ms-playwright`. O `g08k` (zoom com chave do MapTiler) exige um servidor com `VITE_MAPTILER_KEY` e fica fora da execução padrão.
+
 As capturas também rodam um verificador de sobreposição e corte de texto (`scripts/capturas/overlap.js`). O gancho `window.__pavecad` existe só em desenvolvimento.
 
 ## Estrutura
