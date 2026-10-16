@@ -14,7 +14,7 @@ import { abrirConfig, atualizarAviso, configAberta, initConfig } from './app/con
 import { renderAll, renderSeg, setField, setMode, setTab, syncBaseSeg } from './app/paineis';
 import { drawUni, initUnifilar } from './app/unifilar';
 import { clearFocus } from './app/mapa';
-import { $, observarHud, syncAllSegs, syncSeg, toast } from './app/ui';
+import { $, observarHud, observarRolagem, syncAllSegs, syncSeg, toast } from './app/ui';
 
 async function carregarExemplos() {
   const { nomesExemplo, lerExemplo } = await import('./app/exemplo');
@@ -137,6 +137,7 @@ async function boot() {
   initUnifilar();
   initConfig();
   observarHud(agendarReaplicar);
+  document.querySelectorAll<HTMLElement>('.tabbody').forEach(observarRolagem);
   renderAll();
   initMap(() => {
     resolveProps();

@@ -37,3 +37,12 @@ export function observarHud(aoMudar?: () => void) {
   }
   set();
 }
+
+/** Liga a classe .mais no corpo de uma aba enquanto há conteúdo abaixo da área visível (gradiente de rolagem). */
+export function observarRolagem(el: HTMLElement) {
+  const att = () => el.classList.toggle('mais', el.scrollHeight - el.clientHeight - el.scrollTop > 2);
+  el.addEventListener('scroll', att, { passive: true });
+  if (window.ResizeObserver) new ResizeObserver(att).observe(el);
+  new MutationObserver(att).observe(el, { childList: true, subtree: true });
+  att();
+}
