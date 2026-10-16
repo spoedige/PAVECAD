@@ -12,6 +12,35 @@ const zoomPara = async (pg, z) => {
   await pg.waitForTimeout(1500);
 };
 
+/** Ponto de tela sobre a Fx 1 de algum segmento perto do selecionado e livre de painéis (o clique cai no mapa). */
+const pontoLivre = (pg) => pg.evaluate(() => {
+  const E = window.__pavecad.E, sel = E.sel, p = E.P.find((x) => x.id === sel.pid), m = window.__pavecad.map(), box = document.querySelector('#map').getBoundingClientRect();
+  for (const d of [0, 1, -1, 2, -2, 3, -3, 4, -4, 6, -6, 8, -8, 12, -12, 16, -16, 24, -24]) {
+    const row = sel.row + d, f = p.polyByFid.get(row * 8 + 1);
+    if (!f) continue;
+    const c = f.geometry.coordinates[0], pt = m.project([(c[0][0] + c[2][0]) / 2, (c[0][1] + c[2][1]) / 2]);
+    const x = box.left + pt.x, y = box.top + pt.y;
+    if (x < box.left + 4 || y < box.top + 4 || x > box.right - 4 || y > box.bottom - 4) continue;
+    const el = document.elementFromPoint(x, y);
+    if (el && el.classList.contains('maplibregl-canvas')) return { x, y, row };
+  }
+  return null;
+});
+
+/** Cria uma proposta pelo fluxo real da interface (N, clicar um trecho, escolher, Aplicar) e volta à aba Revisão. */
+const criarProposta = async (pg, solucao = 'FSE', nota = '') => {
+  await irParaKm(pg, '170+500', 3500);
+  await pg.keyboard.press('n');
+  const a = await pontoLivre(pg);
+  if (!a) throw new Error('nenhum ponto livre de painéis para clicar no trecho');
+  await pg.mouse.click(a.x, a.y); await pg.waitForTimeout(400);
+  await pg.selectOption('#pTo', solucao);
+  if (nota) await pg.fill('#pNote', nota);
+  await pg.click('#pApply'); await pg.waitForTimeout(400);
+  await pg.keyboard.press('Escape');
+  await aba(pg, 'notas');
+};
+
 const CENARIOS = {
   inicio: async () => {},
   estacas500: async (pg) => { await irParaKm(pg, '170+500'); await zoomPara(pg, 14.6); },
@@ -23,13 +52,11 @@ const CENARIOS = {
   propor0: async (pg) => { await irParaKm(pg, '170+500', 3500); await pg.keyboard.press('n'); await pg.waitForTimeout(300); },
   propor1: async (pg) => {
     await irParaKm(pg, '170+500', 3500); await pg.keyboard.press('n'); await pg.waitForTimeout(300);
-    const a = await pg.evaluate(() => {
-      const E = window.__pavecad.E, sel = E.sel, p = E.P.find((x) => x.id === sel.pid), f = p.polyByFid.get(sel.row * 8 + 1), c = f.geometry.coordinates[0];
-      const pt = window.__pavecad.map().project([(c[0][0] + c[2][0]) / 2, (c[0][1] + c[2][1]) / 2]), box = document.querySelector('#map').getBoundingClientRect();
-      return { x: box.left + pt.x, y: box.top + pt.y };
-    });
-    await pg.mouse.click(a.x, a.y); await pg.waitForTimeout(500);
+    const a = await pontoLivre(pg);
+    if (a) { await pg.mouse.click(a.x, a.y); await pg.waitForTimeout(500); }
   },
+  revisaoVazia: async (pg) => { await aba(pg, 'notas'); await pg.waitForTimeout(300); },
+  revisaoComProposta: async (pg) => { await criarProposta(pg, 'FSE', 'trecho de teste'); },
   limiares: async (pg) => { await pg.click('#btnCfg'); await pg.waitForTimeout(300); await pg.click('#cfgTabs [data-ct=lim]'); await pg.waitForTimeout(400); },
   config: async (pg) => { await pg.click('#btnCfg'); await pg.waitForTimeout(500); },
   toque: async (pg) => { await irParaKm(pg, '170+500'); await aba(pg, 'seg'); },
@@ -47,7 +74,9 @@ const GRUPOS = {
   g08: ['zoom21ruas', 'zoom21sat'],
   g09: ['limiares'],
   g10: ['propor0', 'propor1'],
+  g11: ['revisaoComProposta'],
+  g14: ['revisaoVazia', 'revisaoComProposta'],
   g12: ['config'],
 };
 
-module.exports = { CENARIOS, GRUPOS, irParaKm, aba };
+module.exports = { CENARIOS, GRUPOS, irParaKm, aba, criarProposta, pontoLivre };

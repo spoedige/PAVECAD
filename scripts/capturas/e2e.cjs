@@ -3,7 +3,7 @@
 // Requer o servidor de desenvolvimento em PAVECAD_URL (padrão http://localhost:5199).
 const assert = require('assert/strict');
 const { VPS, abrir, lancar } = require('./lib.cjs');
-const { irParaKm, aba } = require('./scenarios.cjs');
+const { irParaKm, aba, criarProposta, pontoLivre } = require('./scenarios.cjs');
 
 const vp = (nome) => VPS.find((v) => v.nome === nome);
 const estado = (pg, expr) => pg.evaluate(`(${expr})(window.__pavecad.E)`);
@@ -63,6 +63,28 @@ const TESTES = {
       assert.ok(r.max <= 0, `há rolagem em ${r.piores.join('; ')} (altura útil ${r.altura}px, ${r.n} casos)`);
     }],
   ],
+  g11: [
+    ['Baixar CSV: nome, BOM UTF-8, ";" e vírgula decimal, colunas de coordenadas', '1366x768', async (pg) => {
+      await criarProposta(pg, 'FSE', 'obs; com ponto e vírgula');
+      assert.equal(await pg.locator('#pCsvDown').count(), 1, 'botão Baixar CSV');
+      assert.equal(await pg.locator('#pCsv').count(), 1, 'o botão Copiar continua');
+      const [dl] = await Promise.all([pg.waitForEvent('download'), pg.click('#pCsvDown')]);
+      assert.match(dl.suggestedFilename(), /^propostas_\d{4}-\d{2}-\d{2}\.csv$/);
+      const caminho = await dl.path();
+      const buf = require('fs').readFileSync(caminho);
+      assert.deepEqual([...buf.slice(0, 3)], [0xef, 0xbb, 0xbf], 'BOM UTF-8 no início do arquivo');
+      const txt = buf.slice(3).toString('utf8');
+      assert.ok(txt.includes('\r\n'), 'quebras de linha CRLF para o Excel');
+      const [cab, lin] = txt.split('\r\n');
+      assert.equal(cab, 'planilha;faixa;km_inicial;km_final;extensao_m;largura_m;area_m2;codigo_atual;solucao_atual;codigo_proposto;solucao_proposta;observacao;lat_inicial;lon_inicial;lat_final;lon_final;utm_e_inicial;utm_n_inicial;utm_e_final;utm_n_final');
+      assert.match(lin, /"obs; com ponto e vírgula"/, 'observação com ";" fica entre aspas');
+      assert.match(lin, /"FSE"/);
+      assert.match(lin, /;-17,\d{7};-47,\d{7};-17,\d{7};-47,\d{7};\d{6},\d{2};\d{7},\d{2};\d{6},\d{2};\d{7},\d{2}$/, 'lat, lon e UTM com vírgula decimal ao final da linha');
+      assert.doesNotMatch(lin.replace(/"[^"]*"/g, ''), /\d\.\d/, 'nenhum ponto decimal');
+      // acentos preservados (UTF-8)
+      assert.match(txt, /Fresagem estrutural/);
+    }],
+  ],
   g10: [
     ['propor solução: ativar, clicar um trecho, escolher, aplicar, ver na Revisão e sobreviver ao reload', '1366x768', async (pg) => {
       await irParaKm(pg, '170+500', 3500);
@@ -73,12 +95,10 @@ const TESTES = {
       assert.match(await pg.textContent('#propbar'), /Selecione um trecho no mapa/);
       assert.equal(await pg.isDisabled('#pApply'), true);
       // clica no meio da Fx 1 do segmento selecionado
-      const alvo = await pg.evaluate(() => {
-        const E = window.__pavecad.E, sel = E.sel, p = E.P.find((x) => x.id === sel.pid);
-        const f = p.polyByFid.get(sel.row * 8 + 1), c = f.geometry.coordinates[0];
-        const m = window.__pavecad.map(), pt = m.project([(c[0][0] + c[2][0]) / 2, (c[0][1] + c[2][1]) / 2]), box = document.querySelector('#map').getBoundingClientRect();
-        return { x: box.left + pt.x, y: box.top + pt.y, pname: p.meta.name, row: sel.row };
-      });
+      const alvo = await pontoLivre(pg);
+      assert.ok(alvo, 'ponto livre para clicar');
+      alvo.pname = await estado(pg, 'E => E.sel.pid');
+      alvo.id = alvo.pname;
       await pg.mouse.click(alvo.x, alvo.y);
       await pg.waitForTimeout(400);
       assert.match(await pg.textContent('#propbar'), /1 trecho selecionado/);
@@ -117,12 +137,10 @@ const TESTES = {
     ['propor: seleção de planilha removida é descartada e o Aplicar desabilita', '1366x768', async (pg) => {
       await irParaKm(pg, '170+500', 3500);
       await pg.keyboard.press('n');
-      const alvo = await pg.evaluate(() => {
-        const E = window.__pavecad.E, sel = E.sel, p = E.P.find((x) => x.id === sel.pid);
-        const f = p.polyByFid.get(sel.row * 8 + 1), c = f.geometry.coordinates[0];
-        const pt = window.__pavecad.map().project([(c[0][0] + c[2][0]) / 2, (c[0][1] + c[2][1]) / 2]), box = document.querySelector('#map').getBoundingClientRect();
-        return { x: box.left + pt.x, y: box.top + pt.y, id: p.id };
-      });
+      const alvo = await pontoLivre(pg);
+      assert.ok(alvo, 'ponto livre para clicar');
+      alvo.pname = await estado(pg, 'E => E.sel.pid');
+      alvo.id = alvo.pname;
       await pg.mouse.click(alvo.x, alvo.y);
       await pg.waitForTimeout(300);
       assert.match(await pg.textContent('#propbar'), /1 trecho selecionado/);

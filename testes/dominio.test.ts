@@ -123,7 +123,7 @@ describe('propostas de solução', () => {
   it('exporta CSV com ponto e vírgula e vírgula decimal', () => {
     const csv = propostasCsv([base('a', 10, 14)], () => pv, (p) => p.meta.name, (k) => k);
     const [head, linha] = csv.split('\n');
-    expect(head.split(';')).toHaveLength(12);
+    expect(head.split(';')).toHaveLength(20);
     expect(head).toContain('codigo_atual');
     expect(linha).toContain('"GAP"');
     expect(linha).toContain('"FS4"');
