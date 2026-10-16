@@ -48,7 +48,10 @@ async function tema(pg, t) {
 
 
 async function lancar() {
-  return chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+  // No CI vale o Chromium instalado pelo Playwright; aqui, o do ambiente (PAVECAD_CHROMIUM ou /opt/pw-browsers/chromium).
+  const local = process.env.PAVECAD_CHROMIUM || '/opt/pw-browsers/chromium';
+  const executablePath = require('fs').existsSync(local) ? local : undefined;
+  return chromium.launch({ executablePath, args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
 }
 
 module.exports = { RAIZ, URL, VPS, TEMAS, FIXTURES, abrir, tema, lancar };
