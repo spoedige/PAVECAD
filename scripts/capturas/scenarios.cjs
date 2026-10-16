@@ -57,6 +57,7 @@ const CENARIOS = {
   },
   revisaoVazia: async (pg) => { await aba(pg, 'notas'); await pg.waitForTimeout(300); },
   revisaoComProposta: async (pg) => { await criarProposta(pg, 'FSE', 'trecho de teste'); },
+  escalaSat: async (pg) => { await irParaKm(pg, '170+500'); await pg.click('#base [data-b=esri]'); await pg.evaluate(() => window.__pavecad.map().jumpTo({ zoom: 17.5 })); await pg.mouse.move(1, 1); await pg.waitForTimeout(1500); },
   limiares: async (pg) => { await pg.click('#btnCfg'); await pg.waitForTimeout(300); await pg.click('#cfgTabs [data-ct=lim]'); await pg.waitForTimeout(400); },
   config: async (pg) => { await pg.click('#btnCfg'); await pg.waitForTimeout(500); },
   toque: async (pg) => { await irParaKm(pg, '170+500'); await aba(pg, 'seg'); },
@@ -77,6 +78,7 @@ const GRUPOS = {
   g11: ['revisaoComProposta'],
   g13: ['propor1'],
   g14: ['revisaoVazia', 'revisaoComProposta'],
+  g15: ['escalaSat'],
   g12: ['config'],
 };
 

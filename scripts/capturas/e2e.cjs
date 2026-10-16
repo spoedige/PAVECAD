@@ -63,6 +63,35 @@ const TESTES = {
       assert.ok(r.max <= 0, `há rolagem em ${r.piores.join('; ')} (altura útil ${r.altura}px, ${r.n} casos)`);
     }],
   ],
+  g15: [
+    ['escala do mapa: fundo de vidro e texto com contraste (claro, escuro e campo) sobre o satélite', '1366x768', async (pg) => {
+      await irParaKm(pg, '170+500');
+      await pg.click('#base [data-b=esri]');
+      await pg.waitForTimeout(800);
+      const medir = () => pg.evaluate(() => {
+        const e = document.querySelector('.maplibregl-ctrl-scale'), cs = getComputedStyle(e);
+        const rgba = (c) => { const m = c.match(/[\d.]+/g).map(Number); return { r: m[0], g: m[1], b: m[2], a: m[3] === undefined ? 1 : m[3] }; };
+        const lum = ({ r, g, b }) => { const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
+        const sobre = (fg, bg) => ({ r: fg.r * fg.a + bg.r * (1 - fg.a), g: fg.g * fg.a + bg.g * (1 - fg.a), b: fg.b * fg.a + bg.b * (1 - fg.a), a: 1 });
+        const cr = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+        const fundo = rgba(cs.backgroundColor), texto = rgba(cs.color);
+        // pior caso: o vidro sobre preto e sobre branco, e sobre o verde escuro do satélite sintético
+        const piso = [{ r: 0, g: 0, b: 0, a: 1 }, { r: 255, g: 255, b: 255, a: 1 }, { r: 58, g: 84, b: 52, a: 1 }];
+        return { alfa: fundo.a, fonte: cs.fontSize, bt: cs.backgroundColor, minimo: Math.min(...piso.map((b) => cr(texto, sobre(fundo, b)))), blur: cs.backdropFilter, borda: cs.borderBottomWidth };
+      });
+      for (const tema of ['claro', 'escuro', 'campo']) {
+        await pg.emulateMedia({ colorScheme: tema === 'escuro' ? 'dark' : 'light' });
+        await pg.evaluate((campo) => window.__pavecad.setField(campo, true), tema === 'campo');
+        await pg.waitForTimeout(500);
+        const m = await medir();
+        assert.ok(m.alfa >= 0.7, `${tema}: fundo de vidro precisa ser quase opaco (alfa ${m.alfa})`);
+        assert.ok(parseFloat(m.fonte) >= 11, `${tema}: fonte ${m.fonte}`);
+        assert.ok(m.minimo >= 4.5, `${tema}: contraste ${m.minimo.toFixed(2)}:1 no pior fundo (mínimo 4,5:1)`);
+        assert.notEqual(m.borda, '0px');
+        if (tema !== 'campo') assert.notEqual(m.blur, 'none', `${tema}: sem blur de vidro`);
+      }
+    }],
+  ],
   g14: [
     ['Revisão: estados vazios em uma linha e botão "Baixar GeoJSON"', '1366x768', async (pg) => {
       await aba(pg, 'notas');
