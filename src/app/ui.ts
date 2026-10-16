@@ -75,3 +75,12 @@ export function gestoVertical(el: HTMLElement, o: { aoBaixo: () => void; aoCima:
   });
   el.addEventListener('click', (e) => { if (moveu) { e.stopPropagation(); e.preventDefault(); moveu = false; } }, true);
 }
+
+/** Igual a observarRolagem, para a rolagem horizontal (linha de chips): liga .mais enquanto há conteúdo à direita. */
+export function observarRolagemH(el: HTMLElement) {
+  const att = () => el.classList.toggle('mais', el.scrollWidth - el.clientWidth - el.scrollLeft > 2);
+  el.addEventListener('scroll', att, { passive: true });
+  if (window.ResizeObserver) new ResizeObserver(att).observe(el);
+  new MutationObserver(att).observe(el, { childList: true, subtree: true });
+  att();
+}
