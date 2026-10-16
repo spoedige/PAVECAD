@@ -424,7 +424,7 @@ const TESTES = {
 
 (async () => {
   const pedidos = process.argv.slice(2);
-  const grupos = pedidos.length ? pedidos : Object.keys(TESTES);
+  const grupos = pedidos.length ? pedidos : Object.keys(TESTES).filter((g) => g !== 'g08k'); // g08k exige um servidor com VITE_MAPTILER_KEY
   const browser = await lancar();
   let falhas = 0, total = 0;
   for (const g of grupos) {
