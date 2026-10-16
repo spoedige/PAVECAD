@@ -324,6 +324,33 @@ const TESTES = {
       assert.ok(c.tb <= c.it - 8, 'recolhida, a barra lateral desce junto e continua acima da faixa');
     }],
   ],
+  t06: [
+    ['chips de projeto numa linha só, sem quebra e com rolagem horizontal', TODOS, async (pg) => {
+      const m = () => pg.evaluate(() => {
+        const v = document.querySelector('#views'), cs = [...v.querySelectorAll('.chipbtn')], tops = cs.map((c) => Math.round(c.getBoundingClientRect().top));
+        return { n: cs.length, mesmaLinha: new Set(tops).size === 1, wrap: getComputedStyle(v).flexWrap, ox: getComputedStyle(v).overflowX, sobra: v.scrollWidth - v.clientWidth, mais: v.classList.contains('mais'), h: v.getBoundingClientRect().height, vr: v.getBoundingClientRect().right, tr: document.querySelector('.leftcol').getBoundingClientRect().right };
+      });
+      const a = await m();
+      assert.ok(a.n >= 2 && a.mesmaLinha, 'Visão geral e o grupo numa linha só');
+      assert.equal(a.wrap, 'nowrap'); assert.equal(a.ox, 'auto');
+      assert.equal(a.mais, false, 'sem excesso não há fade');
+      // com muitos grupos (050/GO, 050/MG, 040/MG...) a linha rola em vez de quebrar
+      await pg.evaluate(() => { const v = document.querySelector('#views'); for (const g of ['050/MG', '040/MG', '262/MG', '365/MG', '153/GO']) { const b = document.createElement('button'); b.className = 'chipbtn'; b.textContent = g; v.appendChild(b); } });
+      await pg.waitForTimeout(300);
+      const b = await m();
+      assert.ok(b.mesmaLinha, 'continua numa linha com muitos chips');
+      assert.equal(b.h, a.h, 'a altura da linha não cresce: ' + a.h + ' x ' + b.h);
+      assert.ok(b.sobra > 20, 'a linha rola na horizontal (+' + b.sobra + 'px)');
+      assert.equal(b.mais, true, 'fade na borda direita enquanto há mais chips');
+      assert.ok(b.vr <= b.tr + 1, 'a linha não ultrapassa a coluna esquerda');
+      await pg.evaluate(() => { const v = document.querySelector('#views'); v.scrollLeft = v.scrollWidth; });
+      await pg.waitForTimeout(200);
+      const c = await m();
+      assert.equal(c.mais, false, 'no fim da rolagem o fade some');
+      const ult = await pg.evaluate(() => { const v = document.querySelector('#views'), u = v.lastElementChild.getBoundingClientRect(), r = v.getBoundingClientRect(); return u.right <= r.right + 1; });
+      assert.ok(ult, 'o último chip fica inteiro e alcançável');
+    }],
+  ],
   g03: [
     ['a seção é o seletor de faixa (clique, aria-pressed, teclado)', '1366x768', async (pg) => {
       await irParaKm(pg, '170+500'); await aba(pg, 'seg');

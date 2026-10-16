@@ -81,7 +81,11 @@ svg.i{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.8;stro
 .search:focus-within{box-shadow:var(--shadow),0 0 0 2px var(--accent)}
 .search .go{width:26px;height:26px;border-radius:50%;border:0;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;flex:none}
 .rotbar{display:flex;align-items:center;gap:2px;padding:3px;border-radius:14px}
-.views{display:flex;flex-wrap:wrap;gap:6px}
+.views{display:flex;flex-wrap:nowrap;gap:6px;width:100%;max-width:100%;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;overscroll-behavior-x:contain}
+.views::-webkit-scrollbar{display:none}
+.views .chipbtn{flex:none}
+/* a borda direita esmaece enquanto há mais chips para rolar (classe .mais, ligada por observarRolagemH) */
+.views.mais{-webkit-mask-image:linear-gradient(to right,#000 calc(100% - 22px),transparent);mask-image:linear-gradient(to right,#000 calc(100% - 22px),transparent)}
 .chipbtn{height:max(28px,var(--tap));padding:0 11px;border-radius:999px;border:var(--bw) solid var(--hair);background:var(--glass);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);color:var(--fg);font-size:12px;font-weight:500;white-space:nowrap}
 .chipbtn:hover{background:var(--solid)}
 #zoomhost{display:flex;flex-direction:column;gap:8px;align-items:flex-start}

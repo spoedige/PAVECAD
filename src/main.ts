@@ -15,7 +15,7 @@ import { renderAll, renderSeg, setField, setMode, setTab, syncBaseSeg } from './
 import { drawUni, initUnifilar } from './app/unifilar';
 import { initLayout } from './app/layout';
 import { clearFocus } from './app/mapa';
-import { $, observarHud, observarRolagem, syncAllSegs, syncSeg, toast } from './app/ui';
+import { $, observarHud, observarRolagem, observarRolagemH, syncAllSegs, syncSeg, toast } from './app/ui';
 
 async function carregarExemplos() {
   const { nomesExemplo, lerExemplo } = await import('./app/exemplo');
@@ -135,6 +135,7 @@ async function boot() {
   initLayout();
   observarHud(agendarReaplicar);
   document.querySelectorAll<HTMLElement>('.tabbody').forEach(observarRolagem);
+  observarRolagemH($('#views'));
   renderAll();
   initMap(() => {
     resolveProps();
