@@ -147,6 +147,9 @@ export function removeProject(id: string) {
 /* ---------------------------------------------------------------- */
 /* Segmento                                                          */
 /* ---------------------------------------------------------------- */
+/** Detalhes e tratamentos começam recolhidos para o painel caber sem rolar; a escolha do usuário é lembrada. */
+let segDetAberto = false;
+
 export function renderSeg() {
   const el = $('#t-seg'), s = E.sel;
   if (!s) { el.innerHTML = '<div class="empty"><b>Nenhum segmento selecionado</b>Clique em uma faixa no mapa ou no unifilar.</div>'; return; }
@@ -183,17 +186,24 @@ export function renderSeg() {
   if (L?.opdr) extra.push(['Ocorrência O/P/R/D', 'marcada']);
   if (L?.exafe) extra.push(['Ocorrência EX/AF/E', 'marcada']);
   if (drainTxt) extra.push(['Dreno', drainTxt]);
+  if (tr.code) extra.unshift(['Código na planilha', tr.code]);
+  const itens: [string, string][] = [
+    ...treat.map(([k, v]) => [k, typeof v === 'number' ? fmt(v, v % 1 ? 2 : 0) : String(v)] as [string, string]),
+    ...extra,
+  ];
+  const detalhes = itens.length
+    ? `<details id="segDet" ${segDetAberto ? 'open' : ''}><summary>Detalhes e tratamentos <span class="muted num">${itens.length}</span></summary>
+        <div class="kv">${itens.map(([k, v]) => `<div><span>${esc(k)}</span><b class="num">${esc(v)}</b></div>`).join('')}</div></details>`
+    : '';
   el.innerHTML = `
     <div class="shead"><div><h2 class="h1 num">km ${esc(p.kmLab[s.row])}</h2>
-        <p class="lead num">${esc(projName(p))} · hod. ${fmt(r.hod, 3)} km${r.obs || r.platform ? ' · ' + [r.obs, r.platform].filter(Boolean).map(esc).join(' · ') : ''}</p></div>
-      <div class="sbtns"><button class="iconbtn" id="sPrev" aria-label="Segmento anterior" title="Anterior (←)">${IC.prev}</button><button class="iconbtn" id="sNext" aria-label="Próximo segmento" title="Próximo (→)">${IC.next}</button><button class="iconbtn" id="sCopy" aria-label="Copiar localização" title="Copiar">${IC.copy}</button></div></div>
-    <div><div class="sect">Solução</div><div class="chips">${chips.join('')}</div>${tr.code ? `<p class="note num" style="margin-top:7px">Código na planilha: ${esc(tr.code)}</p>` : ''}</div>
-    <div><div class="sect">Seção a partir da coordenada <span style="text-transform:none;font-weight:500">↑ ↓ trocam de faixa</span></div><div class="xs" role="group" aria-label="Faixa do segmento">${xs}</div><div class="xsticks num">${xt}</div></div>
-    ${isSh || !L ? '' : `<div><div class="sect">Parâmetros</div><div class="params">${param('iri')}${param('def', 'Defeitos')}${param('atr')}${param('d0')}${param('rc')}
-      <div class="param"><div class="k">D120</div><div class="v num">${fmt(L.d120, 2)}<small>0,01 mm</small></div></div></div></div>
-    <div><div class="sect">Tratamentos lançados</div>${treat.length ? `<div class="list">${treat.map(([k, v]) => `<div class="row"><div class="grow">${k}</div><div class="val num">${typeof v === 'number' ? fmt(v, v % 1 ? 2 : 0) : esc(v)}</div></div>`).join('')}</div>` : '<p class="note">Nenhum lançamento na coluna de soluções.</p>'}</div>`}
-    ${extra.length ? `<div><div class="sect">Detalhes</div><div class="list">${extra.map(([k, v]) => `<div class="row"><div class="grow muted">${k}</div><div class="val">${esc(v)}</div></div>`).join('')}</div></div>` : ''}
-    <div class="btns"><button class="btn p" id="sNote">${IC.pin} Nota neste segmento</button></div>`;
+        <p class="lead num" title="${esc(projName(p))} · hod. ${fmt(r.hod, 3)} km${r.obs || r.platform ? ' · ' + [r.obs, r.platform].filter(Boolean).map(esc).join(' · ') : ''}">${esc(projName(p))} · hod. ${fmt(r.hod, 3)} km${r.obs || r.platform ? ' · ' + [r.obs, r.platform].filter(Boolean).map(esc).join(' · ') : ''}</p></div>
+      <div class="sbtns"><button class="iconbtn" id="sPrev" aria-label="Segmento anterior" title="Anterior (←)">${IC.prev}</button><button class="iconbtn" id="sNext" aria-label="Próximo segmento" title="Próximo (→)">${IC.next}</button><button class="iconbtn" id="sCopy" aria-label="Copiar localização" title="Copiar localização">${IC.copy}</button><button class="iconbtn" id="sNote" aria-label="Nota neste segmento" title="Nota neste segmento">${IC.pin}</button></div></div>
+    <div class="chips" aria-label="Solução">${chips.join('')}</div>
+    <div><div class="xs" role="group" aria-label="Seção a partir da coordenada: escolha a faixa" title="Seção a partir da coordenada. Setas para cima e para baixo trocam de faixa">${xs}</div><div class="xsticks num">${xt}</div></div>
+    ${isSh || !L ? '' : `<div class="params">${param('iri')}${param('def', 'Defeitos')}${param('atr')}${param('d0')}${param('rc')}
+      <div class="param"><div class="k">D120</div><div class="v num">${fmt(L.d120, 2)}<small>0,01 mm</small></div></div></div>`}
+    ${detalhes}`;
   $('#sPrev').onclick = () => stepSel(-1, 0);
   $('#sNext').onclick = () => stepSel(1, 0);
   $('#sCopy').onclick = () => {
@@ -207,6 +217,7 @@ export function renderSeg() {
     startNote('pin', [[(c[0][0] + c[2][0]) / 2, (c[0][1] + c[2][1]) / 2]]);
   };
   el.querySelectorAll<HTMLElement>('.xs button').forEach((b) => b.addEventListener('click', () => select(s.pid, s.row, +b.dataset.l!)));
+  el.querySelector('#segDet')?.addEventListener('toggle', (ev) => { segDetAberto = (ev.target as HTMLDetailsElement).open; });
   // a seleção refaz o painel: devolve o foco do teclado à faixa escolhida
   if (tinhaFoco) el.querySelector<HTMLElement>('.xs [aria-pressed="true"]')?.focus();
 }
