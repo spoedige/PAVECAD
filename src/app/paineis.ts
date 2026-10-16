@@ -29,10 +29,24 @@ export function setTab(t: typeof E.tab) {
   syncAllSegs();
 }
 
+/** "BR-050 · MG". Com mais de um estado, "BR-050 · GO, MG". Com mais de uma rodovia, separadas por " + ". */
+export function tituloDe(lista: Pick<AppProj, 'meta'>[]): string {
+  if (!lista.length) return 'PaveCAD';
+  const por = new Map<string, Set<string>>();
+  for (const p of lista) {
+    const [via, uf] = p.meta.uf.split('/');
+    if (!por.has(via)) por.set(via, new Set());
+    if (uf) por.get(via)!.add(uf);
+  }
+  return [...por].map(([via, ufs]) => (ufs.size ? `${via} · ${[...ufs].sort().join(', ')}` : via)).join(' + ');
+}
+
 export function renderViews() {
   const v = visibleProjects();
-  $('#title').textContent = E.P.length ? `${E.P.length} planilha${E.P.length > 1 ? 's' : ''}` : 'Nenhuma planilha';
-  $('#subtitle').textContent = v.length ? `${v.length} ${v.length > 1 ? 'visíveis' : 'visível'} · padrão RoadRunner` : 'Carregue um arquivo no padrão RoadRunner';
+  const t = tituloDe(v.length ? v : E.P), n = E.P.length;
+  $('#title').textContent = t;
+  $('#titlebox').title = t;
+  $('#subtitle').textContent = !n ? 'Nenhuma planilha' : `${n} planilha${n > 1 ? 's' : ''}${v.length < n ? ` · ${v.length} ${v.length > 1 ? 'visíveis' : 'visível'}` : ''}`;
   const vb = $('#views'), groups = [...new Set(v.map((p) => p.meta.uf))];
   vb.innerHTML = '<button class="chipbtn" data-g="*">Visão geral</button>' + groups.map((g) => `<button class="chipbtn" data-g="${esc(g)}">${esc(g.replace('BR-', ''))}</button>`).join('');
   vb.querySelectorAll<HTMLButtonElement>('button').forEach((b) => b.addEventListener('click', () => {
