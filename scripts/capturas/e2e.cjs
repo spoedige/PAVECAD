@@ -48,29 +48,33 @@ const TESTES = {
     }],
   ],
   t02: [
-    ['barra única à esquerda, ordem GPS, propor, campo, nota, ⋯, e topo só com indicadores, Planilhas e engrenagem', TODOS, async (pg) => {
+    ['ferramentas na barra compacta do canto superior direito, sob Planilhas e a engrenagem; zoom e ⋯ na lateral', TODOS, async (pg) => {
       assert.equal(await pg.evaluate(() => document.documentElement.classList.contains('unico')), true);
       const m = await pg.evaluate(() => {
         const R = (s) => document.querySelector(s).getBoundingClientRect();
-        const ids = ['#btnGps', '[data-tool=prop]', '#btnField', '[data-tool=pin]', '#btnMore'];
-        const rs = ids.map(R);
+        const ids = ['#btnGps', '[data-tool=prop]', '#btnField', '[data-tool=pin]'];
+        const rs = ids.map(R), tb = R('#toolbar'), linha = R('.topright .trrow'), insp = R('#inspector');
         return {
-          xs: rs.map((r) => Math.round(r.left)), ys: rs.map((r) => r.top), w: rs.map((r) => r.width), h: rs.map((r) => r.height),
-          zoomEmTools: !!document.querySelector('#tools #zoomhost'), barraEmTools: !!document.querySelector('#tools #toolbar'),
-          zoomX: Math.round(R('#zoomhost .maplibregl-ctrl-group').left), borda: R('#toolbar').left,
-          topo: [...document.querySelectorAll('.topbar button')].filter((b) => b.checkVisibility()).map((b) => b.id || b.dataset.m),
-          baseNoTopo: !!document.querySelector('.topbar #base'), rotNoTopo: !!document.querySelector('.leftcol #rotbar'),
+          xs: rs.map((r) => r.left), ys: rs.map((r) => Math.round(r.top)), w: rs.map((r) => r.width), h: rs.map((r) => r.height),
+          noCanto: !!document.querySelector('.topright > #toolbar'), emTools: !!document.querySelector('#tools #zoomhost') && !!document.querySelector('#tools #btnMore'), toolbarEmTools: !!document.querySelector('#tools #toolbar'),
+          abaixo: tb.top - linha.bottom, direita: innerWidth - tb.right, painelGap: insp.top - tb.bottom,
+          zoomX: Math.round(R('#zoomhost .maplibregl-ctrl-group').left), maisX: Math.round(R('#btnMore').left), borda: R('#btnMore').left,
+          topo: [...document.querySelectorAll('.topbar button')].filter((b) => b.checkVisibility()).map((b) => b.id || b.dataset.m || b.dataset.tool),
+          baseNoTopo: !!document.querySelector('.topbar #base'),
         };
       });
-      assert.ok(m.zoomEmTools && m.barraEmTools, 'zoom e ferramentas devem estar na barra lateral');
-      assert.ok(new Set(m.xs).size === 1, 'os botões devem estar alinhados em coluna: ' + m.xs);
-      assert.deepEqual([...m.ys].sort((a, b) => a - b), m.ys, 'ordem vertical: GPS, propor, campo, nota, ⋯');
+      assert.ok(m.noCanto, 'a barra de ferramentas fica no canto superior direito');
+      assert.ok(m.emTools && !m.toolbarEmTools, 'zoom e ⋯ na barra lateral; as ferramentas não');
+      assert.deepEqual([...m.xs].sort((a, b) => a - b), m.xs, 'ordem: GPS, propor, campo, nota');
+      assert.equal(new Set(m.ys).size, 1, 'mesma linha');
       assert.ok(m.w.every((w) => w >= 44) && m.h.every((h) => h >= 44), 'alvos de 44 px');
-      assert.ok(Math.abs(m.zoomX - m.borda) <= 2, 'barra alinhada ao zoom');
-      assert.ok(m.borda <= 20, 'barra encostada na borda esquerda: ' + m.borda);
-      assert.equal(m.topo.filter((x) => !['sol', 'iri', 'atr', 'd0', 'rc', 'def', 'btnAjuda', 'btnCfg', 'btnFile'].includes(x)).length, 0, 'topo com botão extra: ' + m.topo);
+      assert.ok(m.abaixo >= 4 && m.abaixo <= 16, 'sob Planilhas e a engrenagem: ' + m.abaixo);
+      assert.ok(Math.abs(m.direita - 16) <= 2, 'alinhada à direita com 16 px de margem: ' + m.direita);
+      assert.ok(m.painelGap >= 8, 'não cobre o painel direito: ' + m.painelGap);
+      assert.equal(m.zoomX, m.maisX, 'o ⋯ alinha com o zoom');
+      assert.ok(m.borda <= 20, 'barra lateral encostada na borda esquerda: ' + m.borda);
+      assert.equal(m.topo.filter((x) => !['sol', 'iri', 'atr', 'd0', 'rc', 'def', 'btnAjuda', 'btnCfg', 'btnFile', 'btnGps', 'btnField', 'prop', 'pin'].includes(x)).length, 0, 'topo com botão extra: ' + m.topo);
       assert.equal(m.baseNoTopo, false, 'a escolha de base saiu do topo');
-      assert.equal(m.rotNoTopo, false, 'girar e alinhar saíram da coluna esquerda de cima');
     }],
     ['gaveta ⋯ abre alinhar, girar, norte e base; estado salvo; Satélite troca a base', TODOS, async (pg) => {
       assert.equal(await pg.isVisible('#drawer'), false, 'a gaveta começa fechada');
@@ -107,7 +111,7 @@ const TESTES = {
       for (const [w, h] of [[1568, 760], [1366, 768], [1024, 768], [820, 1180]]) {
         await pg.setViewportSize({ width: w, height: h }); await pg.waitForTimeout(600);
         const r = await pg.evaluate(() => {
-          const sel = ['.leftcol > .title', '.leftcol > .search', '.leftcol > .views', '.topbar > .modes', '.topbar > .topright', '#zoomhost .maplibregl-ctrl-group', '#toolbar', '#drawer', '#legend', '#propbar:not([hidden])', '#inspector', '#unicard'];
+          const sel = ['.leftcol > .title', '.leftcol > .search', '.leftcol > .views', '.topbar > .modes', '.topright > .trrow', '#zoomhost .maplibregl-ctrl-group', '#toolbar', '#drawer', '#btnMore', '#legend', '#propbar:not([hidden])', '#inspector', '#unicard'];
           const caixas = sel.map((s) => [s, document.querySelector(s)]).filter(([, e]) => e && e.checkVisibility()).map(([s, e]) => [s, e.getBoundingClientRect()]);
           const ruins = [];
           for (let i = 0; i < caixas.length; i++) for (let j = i + 1; j < caixas.length; j++) {
@@ -192,7 +196,7 @@ const TESTES = {
       for (const [w, h] of [[1568, 760], [1366, 768], [1024, 768], [820, 1180]]) {
         await pg.setViewportSize({ width: w, height: h }); await pg.waitForTimeout(600);
         const r = await pg.evaluate(() => {
-          const sel = ['.leftcol > .title', '.leftcol > .search', '.leftcol > .views', '.topbar > .modes', '.topbar > .topright', '#zoomhost .maplibregl-ctrl-group', '#toolbar', '#legend', '#inspector', '#unicard'];
+          const sel = ['.leftcol > .title', '.leftcol > .search', '.leftcol > .views', '.topbar > .modes', '.topright > .trrow', '#zoomhost .maplibregl-ctrl-group', '#toolbar', '#btnMore', '#legend', '#inspector', '#unicard'];
           const cx = sel.map((s) => [s, document.querySelector(s)]).filter(([, e]) => e && e.checkVisibility()).map(([s, e]) => [s, e.getBoundingClientRect()]);
           const ruins = [];
           for (let i = 0; i < cx.length; i++) for (let j = i + 1; j < cx.length; j++) { const a = cx[i][1], b = cx[j][1]; if (Math.min(a.right, b.right) - Math.max(a.left, b.left) > 1 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 1) ruins.push(cx[i][0] + ' x ' + cx[j][0]); }
@@ -207,7 +211,7 @@ const TESTES = {
   t04: [
     ['legenda começa recolhida, em botão de 44 px; tocar expande e lembra a escolha', TODOS, async (pg) => {
       assert.equal(await pg.getAttribute('#legTog', 'aria-expanded'), 'false', 'a legenda deve começar recolhida em toque');
-      const m = await pg.evaluate(() => { const r = document.querySelector('#legend').getBoundingClientRect(), t = document.querySelector('#legTog').getBoundingClientRect(), b = document.querySelector('#toolbar').getBoundingClientRect(); return { w: r.width, h: t.height, aoLado: r.left >= b.right, naoSobre: r.right <= document.querySelector('#inspector').getBoundingClientRect().left }; });
+      const m = await pg.evaluate(() => { const r = document.querySelector('#legend').getBoundingClientRect(), t = document.querySelector('#legTog').getBoundingClientRect(), b = document.querySelector('#btnMore').getBoundingClientRect(); return { w: r.width, h: t.height, aoLado: r.left >= b.right, naoSobre: r.right <= document.querySelector('#inspector').getBoundingClientRect().left }; });
       assert.ok(m.h >= 43.5, 'botão da legenda com 44 px: ' + m.h);
       assert.ok(m.w < 200, 'botão pequeno: ' + m.w);
       assert.ok(m.aoLado, 'ao lado da barra de ferramentas');
@@ -247,7 +251,7 @@ const TESTES = {
       await toque('touchStart', r.y); for (let i = 1; i <= 6; i++) await toque('touchMove', r.y + i * 12); await toque('touchEnd', r.y + 72); await pg.waitForTimeout(400);
       assert.equal(await estado(pg, 'E => E.uniCollapsed'), true, 'o toque arrastado recolhe');
       const ruins = await pg.evaluate(() => {
-        const sel = ['.leftcol > .title', '.leftcol > .search', '.leftcol > .views', '.topbar > .modes', '.topbar > .topright', '#zoomhost .maplibregl-ctrl-group', '#toolbar', '#legend', '#inspector', '#unicard'];
+        const sel = ['.leftcol > .title', '.leftcol > .search', '.leftcol > .views', '.topbar > .modes', '.topright > .trrow', '#zoomhost .maplibregl-ctrl-group', '#toolbar', '#btnMore', '#legend', '#inspector', '#unicard'];
         const cx = sel.map((s) => [s, document.querySelector(s)]).filter(([, e]) => e && e.checkVisibility()).map(([s, e]) => [s, e.getBoundingClientRect()]);
         const out = [];
         for (let i = 0; i < cx.length; i++) for (let j = i + 1; j < cx.length; j++) { const a = cx[i][1], b = cx[j][1]; if (Math.min(a.right, b.right) - Math.max(a.left, b.left) > 1 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 1) out.push(cx[i][0] + ' x ' + cx[j][0]); }

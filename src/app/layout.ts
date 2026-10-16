@@ -6,12 +6,11 @@ export const MQ_UNICO = '(min-width: 601px)';
 const mq = window.matchMedia(MQ_UNICO);
 export const ehUnico = () => mq.matches;
 
-/** Elementos que mudam de lugar no layout único: a barra única na lateral recebe o zoom e as ferramentas; a gaveta recebe girar e base. */
+/** Elementos que mudam de lugar no layout único: a barra lateral recebe o zoom (o ⋯ já está nela); a gaveta recebe girar e base. */
 const MOVEIS = [
-  { id: 'zoomhost', destino: 'tools' },
-  { id: 'toolbar', destino: 'tools' },
-  { id: 'rotbar', destino: 'drawer' },
-  { id: 'base', destino: 'drawer' },
+  { id: 'zoomhost', destino: 'tools', inicio: true },
+  { id: 'rotbar', destino: 'drawer', inicio: false },
+  { id: 'base', destino: 'drawer', inicio: false },
 ];
 const marcas = new Map<string, Comment>();
 
@@ -35,7 +34,7 @@ function aplicar() {
     const el = document.getElementById(m.id);
     const marca = marcas.get(m.id);
     if (!el || !marca) continue;
-    if (t) document.getElementById(m.destino)!.append(el); else marca.after(el);
+    if (t) { const d = document.getElementById(m.destino)!; if (m.inicio) d.prepend(el); else d.append(el); } else marca.after(el);
   }
   $('#drawer').toggleAttribute('inert', !t || !gavetaAberta);
   setGaveta(gavetaAberta, false);
