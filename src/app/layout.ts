@@ -1,4 +1,4 @@
-import { $, syncAllSegs } from './ui';
+import { $, gestoVertical, syncAllSegs } from './ui';
 
 /** Tablet: toque e largura entre 601 e 1366 px. Celulares (até 600 px) e telas com mouse mantêm o layout atual. */
 export const MQ_TABLET = '(pointer: coarse) and (min-width: 601px) and (max-width: 1366px)';
@@ -51,6 +51,7 @@ export function initLayout() {
     marcas.set(m.id, marca);
   }
   $('#btnMore').addEventListener('click', () => { setGaveta(!gavetaAberta); $('#drawer').toggleAttribute('inert', !gavetaAberta); });
+  initPainel();
   mq.addEventListener('change', aplicar);
   aplicar();
   // a gaveta sobe junto com a altura do que está no dock (legenda ou barra de propor)
@@ -60,4 +61,33 @@ export function initLayout() {
     new ResizeObserver(set).observe(dock);
     set();
   }
+}
+
+/* ---- painel direito: o cabeçalho (grip, abas e km) é o puxador ---- */
+const CHAVE_PAINEL = 'pavecad-painel';
+export const painelRecolhido = () => $('#inspector').classList.contains('collapsed');
+
+export function setPainel(recolher: boolean, salvar = true) {
+  const c = $('#collapse');
+  $('#inspector').classList.toggle('collapsed', recolher);
+  c.setAttribute('aria-label', recolher ? 'Expandir painel' : 'Recolher painel');
+  c.setAttribute('title', recolher ? 'Expandir painel' : 'Recolher painel');
+  c.setAttribute('aria-expanded', String(!recolher));
+  c.innerHTML = `<svg class="i" viewBox="0 0 24 24"><path d="${recolher ? 'M6 9l6 6 6-6' : 'M6 15l6-6 6 6'}"/></svg>`;
+  if (salvar) try { localStorage.setItem(CHAVE_PAINEL, recolher ? '1' : '0'); } catch { /* sem storage */ }
+}
+
+export function initPainel() {
+  let salvo = false;
+  try { salvo = localStorage.getItem(CHAVE_PAINEL) === '1'; } catch { /* sem storage */ }
+  setPainel(salvo, false);
+  $('#collapse').addEventListener('click', () => setPainel(!painelRecolhido()));
+  const cab = $('#ihead');
+  gestoVertical(cab, { ativo: isTablet, aoBaixo: () => setPainel(true), aoCima: () => setPainel(false) });
+  // tocar na faixa recolhida (fora dos botões) ou numa aba abre de novo
+  cab.addEventListener('click', (e) => {
+    // o chevron troca o próprio ícone ao clicar, então o alvo do evento já saiu do DOM: usa o caminho original
+    if (!painelRecolhido() || e.composedPath().includes($('#collapse'))) return;
+    setPainel(false);
+  });
 }

@@ -54,11 +54,6 @@ $('#btnGps').addEventListener('click', () => void gpsToggle());
 $('#btnField').addEventListener('click', () => setField(!E.field));
 $('#goBtn').addEventListener('click', () => { const v = $<HTMLInputElement>('#gokm').value; if (v.trim()) goLabel(v); });
 $('#gokm').addEventListener('keydown', (e) => { if (e.key === 'Enter') { $('#goBtn').click(); (e.target as HTMLElement).blur(); } });
-$('#collapse').addEventListener('click', () => {
-  const c = $('#inspector').classList.toggle('collapsed');
-  $('#collapse').setAttribute('aria-label', c ? 'Expandir painel' : 'Recolher painel');
-  $('#collapse').innerHTML = `<svg class="i" viewBox="0 0 24 24"><path d="${c ? 'M6 9l6 6 6-6' : 'M6 15l6-6 6 6'}"/></svg>`;
-});
 
 /* ---- lista de atalhos ---- */
 const ajudaAberta = () => !$('#ajuda').hidden;
