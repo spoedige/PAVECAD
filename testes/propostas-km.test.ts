@@ -98,13 +98,14 @@ describe('propostas ancoradas no km', () => {
 
   it('marcos repetidos (9+1000 e 10+000, mesmo km) não quebram o reposicionamento', () => {
     const rows = original.rows.map((r) => ({ ...r }));
-    rows[5].marco = '163+1000';
-    rows[6].marco = '164+000'; // mesmo km do marco anterior normalizado
+    expect(rows[98].marco).toBe('166+0');
+    rows[99].marco = '165+1000'; // mesmo km da linha 98, depois de normalizar
     const dup = comoPV({ ...original, rows }, 'p9');
-    const out = reposicionar([{ ...prop('a', 6, 8), km0: dup.kmNum[6], km1: dup.kmNum[8] }], [dup]);
+    expect(dup.kmNum[99]).toBeCloseTo(dup.kmNum[98], 9);
+    const out = reposicionar([{ ...prop('a', 99, 101), km0: dup.kmNum[99], km1: dup.kmNum[101] }], [dup]);
     expect(out[0].orfa).toBe(false);
-    expect(out[0].r1).toBe(8);
+    expect(out[0].r1).toBe(101);
     // com o km repetido, vale a primeira ocorrência: no máximo uma linha de diferença
-    expect([5, 6]).toContain(out[0].r0);
+    expect([98, 99]).toContain(out[0].r0);
   });
 });
