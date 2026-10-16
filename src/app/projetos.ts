@@ -7,7 +7,7 @@ import { aplicarGeometria, baseOf, criarProjeto, E, H, novoId, type AppProj } fr
 import { addProjectToMap, applyPaint, clearFocus, fitList, removeProjectFromMap, setProjectData, updateSelLayer } from './mapa';
 import * as db from './persist';
 import { renderAll } from './paineis';
-import { refreshPropLayers, resolveProps } from './revisao';
+import { refreshProp, refreshPropLayers, resolveProps } from './revisao';
 import { toast } from './ui';
 
 type Resp = Awaited<ReturnType<typeof carregarPlanilha>>;
@@ -122,6 +122,7 @@ function terminar(novos: AppProj[], enquadrar = true) {
   E.settingsPid ??= novos[0].id;
   E.activeGroup ??= novos[0].meta.uf;
   resolveProps();
+  refreshProp();
   refreshPropLayers();
   renderAll();
   if (enquadrar) fitList(novos);

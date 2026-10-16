@@ -63,6 +63,78 @@ const TESTES = {
       assert.ok(r.max <= 0, `há rolagem em ${r.piores.join('; ')} (altura útil ${r.altura}px, ${r.n} casos)`);
     }],
   ],
+  g10: [
+    ['propor solução: ativar, clicar um trecho, escolher, aplicar, ver na Revisão e sobreviver ao reload', '1366x768', async (pg) => {
+      await irParaKm(pg, '170+500', 3500);
+      await pg.keyboard.press('n');
+      assert.equal(await pg.isVisible('#propbar'), true, 'a barra de propor deve abrir com a tecla N');
+      // estado inicial: nenhum trecho
+      assert.match(await pg.textContent('#propbar'), /0 trechos selecionados/);
+      assert.match(await pg.textContent('#propbar'), /Selecione um trecho no mapa/);
+      assert.equal(await pg.isDisabled('#pApply'), true);
+      // clica no meio da Fx 1 do segmento selecionado
+      const alvo = await pg.evaluate(() => {
+        const E = window.__pavecad.E, sel = E.sel, p = E.P.find((x) => x.id === sel.pid);
+        const f = p.polyByFid.get(sel.row * 8 + 1), c = f.geometry.coordinates[0];
+        const m = window.__pavecad.map(), pt = m.project([(c[0][0] + c[2][0]) / 2, (c[0][1] + c[2][1]) / 2]), box = document.querySelector('#map').getBoundingClientRect();
+        return { x: box.left + pt.x, y: box.top + pt.y, pname: p.meta.name, row: sel.row };
+      });
+      await pg.mouse.click(alvo.x, alvo.y);
+      await pg.waitForTimeout(400);
+      assert.match(await pg.textContent('#propbar'), /1 trecho selecionado/);
+      assert.doesNotMatch(await pg.textContent('#propbar'), /Selecione um trecho no mapa/);
+      assert.equal(await pg.isDisabled('#pApply'), false, 'o Aplicar deve habilitar com seleção');
+      // escolhe a solução e a observação
+      await pg.selectOption('#pTo', 'FSE');
+      await pg.fill('#pNote', 'teste e2e');
+      await pg.click('#pApply');
+      await pg.waitForTimeout(400);
+      const props = await estado(pg, 'E => E.props.map((r) => ({ to: r.to, note: r.note, pid: !!r.pid, orfa: !!r.orfa, km0: r.km0 }))');
+      assert.equal(props.length, 1, 'a proposta deve ter sido criada');
+      assert.deepEqual([props[0].to, props[0].note, props[0].pid, props[0].orfa], ['FSE', 'teste e2e', true, false]);
+      assert.match(await pg.textContent('#propbar'), /0 trechos selecionados/, 'a seleção zera depois de aplicar');
+      assert.equal(await pg.isDisabled('#pApply'), true);
+      // aba Revisão
+      await pg.keyboard.press('Escape');
+      await aba(pg, 'notas');
+      const txt = await pg.textContent('#t-notas');
+      assert.match(txt, /Propostas de solução\s*1/);
+      assert.match(txt, /→ Fresagem estrutural/);
+      assert.match(txt, /teste e2e/);
+      // sobrevive ao reload (planilhas e propostas voltam do IndexedDB)
+      await pg.reload();
+      await pg.waitForFunction(() => window.__pavecad && window.__pavecad.E.P.length === 2, null, { timeout: 90000 });
+      await pg.waitForTimeout(1500);
+      const depois = await estado(pg, 'E => E.props.map((r) => ({ to: r.to, pid: !!r.pid, orfa: !!r.orfa, r0: r.r0 }))');
+      assert.equal(depois.length, 1);
+      assert.deepEqual([depois[0].to, depois[0].pid, depois[0].orfa], ['FSE', true, false]);
+      await aba(pg, 'notas');
+      assert.match(await pg.textContent('#t-notas'), /→ Fresagem estrutural/);
+      assert.equal(await pg.locator('#t-notas [data-pd]').count(), 1);
+    }],
+  ],
+  g10b: [
+    ['propor: seleção de planilha removida é descartada e o Aplicar desabilita', '1366x768', async (pg) => {
+      await irParaKm(pg, '170+500', 3500);
+      await pg.keyboard.press('n');
+      const alvo = await pg.evaluate(() => {
+        const E = window.__pavecad.E, sel = E.sel, p = E.P.find((x) => x.id === sel.pid);
+        const f = p.polyByFid.get(sel.row * 8 + 1), c = f.geometry.coordinates[0];
+        const pt = window.__pavecad.map().project([(c[0][0] + c[2][0]) / 2, (c[0][1] + c[2][1]) / 2]), box = document.querySelector('#map').getBoundingClientRect();
+        return { x: box.left + pt.x, y: box.top + pt.y, id: p.id };
+      });
+      await pg.mouse.click(alvo.x, alvo.y);
+      await pg.waitForTimeout(300);
+      assert.match(await pg.textContent('#propbar'), /1 trecho selecionado/);
+      // remove a planilha da seleção pelo painel Resumo
+      await aba(pg, 'resumo');
+      await pg.click(`#t-resumo [data-del="${alvo.id}"]`);
+      await pg.waitForTimeout(500);
+      assert.match(await pg.textContent('#propbar'), /0 trechos selecionados/);
+      assert.equal(await pg.isDisabled('#pApply'), true);
+      assert.match(await pg.textContent('#propbar'), /Selecione um trecho no mapa/);
+    }],
+  ],
   g09: [
     ['limiares: campos dentro do cartão, sem sobrepor, em 1366, 1024, 820 e 480 px', '1366x768', async (pg, { ctx }) => {
       const medir = () => pg.evaluate(() => {

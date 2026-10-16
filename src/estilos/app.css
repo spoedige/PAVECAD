@@ -121,6 +121,7 @@ svg.i{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.8;stro
 .pb-top{display:flex;justify-content:space-between;gap:8px;align-items:baseline;flex-wrap:wrap}
 .pb-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .pb-row select{flex:1;min-width:0;border:0;border-radius:10px;background:var(--fill);padding:7px 10px;min-height:max(34px,var(--tap));color:var(--fg);font-weight:500}
+.pb-hint{flex:1 1 auto;min-width:0;font-size:12px;color:var(--muted)}
 .pb-in{flex:1;min-width:120px;border:0;border-radius:10px;background:var(--fill);padding:8px 12px;min-height:max(34px,var(--tap));outline:none}
 .pb-in:focus{box-shadow:0 0 0 2px var(--accent)}
 .pb-row .btn{flex:none}

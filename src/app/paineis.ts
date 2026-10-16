@@ -8,7 +8,7 @@ import { regeometrar, removerProjeto } from './projetos';
 import { IC } from './icones';
 import { applyLayers, applyPaint, clearFocus, clearSel, fitAll, fitFocus, fitList, getMap, renderLegend, select, setBase, setFocus, setProjectData, stepSel, updateSelLayer, updateStakes, applyVisibility, temMapTiler } from './mapa';
 import { drawUni, renderGroups } from './unifilar';
-import { refreshPropLayers, renderNotes, resolveProps, startNote } from './revisao';
+import { refreshProp, refreshPropLayers, renderNotes, resolveProps, startNote } from './revisao';
 import { $, cssv, esc, fmt, syncAllSegs, syncSeg, toast } from './ui';
 
 const Q = () => (E.field ? Q5F : Q5);
@@ -139,6 +139,7 @@ export function removeProject(id: string) {
   if (E.sel?.pid === id) { E.sel = null; updateSelLayer(); }
   if (E.focus) clearFocus();
   resolveProps();
+  refreshProp();
   refreshPropLayers();
   renderAll();
   toast('Planilha removida');

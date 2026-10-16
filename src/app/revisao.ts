@@ -70,13 +70,15 @@ const totalAlvos = (list: Alvo[]) => list.reduce((a, s) => {
 }, { len: 0, area: 0 });
 
 export function refreshProp() {
+  // seleção de uma planilha que saiu (removida ou recarregada) não conta
+  E.propSel = E.propSel.filter((s) => getP(s.pid ?? ''));
   const bar = $('#propbar');
   if (E.tool !== 'prop') { bar.hidden = true; return; }
   bar.hidden = false;
   const tot = totalAlvos(E.propSel), n = E.propSel.length;
-  bar.innerHTML = `<div class="pb-top"><b>Propor solução</b><span class="muted num">${n ? `${n} trecho${n > 1 ? 's' : ''} · ${fmt(tot.len, 0)} m · ${fmt(tot.area, 0)} m²` : 'Clique em uma solução no mapa'}</span></div>
+  bar.innerHTML = `<div class="pb-top"><b>Propor solução</b><span class="muted num" id="pCount" aria-live="polite">${n} trecho${n === 1 ? '' : 's'} selecionado${n === 1 ? '' : 's'}${n ? ` · ${fmt(tot.len, 0)} m · ${fmt(tot.area, 0)} m²` : ''}</span></div>
     <div class="pb-row"><div class="seg" id="pmSeg" role="group" aria-label="Seleção"><button data-pm="run" aria-pressed="${E.propMode === 'run'}">Solução inteira</button><button data-pm="one" aria-pressed="${E.propMode === 'one'}">20 m</button></div><select id="pTo" aria-label="Nova solução">${[...trOrder(), '-'].map((k) => `<option value="${k}">${k === '-' ? 'Sem intervenção' : esc(trLabel(k))}</option>`).join('')}</select></div>
-    <div class="pb-row"><input id="pNote" class="pb-in" placeholder="Observação (opcional)" value="${esc(E.propNote)}" aria-label="Observação"><button class="btn p" id="pApply" ${n ? '' : 'disabled'}>Aplicar</button><button class="btn" id="pClear" ${n ? '' : 'disabled'}>Limpar</button><button class="iconbtn" id="pClose" aria-label="Fechar">${IC.x}</button></div>`;
+    <div class="pb-row"><input id="pNote" class="pb-in" placeholder="Observação (opcional)" value="${esc(E.propNote)}" aria-label="Observação"><button class="btn p" id="pApply" ${n ? '' : 'disabled'}>Aplicar</button>${n ? '' : '<span class="pb-hint" id="pHint">Selecione um trecho no mapa</span>'}<button class="btn" id="pClear" ${n ? '' : 'disabled'}>Limpar</button><button class="iconbtn" id="pClose" aria-label="Fechar">${IC.x}</button></div>`;
   const to = $<HTMLSelectElement>('#pTo');
   to.value = E.propTo;
   to.onchange = () => { E.propTo = to.value; };
@@ -86,10 +88,11 @@ export function refreshProp() {
   $('#pClear').onclick = () => { E.propSel = []; refreshProp(); refreshPropLayers(); };
   $('#pClose').onclick = () => setTool(null);
   $('#pApply').onclick = () => {
-    const total = E.propSel.length;
+    let aplicadas = 0;
     for (const s of E.propSel) {
       const pj = getP(s.pid ?? '');
-      if (!pj) continue;
+      if (!pj) continue; // planilha removida ou recarregada depois da seleção
+      aplicadas++;
       const rec: Proposta = { pid: s.pid, pname: s.pname, lane: s.lane, r0: s.r0, r1: s.r1, km0: pj.kmNum[s.r0], km1: pj.kmNum[s.r1], from: s.from, id: 'q' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), to: E.propTo, note: E.propNote.trim(), t: new Date().toISOString() };
       const r = addProposta(E.props, rec, pj.kmNum);
       E.props = r.list;
@@ -101,7 +104,8 @@ export function refreshProp() {
     refreshProp();
     refreshPropLayers();
     renderNotes();
-    toast(`${total} proposta${total > 1 ? 's' : ''} aplicada${total > 1 ? 's' : ''}. Veja a lista na aba Revisão`);
+    if (!aplicadas) toast('Nenhuma proposta aplicada: a planilha mudou depois da seleção. Selecione o trecho de novo.', 5000);
+    else toast(`${aplicadas} proposta${aplicadas > 1 ? 's' : ''} aplicada${aplicadas > 1 ? 's' : ''}. Veja a lista na aba Revisão`);
   };
 }
 
