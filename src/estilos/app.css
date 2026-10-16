@@ -155,6 +155,7 @@ svg.i{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.8;stro
 .iconbtn{width:max(30px,var(--tap));height:max(30px,var(--tap));border-radius:50%;border:0;background:var(--fill);display:grid;place-items:center;color:var(--muted);flex:none;transition:background .15s,color .15s}
 .iconbtn:hover{background:var(--fill2);color:var(--fg)}
 .iconbtn[disabled]{opacity:.35;cursor:default}
+.grip,.ikm{display:none}
 .tabbody{padding:6px 14px 14px;overflow-y:auto;min-height:0;display:flex;flex-direction:column;gap:18px;scrollbar-width:thin}
 .tabbody>*{flex:none}
 /* Fade no rodapé só enquanto há mais conteúdo abaixo (classe .mais, ligada por observarRolagem). No fim da rolagem o último item aparece inteiro. */
@@ -374,3 +375,11 @@ textarea:focus{box-shadow:inset 0 0 0 2px var(--accent)}
 .tablet .drawer .rotbar{background:none;border:0;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;padding:0;gap:4px}
 .tablet .drawer .seg{display:flex;background:var(--fill);box-shadow:none;border:0}
 .tablet .drawer .seg button{flex:1}
+
+/* Painel direito no tablet: grip, abas e km formam o cabeçalho; arrastar para baixo recolhe até essa faixa. */
+.tablet .ihead{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"grip grip" "tabs tabs" "km chev";gap:4px 8px;align-items:center;padding:4px 10px 8px 12px;touch-action:pan-x;cursor:grab;user-select:none;-webkit-user-select:none}
+.tablet .grip{display:block;grid-area:grip;justify-self:center;width:44px;height:5px;border-radius:3px;background:var(--faint);margin:6px 0 4px}
+.tablet .ihead .seg{grid-area:tabs;display:grid;grid-template-columns:repeat(5,minmax(0,1fr))}
+.tablet .ikm{display:block;grid-area:km;min-width:0;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tablet #collapse{grid-area:chev}
+.tablet .inspector.collapsed .ihead{cursor:pointer}

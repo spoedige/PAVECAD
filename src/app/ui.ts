@@ -46,3 +46,32 @@ export function observarRolagem(el: HTMLElement) {
   new MutationObserver(att).observe(el, { childList: true, subtree: true });
   att();
 }
+
+/** Gesto vertical num cabeçalho (puxador). Arrastar `limite` px ou mais para baixo ou para cima chama o callback.
+ *  Só vale quando `ativo()` é verdadeiro. Move e soltar são ouvidos na janela, porque o ponteiro pode sair do cabeçalho
+ *  durante o arrasto. O clique que termina um arrasto é descartado, então tocar nas abas continua funcionando. */
+export function gestoVertical(el: HTMLElement, o: { aoBaixo: () => void; aoCima: () => void; ativo: () => boolean; limite?: number }) {
+  const limite = o.limite ?? 40;
+  let id = -1, y0 = 0, moveu = false;
+  const mover = (e: PointerEvent) => { if (e.pointerId === id && Math.abs(e.clientY - y0) > 8) moveu = true; };
+  const soltar = (e: PointerEvent, cancelado: boolean) => {
+    if (e.pointerId !== id) return;
+    id = -1;
+    window.removeEventListener('pointermove', mover);
+    window.removeEventListener('pointerup', aoSoltar);
+    window.removeEventListener('pointercancel', aoCancelar);
+    const dy = e.clientY - y0;
+    if (cancelado || !moveu) return;
+    if (dy >= limite) o.aoBaixo(); else if (dy <= -limite) o.aoCima();
+  };
+  const aoSoltar = (e: PointerEvent) => soltar(e, false);
+  const aoCancelar = (e: PointerEvent) => soltar(e, true);
+  el.addEventListener('pointerdown', (e) => {
+    if (!o.ativo() || !e.isPrimary || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    id = e.pointerId; y0 = e.clientY; moveu = false;
+    window.addEventListener('pointermove', mover);
+    window.addEventListener('pointerup', aoSoltar);
+    window.addEventListener('pointercancel', aoCancelar);
+  });
+  el.addEventListener('click', (e) => { if (moveu) { e.stopPropagation(); e.preventDefault(); moveu = false; } }, true);
+}

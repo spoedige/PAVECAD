@@ -79,7 +79,8 @@
   </div>
 
   <aside class="glass inspector" id="inspector">
-    <div class="ihead">
+    <div class="ihead" id="ihead">
+      <div class="grip" aria-hidden="true"></div>
       <div class="seg lg" id="tabs" role="tablist">
         <button role="tab" aria-selected="true" data-t="resumo">Resumo</button>
         <button role="tab" aria-selected="false" data-t="seg">Segmento</button>
@@ -87,6 +88,7 @@
         <button role="tab" aria-selected="false" data-t="notas">Revisão</button>
         <button role="tab" aria-selected="false" data-t="aj">Ajustes</button>
       </div>
+      <div class="ikm" id="ikm"></div>
       <button class="iconbtn" id="collapse" aria-label="Recolher painel" title="Recolher painel"><svg class="i" viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></svg></button>
     </div>
     <div class="tabbody" id="t-resumo"></div>

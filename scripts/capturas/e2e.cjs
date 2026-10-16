@@ -133,6 +133,80 @@ const TESTES = {
       assert.deepEqual(d, { tablet: false, base: true, rot: true, more: false });
     }],
   ],
+  t03: [
+    ['painel: arrastar o cabeçalho para baixo (40 px) recolhe até a faixa com abas e km; para cima reabre', 'tablet-h-1024x768', async (pg) => {
+      await irParaKm(pg, '170+500'); await aba(pg, 'seg');
+      const cab = () => pg.evaluate(() => { const r = document.querySelector('#ihead').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + 8, b: r.bottom }; });
+      const arrastar = async (de, dy) => { await pg.mouse.move(de.x, de.y); await pg.mouse.down(); for (let i = 1; i <= 6; i++) await pg.mouse.move(de.x, de.y + (dy * i) / 6); await pg.mouse.up(); await pg.waitForTimeout(250); };
+      const rec = () => pg.evaluate(() => document.querySelector('#inspector').classList.contains('collapsed'));
+      assert.match(await pg.textContent('#ikm'), /^km 170\+500 · /);
+      await arrastar(await cab(), 30);
+      assert.equal(await rec(), false, '30 px não chega ao limite de 40');
+      await arrastar(await cab(), 60);
+      assert.equal(await rec(), true, 'arrastar 60 px para baixo recolhe');
+      assert.equal(await pg.evaluate(() => localStorage.getItem('pavecad-painel')), '1');
+      const faixa = await pg.evaluate(() => { const r = document.querySelector('#inspector').getBoundingClientRect(); return { h: r.height, tabs: document.querySelector('#tabs').checkVisibility(), km: document.querySelector('#ikm').checkVisibility(), corpo: document.querySelector('#t-seg').checkVisibility() }; });
+      assert.ok(faixa.tabs && faixa.km && !faixa.corpo, 'a faixa mostra abas e km, sem o corpo');
+      assert.ok(faixa.h < 140, 'faixa baixa: ' + faixa.h);
+      await arrastar(await cab(), -60);
+      assert.equal(await rec(), false, 'arrastar para cima reabre');
+      assert.equal(await pg.evaluate(() => localStorage.getItem('pavecad-painel')), '0');
+    }],
+    ['painel: tocar na faixa, numa aba ou no chevron reabre; o gesto só vale no cabeçalho', 'tablet-h-1024x768', async (pg) => {
+      await irParaKm(pg, '170+500'); await aba(pg, 'seg');
+      const rec = () => pg.evaluate(() => document.querySelector('#inspector').classList.contains('collapsed'));
+      // arrastar no corpo do painel não recolhe
+      const c = await pg.evaluate(() => { const r = document.querySelector('#t-seg').getBoundingClientRect(); return { x: r.left + 40, y: r.top + 60 }; });
+      await pg.mouse.move(c.x, c.y); await pg.mouse.down(); await pg.mouse.move(c.x, c.y + 90, { steps: 6 }); await pg.mouse.up();
+      assert.equal(await rec(), false, 'o gesto só vale no cabeçalho');
+      // chevron recolhe e abre
+      await pg.click('#collapse'); assert.equal(await rec(), true);
+      await pg.click('#collapse'); assert.equal(await rec(), false);
+      // tocar na faixa
+      await pg.click('#collapse'); await pg.click('#ikm'); assert.equal(await rec(), false, 'tocar no km reabre');
+      // tocar numa aba reabre e seleciona
+      await pg.click('#collapse'); await pg.click('#tabs [data-t=ana]');
+      assert.equal(await rec(), false); assert.equal(await estado(pg, 'E => E.tab'), 'ana');
+      // um toque nas abas continua selecionando (o gesto não engole o clique)
+      await pg.click('#tabs [data-t=seg]'); assert.equal(await estado(pg, 'E => E.tab'), 'seg');
+    }],
+    ['painel: gesto de toque real (CDP) e estado recolhido lembrado ao recarregar', 'tablet-h-1024x768', async (pg, { ctx }) => {
+      const cdp = await ctx.newCDPSession(pg);
+      const r = await pg.evaluate(() => { const b = document.querySelector('#ihead').getBoundingClientRect(); return { x: Math.round(b.left + b.width / 2), y: Math.round(b.top + 10) }; });
+      const toque = (type, y) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x: r.x, y }] });
+      await toque('touchStart', r.y);
+      for (let i = 1; i <= 6; i++) await toque('touchMove', r.y + i * 12);
+      await toque('touchEnd', r.y + 72); await pg.waitForTimeout(300);
+      assert.equal(await pg.evaluate(() => document.querySelector('#inspector').classList.contains('collapsed')), true, 'o toque arrastado para baixo recolhe');
+      await pg.reload(); await pg.waitForTimeout(1500);
+      assert.equal(await pg.evaluate(() => document.querySelector('#inspector').classList.contains('collapsed')), true, 'recolhido volta recolhido');
+      assert.equal(await pg.getAttribute('#collapse', 'aria-label'), 'Expandir painel');
+    }],
+    ['painel: na faixa recolhida nada se sobrepõe, nos dois tablets', 'tablet-h-1024x768', async (pg) => {
+      await irParaKm(pg, '170+500'); await pg.click('#collapse');
+      for (const [w, h] of [[1024, 768], [820, 1180]]) {
+        await pg.setViewportSize({ width: w, height: h }); await pg.waitForTimeout(600);
+        const r = await pg.evaluate(() => {
+          const sel = ['.leftcol > .title', '.leftcol > .search', '.leftcol > .views', '.topbar > .modes', '.topbar > .topright', '#zoomhost .maplibregl-ctrl-group', '#toolbar', '#legend', '#inspector', '#unicard'];
+          const cx = sel.map((s) => [s, document.querySelector(s)]).filter(([, e]) => e && e.checkVisibility()).map(([s, e]) => [s, e.getBoundingClientRect()]);
+          const ruins = [];
+          for (let i = 0; i < cx.length; i++) for (let j = i + 1; j < cx.length; j++) { const a = cx[i][1], b = cx[j][1]; if (Math.min(a.right, b.right) - Math.max(a.left, b.left) > 1 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 1) ruins.push(cx[i][0] + ' x ' + cx[j][0]); }
+          const ikm = document.querySelector('#ikm');
+          return { ruins, kmCortado: ikm.scrollWidth > ikm.clientWidth + 1 };
+        });
+        assert.deepEqual(r.ruins, [], `${w}: sobreposição`);
+        assert.equal(r.kmCortado, false, `${w}: km cortado na faixa`);
+      }
+    }],
+    ['desktop: arrastar o cabeçalho não recolhe; o chevron continua funcionando', '1366x768', async (pg) => {
+      const r = await pg.evaluate(() => { const b = document.querySelector('#ihead').getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + 8 }; });
+      await pg.mouse.move(r.x, r.y); await pg.mouse.down(); await pg.mouse.move(r.x, r.y + 80, { steps: 6 }); await pg.mouse.up();
+      assert.equal(await pg.evaluate(() => document.querySelector('#inspector').classList.contains('collapsed')), false);
+      assert.equal(await pg.evaluate(() => getComputedStyle(document.querySelector('.grip')).display), 'none');
+      await pg.click('#collapse');
+      assert.equal(await pg.evaluate(() => document.querySelector('#inspector').classList.contains('collapsed')), true);
+    }],
+  ],
   g03: [
     ['a seção é o seletor de faixa (clique, aria-pressed, teclado)', '1366x768', async (pg) => {
       await irParaKm(pg, '170+500'); await aba(pg, 'seg');

@@ -153,9 +153,10 @@ let segDetAberto = false;
 
 export function renderSeg() {
   const el = $('#t-seg'), s = E.sel;
-  if (!s) { el.innerHTML = '<div class="empty"><b>Nenhum segmento selecionado</b>Clique em uma faixa no mapa ou no unifilar.</div>'; return; }
+  if (!s) { el.innerHTML = '<div class="empty"><b>Nenhum segmento selecionado</b>Clique em uma faixa no mapa ou no unifilar.</div>'; $('#ikm').textContent = 'Nenhum segmento'; return; }
   const p = getP(s.pid);
   if (!p) { E.sel = null; return renderSeg(); }
+  $('#ikm').textContent = `km ${p.kmLab[s.row]} · ${projName(p)}`;
   const tinhaFoco = !!document.activeElement?.closest('#t-seg .xs');
   const r = p.rows[s.row], md = p.model[s.row], N = r.widths.length, isSh = s.lane === 0;
   const L = isSh ? null : r.lanes[s.lane - 1], tr = isSh ? md.sh : md.tr[s.lane - 1];
