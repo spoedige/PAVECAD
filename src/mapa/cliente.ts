@@ -1,4 +1,5 @@
 import type { GeoOptions } from '../geometry/build';
+import type { ParsedProject } from '../formats/types';
 import type { Project } from '../geometry/project';
 import type { Req, Res } from './worker';
 
@@ -38,3 +39,7 @@ export const carregarPlanilha = (pid: string, dados: ArrayBuffer, zone?: number)
 
 export const recalcular = (pid: string, projeto: Project, opts: Partial<GeoOptions>) =>
   chamar({ tipo: 'recalcular', pid, projeto, opts });
+
+/** Projeto já lido (por exemplo, dos JSON de exemplo em desenvolvimento). */
+export const carregarLido = (pid: string, parsed: ParsedProject, zone?: number) =>
+  chamar({ tipo: 'parsed', pid, parsed, zone });

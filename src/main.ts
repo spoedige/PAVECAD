@@ -1,36 +1,18 @@
 import './estilos/app.css';
-import { carregarPlanilha } from './mapa/cliente';
-import { criarProjeto, E, novoId, visibleProjects, type AppProj } from './app/estado';
+import { carregarLido, carregarPlanilha } from './mapa/cliente';
+import { criarProjeto, E, H, novoId, type AppProj } from './app/estado';
 import {
-  addProjectToMap, alignToRoad, applyPaint, clearSel, fitAll, fitList, goLabel, initMap, north,
-  removeProjectFromMap, renderLegend, rotate, setBase, stepSel, updateStakes,
+  addProjectToMap, alignToRoad, applyLayers, clearSel, fitList, goLabel, initMap, north, removeProjectFromMap, rotate,
+  setBase, stepSel, updateStakes,
 } from './app/mapa';
 import { MODE_KEYS, type ModeKey } from './dominio/indicadores';
-import { $, esc, syncAllSegs, syncSeg, toast } from './app/ui';
-
-function renderHeader() {
-  const v = visibleProjects();
-  $('#title').textContent = E.P.length ? `${E.P.length} planilha${E.P.length > 1 ? 's' : ''}` : 'Nenhuma planilha';
-  $('#subtitle').textContent = v.length ? `${v.length} ${v.length > 1 ? 'visíveis' : 'visível'} · padrão RoadRunner` : 'Carregue um arquivo no padrão RoadRunner';
-  const vb = $('#views'), groups = [...new Set(v.map((p) => p.meta.uf))];
-  vb.innerHTML = '<button class="chipbtn" data-g="*">Visão geral</button>' + groups.map((g) => `<button class="chipbtn" data-g="${esc(g)}">${esc(g.replace('BR-', ''))}</button>`).join('');
-  vb.querySelectorAll<HTMLButtonElement>('button').forEach((b) =>
-    b.addEventListener('click', () => {
-      const g = b.dataset.g!;
-      if (g === '*') fitAll();
-      else { E.activeGroup = g; fitList(visibleProjects().filter((p) => p.meta.uf === g)); }
-    }));
-  renderLegend();
-  syncAllSegs();
-}
-
-function setMode(m: ModeKey) {
-  E.mode = m;
-  E.dim.clear();
-  document.querySelectorAll<HTMLButtonElement>('#modes button').forEach((x) => x.setAttribute('aria-pressed', String(x.dataset.m === m)));
-  syncSeg($('#modes'));
-  applyPaint();
-}
+import { abrirDb } from './app/persist';
+import { gpsToggle } from './app/gps';
+import { initRevisao, onToolClick, refreshNotesLayer, refreshPropLayers, resolveProps, setTool } from './app/revisao';
+import { renderAll, renderSeg, setField, setMode, setTab, syncBaseSeg } from './app/paineis';
+import { drawUni, initUnifilar } from './app/unifilar';
+import { clearFocus } from './app/mapa';
+import { $, syncAllSegs, syncSeg, toast } from './app/ui';
 
 function addProject(p: AppProj) {
   const old = E.P.find((x) => x.meta.name === p.meta.name);
@@ -39,30 +21,58 @@ function addProject(p: AppProj) {
   if (E.mapReady) addProjectToMap(p);
 }
 
+async function incluir(carregar: (id: string) => ReturnType<typeof carregarPlanilha>, rotulo: string): Promise<AppProj | null> {
+  try {
+    const id = novoId();
+    const r = await carregar(id);
+    const p = criarProjeto(id, r.projeto, { opts: r.opts, normals: r.normals, camadas: r.camadas });
+    for (const l of p.log) console.info(`[${p.meta.name}] ${l.level}: ${l.msg}`);
+    addProject(p);
+    const avisos = p.log.filter((l) => l.level === 'warn').length;
+    if (avisos) toast(`${rotulo}: ${avisos} aviso(s) de importação. Veja em Ajustes`, 5000);
+    return p;
+  } catch (err) {
+    toast(`${rotulo}: ${(err as Error).message}`, 6000);
+    return null;
+  }
+}
+
+async function terminar(novos: AppProj[]) {
+  if (!novos.length) return;
+  E.settingsPid ??= novos[0].id;
+  E.activeGroup ??= novos[0].meta.uf;
+  resolveProps();
+  refreshPropLayers();
+  renderAll();
+  fitList(novos);
+  toast(`${novos.length} planilha(s) carregada(s)`);
+}
+
 async function abrir(files: File[]) {
   const novos: AppProj[] = [];
   for (const f of files) {
     toast(`Lendo ${f.name}... arquivos grandes podem levar alguns segundos`, 60000);
-    try {
-      const id = novoId();
-      const r = await carregarPlanilha(id, await f.arrayBuffer());
-      const p = criarProjeto(id, r.projeto, { opts: r.opts, normals: r.normals, camadas: r.camadas });
-      for (const l of p.log) console.info(`[${p.meta.name}] ${l.level}: ${l.msg}`);
-      addProject(p);
-      novos.push(p);
-      const avisos = p.log.filter((l) => l.level === 'warn').length;
-      if (avisos) toast(`${f.name}: ${avisos} aviso(s) de importação. Veja o console`, 5000);
-    } catch (err) {
-      toast(`${f.name}: ${(err as Error).message}`, 6000);
-    }
+    const buf = await f.arrayBuffer();
+    const p = await incluir((id) => carregarPlanilha(id, buf), f.name);
+    if (p) novos.push(p);
   }
-  if (novos.length) {
-    renderHeader();
-    fitList(novos);
-    toast(`${novos.length} planilha(s) carregada(s)`);
-  }
+  await terminar(novos);
 }
 
+async function carregarExemplos() {
+  const { nomesExemplo, lerExemplo } = await import('./app/exemplo');
+  toast('Carregando exemplos...', 60000);
+  const novos: AppProj[] = [];
+  for (const n of nomesExemplo()) {
+    const parsed = await lerExemplo(n);
+    const p = await incluir((id) => carregarLido(id, parsed), n);
+    if (p) novos.push(p);
+  }
+  E.activeGroup = novos[0]?.meta.uf ?? E.activeGroup;
+  await terminar(novos);
+}
+
+/* ---- controles ---- */
 $('#btnFile').addEventListener('click', () => $('#file').click());
 $('#file').addEventListener('change', (e) => {
   const input = e.target as HTMLInputElement;
@@ -70,19 +80,27 @@ $('#file').addEventListener('change', (e) => {
   input.value = '';
   if (files.length) void abrir(files);
 });
+if (import.meta.env.DEV) {
+  $('#btnExample').hidden = false;
+  $('#btnExample').addEventListener('click', () => void carregarExemplos());
+}
 document.querySelectorAll<HTMLButtonElement>('#modes button').forEach((b) => b.addEventListener('click', () => setMode(b.dataset.m as ModeKey)));
+document.querySelectorAll<HTMLButtonElement>('#tabs button').forEach((b) => b.addEventListener('click', () => setTab(b.dataset.t as typeof E.tab)));
 document.querySelectorAll<HTMLButtonElement>('#base button').forEach((b) =>
-  b.addEventListener('click', () => {
-    document.querySelectorAll('#base button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
-    syncSeg($('#base'));
-    setBase(b.dataset.b as typeof E.base);
-  }));
+  b.addEventListener('click', () => { setBase(b.dataset.b as typeof E.base); syncBaseSeg(); renderAll(); }));
 $('#rotL').addEventListener('click', () => rotate(-15));
 $('#rotR').addEventListener('click', () => rotate(15));
 $('#rotN').addEventListener('click', north);
 $('#rotA').addEventListener('click', alignToRoad);
+$('#btnGps').addEventListener('click', () => void gpsToggle());
+$('#btnField').addEventListener('click', () => setField(!E.field));
 $('#goBtn').addEventListener('click', () => { const v = $<HTMLInputElement>('#gokm').value; if (v.trim()) goLabel(v); });
 $('#gokm').addEventListener('keydown', (e) => { if (e.key === 'Enter') { $('#goBtn').click(); (e.target as HTMLElement).blur(); } });
+$('#collapse').addEventListener('click', () => {
+  const c = $('#inspector').classList.toggle('collapsed');
+  $('#collapse').setAttribute('aria-label', c ? 'Expandir painel' : 'Recolher painel');
+  $('#collapse').innerHTML = `<svg class="i" viewBox="0 0 24 24"><path d="${c ? 'M6 9l6 6 6-6' : 'M6 15l6-6 6 6'}"/></svg>`;
+});
 
 window.addEventListener('keydown', (e) => {
   const t = (e.target as HTMLElement).tagName;
@@ -90,11 +108,21 @@ window.addEventListener('keydown', (e) => {
   const k = e.key;
   if (k >= '1' && k <= '6') { setMode(MODE_KEYS[+k - 1]); return; }
   if (k === '/') { e.preventDefault(); $('#gokm').focus(); return; }
-  if (k === 'Escape') { clearSel(); return; }
+  if (k === 'Escape') {
+    if (E.tool) { setTool(null); return; }
+    if (E.editing) { E.editing = null; refreshNotesLayer(); renderAll(); return; }
+    if (E.focus) { clearFocus(); return; }
+    clearSel();
+    return;
+  }
   const lk = k.toLowerCase();
+  if (lk === 'p') { setTool('pin'); return; }
+  if (lk === 'n') { setTool('prop'); return; }
   if (lk === 'q') { rotate(-15); return; }
   if (lk === 'e') { rotate(15); return; }
   if (lk === 'r') { alignToRoad(); return; }
+  if (lk === 'g') { void gpsToggle(); return; }
+  if (lk === 's') { setField(!E.field); return; }
   if (!E.sel) return;
   const big = e.shiftKey ? 10 : 1;
   if (k === 'ArrowRight') { e.preventDefault(); stepSel(big, 0); }
@@ -103,5 +131,31 @@ window.addEventListener('keydown', (e) => {
   else if (k === 'ArrowDown') { e.preventDefault(); stepSel(0, 1); }
 });
 
-initMap(() => { renderHeader(); updateStakes(); });
-renderHeader();
+/* ---- ganchos entre mapa e painéis ---- */
+H.onSelect = (opt) => {
+  if (E.sel) E.settingsPid = E.sel.pid;
+  renderSeg();
+  drawUni();
+  if (opt.tab) setTab('seg');
+};
+H.onClick = onToolClick;
+
+async function boot() {
+  try { E.field = localStorage.getItem('pavecad-field') === '1'; } catch { /* sem storage */ }
+  if (E.field) { document.documentElement.setAttribute('data-contrast', 'field'); $('#btnField').setAttribute('aria-pressed', 'true'); }
+  await abrirDb();
+  await initRevisao();
+  initUnifilar();
+  renderAll();
+  initMap(() => {
+    resolveProps();
+    applyLayers();
+    refreshNotesLayer();
+    refreshPropLayers();
+    renderAll();
+    updateStakes();
+  });
+  syncAllSegs();
+  syncSeg($('#modes'));
+}
+void boot();
