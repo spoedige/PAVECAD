@@ -302,14 +302,12 @@ const TESTES = {
     }],
   ],
   g08: [
-    ['zoom até o limite em Ruas e Satélite sem pedir tiles acima do 19', '1366x768', async (pg, { log }) => {
-      for (const [base, nome] of [['osm', 'Ruas'], ['esri', 'Satélite']]) {
+    ['zoom até o limite em Ruas (tile 19) e Satélite (tile 17) com sobrezoom até o 21', '1366x768', async (pg, { log }) => {
+      for (const [base, nome, tileMax] of [['osm', 'Ruas', 19], ['esri', 'Satélite', 17]]) {
         await pg.evaluate(() => window.__pavecad.map().jumpTo({ zoom: 15 }));
+        log.tiles.length = 0;
         await pg.click(`#base [data-b=${base}]`);
         await irParaKm(pg, '170+500', 1500);
-        await pg.evaluate(() => window.__pavecad.map().jumpTo({ zoom: 16 }));
-        await pg.waitForTimeout(800);
-        log.tiles.length = 0;
         // zoom de verdade: rolagem do mouse sobre o mapa até travar no limite
         const box = await pg.locator('#map').boundingBox();
         await pg.mouse.move(box.x + box.width * 0.5, box.y + box.height * 0.55);
@@ -320,8 +318,8 @@ const TESTES = {
         assert.equal(await pg.evaluate(() => window.__pavecad.map().getMaxZoom()), 21);
         const zs = log.tiles.map((t) => t.z).filter((v) => v !== null);
         assert.ok(zs.length > 0, `${nome}: nenhum tile pedido`);
-        assert.ok(Math.max(...zs) <= 19, `${nome}: pediu tile de zoom ${Math.max(...zs)}`);
-        assert.ok(zs.includes(19), `${nome}: deveria usar o tile 19 ampliado`);
+        assert.ok(Math.max(...zs) <= tileMax, `${nome}: pediu tile de zoom ${Math.max(...zs)} (máximo ${tileMax})`);
+        assert.ok(zs.includes(tileMax), `${nome}: deveria usar o tile ${tileMax} ampliado`);
         // a base continua desenhada (a camada raster está visível) no zoom máximo
         const vis = await pg.evaluate((b) => window.__pavecad.map().getLayoutProperty(b, 'visibility'), base);
         assert.equal(vis, 'visible');
