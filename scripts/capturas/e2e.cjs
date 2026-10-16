@@ -63,6 +63,41 @@ const TESTES = {
       assert.ok(r.max <= 0, `há rolagem em ${r.piores.join('; ')} (altura útil ${r.altura}px, ${r.n} casos)`);
     }],
   ],
+  g09: [
+    ['limiares: campos dentro do cartão, sem sobrepor, em 1366, 1024, 820 e 480 px', '1366x768', async (pg, { ctx }) => {
+      const medir = () => pg.evaluate(() => {
+        const out = [];
+        for (const card of document.querySelectorAll('#cfgBody [data-k]')) {
+          const c = card.getBoundingClientRect(), campos = [...card.querySelectorAll('.lims input, .lims output')].map((e) => e.getBoundingClientRect());
+          const cols = getComputedStyle(card.querySelector('.lims')).gridTemplateColumns.split(' ').length;
+          const linhas = new Set(campos.map((r) => Math.round(r.top))).size;
+          for (const [i, r] of campos.entries()) {
+            if (r.left < c.left - 0.5 || r.right > c.right + 0.5) out.push(`${card.dataset.k}#${i} fora do cartão (${Math.round(r.right - c.right)}px)`);
+            for (const [j, q] of campos.entries()) if (j > i && r.left < q.right - 0.5 && r.right > q.left + 0.5 && r.top < q.bottom - 0.5 && r.bottom > q.top + 0.5) out.push(`${card.dataset.k}#${i} sobrepõe #${j}`);
+          }
+          out.push(`@${card.dataset.k}:cols=${cols}:campos=${campos.length}:linhas=${linhas}`);
+        }
+        return out;
+      });
+      for (const [w, h] of [[1366, 768], [1024, 768], [820, 1180], [480, 900]]) {
+        await pg.setViewportSize({ width: w, height: h });
+        await pg.click('#btnCfg');
+        await pg.click('#cfgTabs [data-ct=lim]');
+        await pg.waitForTimeout(300);
+        const r = await medir();
+        const problemas = r.filter((x) => !x.startsWith('@'));
+        assert.equal(problemas.length, 0, `${w}px: ` + problemas.slice(0, 5).join(' | '));
+        const info = r.filter((x) => x.startsWith('@'));
+        assert.equal(info.length, 5, 'cinco indicadores');
+        for (const x of info) {
+          assert.match(x, /campos=5/, `${w}px: 5 campos por cartão (${x})`);
+          if (w < 520) assert.match(x, /linhas=2/, `${w}px: quebra em 2 linhas (${x})`);
+          else assert.match(x, /cols=5:campos=5:linhas=1/, `${w}px: 5 colunas numa linha (${x})`);
+        }
+        await pg.click('#cfgClose');
+      }
+    }],
+  ],
   g08: [
     ['zoom até o limite em Ruas e Satélite sem pedir tiles acima do 19', '1366x768', async (pg, { log }) => {
       for (const [base, nome] of [['osm', 'Ruas'], ['esri', 'Satélite']]) {

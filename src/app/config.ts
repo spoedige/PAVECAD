@@ -259,7 +259,7 @@ function renderLimiares(body: HTMLElement) {
       const I = IND[k], desc = k === 'rc';
       return `<div class="cfg-card" data-k="${k}"><div class="sect" style="margin:0">${I.label} <span style="text-transform:none;font-weight:500">${I.unit}</span></div>
         <p class="note">${desc ? 'Quatro limites, do maior para o menor. Classe 1: Rc ≥ primeiro limite.' : 'Quatro limites crescentes. Classe 1: valor ≤ primeiro limite.'}</p>
-        <div class="lims">${atual[k].map((v, i) => `<input class="in" type="number" step="any" inputmode="decimal" data-i="${i}" value="${+(v * I.scale).toFixed(4)}" aria-label="Limite ${i + 1} de ${I.label}">`).join('')}</div>
+        <div class="lims">${atual[k].map((v, i) => `<div><span class="cl"><i style="background:${Q[i]}"></i>Classe ${i + 1}</span><input class="in" type="number" step="any" inputmode="decimal" data-i="${i}" value="${+(v * I.scale).toFixed(4)}" aria-label="Limite da classe ${i + 1} de ${I.label}"></div>`).join('')}<div><span class="cl"><i style="background:${Q[4]}"></i>Classe 5</span><output class="in" data-auto aria-label="Classe 5 de ${I.label}: ${desc ? 'abaixo' : 'acima'} do limite 4">${desc ? '<' : '>'} ${+(atual[k][3] * I.scale).toFixed(4)}</output></div></div>
         <div class="leg5" data-leg>${rotulosPara(k, atual[k]).map((l, i) => `<span><i style="background:${Q[i]}"></i>${esc(l)}</span>`).join('')}</div>
         <p class="cfg-err" data-err role="alert"></p></div>`;
     }).join('')}</div>
@@ -273,6 +273,8 @@ function renderLimiares(body: HTMLElement) {
   const previa = (k: IndKey) => {
     const card = body.querySelector<HTMLElement>(`[data-k="${k}"]`)!, v = ler(k), msg = validarLimites(k, v);
     card.querySelector<HTMLElement>('[data-err]')!.textContent = msg ?? '';
+    const auto = card.querySelector<HTMLElement>('[data-auto]');
+    if (!msg && auto) auto.textContent = `${k === 'rc' ? '<' : '>'} ${+(v[3] * IND[k].scale).toFixed(4)}`;
     if (!msg) card.querySelector<HTMLElement>('[data-leg]')!.innerHTML = rotulosPara(k, v).map((l, i) => `<span><i style="background:${Q[i]}"></i>${esc(l)}</span>`).join('');
     return msg;
   };
