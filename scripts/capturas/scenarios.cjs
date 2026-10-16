@@ -63,6 +63,11 @@ const CENARIOS = {
   toque: async (pg) => { await irParaKm(pg, '170+500'); await aba(pg, 'seg'); },
   segmento: async (pg) => { await irParaKm(pg, '170+500'); await aba(pg, 'seg'); },
   /** Aba Segmento rolada até o fim: o último cartão precisa ficar inteiro. */
+  /** Tablet com a gaveta de mapa (alinhar, girar, base) aberta. */
+  gaveta: async (pg, { vp }) => {
+    await irParaKm(pg, '170+500'); await aba(pg, 'seg');
+    if (vp.toque) { await pg.click('#btnMore'); await pg.waitForTimeout(500); }
+  },
   segmentoFim: async (pg) => {
     await irParaKm(pg, '170+500'); await aba(pg, 'seg');
     await pg.evaluate(() => { const b = document.querySelector('#t-seg'); b.scrollTop = b.scrollHeight; window.scrollTo(0, document.body.scrollHeight); });
@@ -86,7 +91,7 @@ const GRUPOS = {
   g14: ['revisaoVazia', 'revisaoComProposta'],
   g15: ['escalaSat'],
   g12: ['config'],
-  t01: ['inicio', 'segmento', 'segmentoFim'],
+  t01: ['inicio', 'segmento', 'segmentoFim', 'gaveta'],
 };
 
 module.exports = { CENARIOS, GRUPOS, irParaKm, aba, criarProposta, pontoLivre };

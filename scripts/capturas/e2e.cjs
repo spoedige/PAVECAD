@@ -28,6 +28,7 @@ const TESTES = {
       }
     }],
     ['gradiente de rolagem só enquanto há mais conteúdo; o último cartão fica inteiro', 'tablet-h-1024x768', async (pg) => {
+      await pg.setViewportSize({ width: 1024, height: 600 }); await pg.waitForTimeout(500); // baixo o bastante para o painel rolar
       await irParaKm(pg, '170+500'); await aba(pg, 'seg');
       await pg.click('#segDet summary'); await pg.waitForTimeout(300);
       const r = await pg.evaluate(async () => {
@@ -42,6 +43,94 @@ const TESTES = {
       assert.equal(r.fim, true);
       assert.equal(r.fimMais, false, 'no fim da rolagem o gradiente deve sumir');
       assert.ok(r.folga >= 0, 'o cartão Detalhes e tratamentos ficou cortado no fim: ' + r.folga);
+    }],
+  ],
+  t02: [
+    ['tablet: barra única à esquerda, ordem GPS, propor, campo, nota, ⋯, e topo só com indicadores, Planilhas e engrenagem', 'tablet-h-1024x768', async (pg) => {
+      assert.equal(await pg.evaluate(() => document.documentElement.classList.contains('tablet')), true);
+      const m = await pg.evaluate(() => {
+        const R = (s) => document.querySelector(s).getBoundingClientRect();
+        const ids = ['#btnGps', '[data-tool=prop]', '#btnField', '[data-tool=pin]', '#btnMore'];
+        const rs = ids.map(R);
+        return {
+          xs: rs.map((r) => Math.round(r.left)), ys: rs.map((r) => r.top), w: rs.map((r) => r.width), h: rs.map((r) => r.height),
+          zoomEmTools: !!document.querySelector('#tools #zoomhost'), barraEmTools: !!document.querySelector('#tools #toolbar'),
+          zoomX: Math.round(R('#zoomhost .maplibregl-ctrl-group').left), borda: R('#toolbar').left,
+          topo: [...document.querySelectorAll('.topbar button')].filter((b) => b.checkVisibility()).map((b) => b.id || b.dataset.m),
+          baseNoTopo: !!document.querySelector('.topbar #base'), rotNoTopo: !!document.querySelector('.leftcol #rotbar'),
+        };
+      });
+      assert.ok(m.zoomEmTools && m.barraEmTools, 'zoom e ferramentas devem estar na barra lateral');
+      assert.ok(new Set(m.xs).size === 1, 'os botões devem estar alinhados em coluna: ' + m.xs);
+      assert.deepEqual([...m.ys].sort((a, b) => a - b), m.ys, 'ordem vertical: GPS, propor, campo, nota, ⋯');
+      assert.ok(m.w.every((w) => w >= 44) && m.h.every((h) => h >= 44), 'alvos de 44 px');
+      assert.ok(Math.abs(m.zoomX - m.borda) <= 2, 'barra alinhada ao zoom');
+      assert.ok(m.borda <= 20, 'barra encostada na borda esquerda: ' + m.borda);
+      assert.equal(m.topo.filter((x) => !['sol', 'iri', 'atr', 'd0', 'rc', 'def', 'btnCfg', 'btnFile'].includes(x)).length, 0, 'topo com botão extra: ' + m.topo);
+      assert.equal(m.baseNoTopo, false, 'a escolha de base saiu do topo');
+      assert.equal(m.rotNoTopo, false, 'girar e alinhar saíram da coluna esquerda de cima');
+    }],
+    ['tablet: gaveta ⋯ abre alinhar, girar, norte e base; estado salvo; Satélite troca a base', 'tablet-h-1024x768', async (pg) => {
+      assert.equal(await pg.isVisible('#drawer'), false, 'a gaveta começa fechada');
+      assert.equal(await pg.getAttribute('#btnMore', 'aria-expanded'), 'false');
+      await pg.click('#btnMore'); await pg.waitForTimeout(400);
+      assert.equal(await pg.isVisible('#drawer'), true);
+      assert.equal(await pg.getAttribute('#btnMore', 'aria-expanded'), 'true');
+      assert.equal(await pg.evaluate(() => localStorage.getItem('pavecad-gaveta')), '1');
+      const alvos = await pg.evaluate(() => ['#rotL', '#rotN', '#rotR', '#rotA', '#base [data-b=none]', '#base [data-b=osm]', '#base [data-b=esri]'].map((s) => { const r = document.querySelector('#drawer ' + s).getBoundingClientRect(); return [s, Math.round(r.width), Math.round(r.height)]; }));
+      for (const [s, w, h] of alvos) assert.ok(w >= 44 && h >= 44, `${s} ${w}x${h}`);
+      await pg.click('#drawer #base [data-b=esri]'); await pg.waitForTimeout(300);
+      assert.equal(await estado(pg, 'E => E.base'), 'esri');
+      await pg.click('#drawer #rotR'); await pg.waitForTimeout(500);
+      assert.ok(Math.abs(await pg.evaluate(() => window.__pavecad.map().getBearing())) > 1, 'girar à direita deve mudar o rumo');
+      await pg.click('#drawer #rotN'); await pg.waitForTimeout(600);
+      assert.ok(Math.abs(await pg.evaluate(() => window.__pavecad.map().getBearing())) < 1, 'norte volta o rumo a 0');
+      await pg.click('#btnMore'); await pg.waitForTimeout(400);
+      assert.equal(await pg.isVisible('#drawer'), false);
+      assert.equal(await pg.evaluate(() => localStorage.getItem('pavecad-gaveta')), '0');
+    }],
+    ['tablet: gaveta aberta lembrada ao recarregar e animação curta que respeita prefers-reduced-motion', 'tablet-h-1024x768', async (pg) => {
+      const dur = () => pg.evaluate(() => getComputedStyle(document.querySelector('#drawer')).transitionDuration);
+      assert.match(await dur(), /0\.16s/, 'animação curta (160 ms)');
+      await pg.emulateMedia({ reducedMotion: 'reduce' }); await pg.waitForTimeout(100);
+      assert.match(await dur(), /^0s/, 'sem animação com prefers-reduced-motion');
+      await pg.evaluate(() => localStorage.setItem('pavecad-gaveta', '1'));
+      await pg.reload(); await pg.waitForTimeout(1500);
+      assert.equal(await pg.isVisible('#drawer'), true, 'a gaveta deve voltar aberta');
+      assert.equal(await pg.getAttribute('#btnMore', 'aria-expanded'), 'true');
+    }],
+    ['tablet: nenhum controle sobreposto, com a gaveta aberta, nos dois tablets', 'tablet-h-1024x768', async (pg) => {
+      await irParaKm(pg, '170+500'); await aba(pg, 'seg');
+      await pg.click('#btnMore'); await pg.waitForTimeout(400);
+      for (const [w, h] of [[1024, 768], [820, 1180]]) {
+        await pg.setViewportSize({ width: w, height: h }); await pg.waitForTimeout(600);
+        const r = await pg.evaluate(() => {
+          const sel = ['.leftcol > .title', '.leftcol > .search', '.leftcol > .views', '.topbar > .modes', '.topbar > .topright', '#zoomhost .maplibregl-ctrl-group', '#toolbar', '#drawer', '#legend', '#propbar:not([hidden])', '#inspector', '#unicard'];
+          const caixas = sel.map((s) => [s, document.querySelector(s)]).filter(([, e]) => e && e.checkVisibility()).map(([s, e]) => [s, e.getBoundingClientRect()]);
+          const ruins = [];
+          for (let i = 0; i < caixas.length; i++) for (let j = i + 1; j < caixas.length; j++) {
+            const a = caixas[i][1], b = caixas[j][1];
+            const ox = Math.min(a.right, b.right) - Math.max(a.left, b.left), oy = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+            if (ox > 1 && oy > 1) ruins.push(`${caixas[i][0]} x ${caixas[j][0]} (${Math.round(ox)}x${Math.round(oy)})`);
+          }
+          const fora = caixas.filter(([, b]) => b.left < -1 || b.top < -1 || b.right > innerWidth + 1 || b.bottom > innerHeight + 1).map(([s]) => s);
+          return { ruins, fora, n: caixas.length };
+        });
+        assert.ok(r.n >= 9, `${w}: poucos controles medidos (${r.n})`);
+        assert.deepEqual(r.ruins, [], `${w}: controles sobrepostos`);
+        assert.deepEqual(r.fora, [], `${w}: controles fora da tela`);
+      }
+    }],
+    ['desktop (mouse) mantém o layout atual, e voltar a largura de desktop devolve os controles', 'tablet-h-1024x768', async (pg) => {
+      await pg.setViewportSize({ width: 1500, height: 800 }); await pg.waitForTimeout(600);
+      const d = await pg.evaluate(() => ({ tablet: document.documentElement.classList.contains('tablet'), base: !!document.querySelector('.topright #base'), rot: !!document.querySelector('.leftcol #rotbar'), zoom: !!document.querySelector('.leftcol #zoomhost'), barra: !!document.querySelector('.hud-main #toolbar'), more: document.querySelector('#btnMore').checkVisibility() }));
+      assert.deepEqual(d, { tablet: false, base: true, rot: true, zoom: true, barra: true, more: false });
+      await pg.setViewportSize({ width: 1024, height: 768 }); await pg.waitForTimeout(600);
+      assert.equal(await pg.evaluate(() => document.documentElement.classList.contains('tablet')), true);
+    }],
+    ['desktop 1366x768: sem classe tablet, base no topo e rotação na coluna esquerda', '1366x768', async (pg) => {
+      const d = await pg.evaluate(() => ({ tablet: document.documentElement.classList.contains('tablet'), base: !!document.querySelector('.topright #base'), rot: !!document.querySelector('.leftcol #rotbar'), more: document.querySelector('#btnMore').checkVisibility() }));
+      assert.deepEqual(d, { tablet: false, base: true, rot: true, more: false });
     }],
   ],
   g03: [

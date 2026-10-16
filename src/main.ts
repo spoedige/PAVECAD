@@ -13,6 +13,7 @@ import { abrirArquivos, abrirLidas, carregarConfig, restaurarProjetos } from './
 import { abrirConfig, atualizarAviso, configAberta, initConfig } from './app/config';
 import { renderAll, renderSeg, setField, setMode, setTab, syncBaseSeg } from './app/paineis';
 import { drawUni, initUnifilar } from './app/unifilar';
+import { initLayout } from './app/layout';
 import { clearFocus } from './app/mapa';
 import { $, observarHud, observarRolagem, syncAllSegs, syncSeg, toast } from './app/ui';
 
@@ -136,6 +137,7 @@ async function boot() {
   await initRevisao();
   initUnifilar();
   initConfig();
+  initLayout();
   observarHud(agendarReaplicar);
   document.querySelectorAll<HTMLElement>('.tabbody').forEach(observarRolagem);
   renderAll();
