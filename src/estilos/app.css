@@ -290,28 +290,28 @@ textarea:focus{box-shadow:inset 0 0 0 2px var(--accent)}
 .uni.collapsed .uni-wrap{display:none}
 
 @media (max-width:900px){
-  :root:not(.tablet) body{overflow:auto}
-  :root:not(.tablet) .app{height:auto;display:flex;flex-direction:column;gap:12px;padding-bottom:16px}
-  :root:not(.tablet) .stage{position:relative;inset:auto;height:72vh;min-height:460px}
-  :root:not(.tablet) .hud{top:10px;flex-direction:column;align-items:stretch;gap:8px}
-  :root:not(.tablet) .leftcol{width:auto;flex-direction:row;flex-wrap:wrap;align-items:center}
-  :root:not(.tablet) .leftcol>.title{flex:1 1 180px;width:auto}
-  :root:not(.tablet) .leftcol>.search{width:200px}
-  :root:not(.tablet) .hud-main{align-items:stretch}
-  :root:not(.tablet) .hud-main>.toolbar{align-self:flex-start}
-  :root:not(.tablet) .topbar{align-items:stretch}
-  :root:not(.tablet) .topright{order:2}
-  :root:not(.tablet) .modes{order:3;width:100%}
-  :root:not(.tablet) .modes button{flex:1;padding:6px 4px}
-  :root:not(.tablet) .zoomnote,:root:not(.tablet) #zoomhost{display:none}
-  :root:not(.tablet) .legend{position:relative;left:auto;bottom:auto;margin:0 var(--gr) 0 var(--g);max-width:none;z-index:1}
-  :root:not(.tablet) .inspector{position:relative;right:auto;top:auto;bottom:auto;width:auto;margin:0 var(--gr) 0 var(--g)}
-  :root:not(.tablet) .inspector .tabbody{overflow:visible}
-  :root:not(.tablet) .uni{position:relative;left:auto;right:auto;bottom:auto;margin:0 var(--gr) 0 var(--g)}
-  :root:not(.tablet) .toast{bottom:80px}
-  :root:not(.tablet) .dock{display:contents}
-  :root:not(.tablet) .propbar{position:static;width:auto;margin:0 var(--gr) 0 var(--g)}
-  :root:not(.tablet) .gpschip{top:176px}
+  :root:not(.unico) body{overflow:auto}
+  :root:not(.unico) .app{height:auto;display:flex;flex-direction:column;gap:12px;padding-bottom:16px}
+  :root:not(.unico) .stage{position:relative;inset:auto;height:72vh;min-height:460px}
+  :root:not(.unico) .hud{top:10px;flex-direction:column;align-items:stretch;gap:8px}
+  :root:not(.unico) .leftcol{width:auto;flex-direction:row;flex-wrap:wrap;align-items:center}
+  :root:not(.unico) .leftcol>.title{flex:1 1 180px;width:auto}
+  :root:not(.unico) .leftcol>.search{width:200px}
+  :root:not(.unico) .hud-main{align-items:stretch}
+  :root:not(.unico) .hud-main>.toolbar{align-self:flex-start}
+  :root:not(.unico) .topbar{align-items:stretch}
+  :root:not(.unico) .topright{order:2}
+  :root:not(.unico) .modes{order:3;width:100%}
+  :root:not(.unico) .modes button{flex:1;padding:6px 4px}
+  :root:not(.unico) .zoomnote,:root:not(.unico) #zoomhost{display:none}
+  :root:not(.unico) .legend{position:relative;left:auto;bottom:auto;margin:0 var(--gr) 0 var(--g);max-width:none;z-index:1}
+  :root:not(.unico) .inspector{position:relative;right:auto;top:auto;bottom:auto;width:auto;margin:0 var(--gr) 0 var(--g)}
+  :root:not(.unico) .inspector .tabbody{overflow:visible}
+  :root:not(.unico) .uni{position:relative;left:auto;right:auto;bottom:auto;margin:0 var(--gr) 0 var(--g)}
+  :root:not(.unico) .toast{bottom:80px}
+  :root:not(.unico) .dock{display:contents}
+  :root:not(.unico) .propbar{position:static;width:auto;margin:0 var(--gr) 0 var(--g)}
+  :root:not(.unico) .gpschip{top:176px}
 }
 /* Em telas baixas, a pilha legenda + barra de propor encostaria na coluna esquerda: a legenda sai enquanto a barra está aberta. */
 @media (min-width:901px) and (max-height:820px){.modo-propor .legend{display:none}}
@@ -349,44 +349,51 @@ textarea:focus{box-shadow:inset 0 0 0 2px var(--accent)}
 }
 
 /* ---------------------------------------------------------------- */
-/* Tablet (html.tablet, ligado em layout.ts): mapa em tela cheia, barra única à esquerda, gaveta de mapa e topo enxuto.   */
+/* Tablet (html.unico, ligado em layout.ts): mapa em tela cheia, barra única à esquerda, gaveta de mapa e topo enxuto.   */
 /* ---------------------------------------------------------------- */
 .tools,.drawer,#btnMore{display:none}
-.tablet{--painel-w:360px;--tools-w:52px}
-.tablet #btnMore{display:grid}
-.tablet #btnExample{display:none}
-.tablet .tools{display:flex;flex-direction:column;align-items:flex-start;gap:8px;position:absolute;left:var(--g);bottom:calc(var(--uni-h) + 24px);z-index:6}
-.tablet .tools #zoomhost{position:relative}
-.tablet .tools .maplibregl-ctrl-scale{position:absolute;left:calc(100% + 8px);top:0}
-.tablet .tools .toolbar{flex-direction:column;width:var(--tools-w);align-items:center}
-.tablet .tools .tsep{display:none}
-.tablet .tools [id=btnGps]{order:1}
-.tablet .tools [data-tool=prop]{order:2}
-.tablet .tools #btnField{order:3}
-.tablet .tools [data-tool=pin]{order:4}
-.tablet .tools #btnMore{order:5}
-.tablet .tools #btnMore[aria-expanded="true"]{background:var(--fill2)}
-.tablet .inspector{width:var(--painel-w)}
-.tablet .sbtns{gap:4px}
-.tablet #t-seg .h1{font-size:20px}
-.tablet .dock{left:calc(var(--g) + var(--tools-w) + 10px);right:calc(var(--gr) + var(--painel-w) + 12px)}
-.tablet .drawer{display:flex;flex-direction:column;gap:8px;position:absolute;z-index:7;padding:8px;left:calc(var(--g) + var(--tools-w) + 10px);
+.unico{--painel-w:360px;--tools-w:52px}
+.unico #btnMore{display:grid}
+.unico #btnExample{display:none}
+.unico .tools{display:flex;flex-direction:column;align-items:flex-start;gap:8px;position:absolute;left:var(--g);bottom:calc(var(--uni-h) + 24px);z-index:6}
+.unico .tools #zoomhost{position:relative}
+.unico .tools .maplibregl-ctrl-scale{position:absolute;left:calc(100% + 8px);top:0}
+.unico .tools .toolbar{flex-direction:column;width:var(--tools-w);align-items:center}
+.unico .tools .tsep{display:none}
+.unico .tools [id=btnGps]{order:1}
+.unico .tools [data-tool=prop]{order:2}
+.unico .tools #btnField{order:3}
+.unico .tools [data-tool=pin]{order:4}
+.unico .tools #btnMore{order:5}
+.unico .tools #btnMore[aria-expanded="true"]{background:var(--fill2)}
+.unico .inspector{width:var(--painel-w)}
+.unico .sbtns{gap:4px}
+.unico #t-seg .h1{font-size:20px}
+.unico .dock{left:calc(var(--g) + var(--tools-w) + 10px);right:calc(var(--gr) + var(--painel-w) + 12px)}
+.unico .drawer{display:flex;flex-direction:column;gap:8px;position:absolute;z-index:7;padding:8px;left:calc(var(--g) + var(--tools-w) + 10px);
   bottom:calc(var(--uni-h) + 24px + var(--dock-h,0px) + 8px);opacity:0;visibility:hidden;transform:translateX(-10px);
   transition:opacity .16s ease,transform .16s ease,visibility 0s linear .16s}
-.tablet .drawer.open{opacity:1;visibility:visible;transform:none;transition:opacity .16s ease,transform .16s ease}
-.tablet .drawer .rotbar{background:none;border:0;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;padding:0;gap:4px}
-.tablet .drawer .seg{display:flex;background:var(--fill);box-shadow:none;border:0}
-.tablet .drawer .seg button{flex:1}
+.unico .drawer.open{opacity:1;visibility:visible;transform:none;transition:opacity .16s ease,transform .16s ease}
+.unico .drawer .rotbar{background:none;border:0;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;padding:0;gap:4px}
+.unico .drawer .seg{display:flex;background:var(--fill);box-shadow:none;border:0}
+.unico .drawer .seg button{flex:1}
 
-/* Painel direito no tablet: grip, abas e km formam o cabeçalho; arrastar para baixo recolhe até essa faixa. */
-.tablet .ihead{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"grip grip" "tabs tabs" "km chev";gap:4px 8px;align-items:center;padding:4px 10px 8px 12px;touch-action:pan-x;cursor:grab;user-select:none;-webkit-user-select:none}
-.tablet .grip{display:block;grid-area:grip;justify-self:center;width:44px;height:5px;border-radius:3px;background:var(--faint);margin:6px 0 4px}
-.tablet .ihead .seg{grid-area:tabs;display:grid;grid-template-columns:repeat(5,minmax(0,1fr))}
-.tablet .ikm{display:block;grid-area:km;min-width:0;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.tablet #collapse{grid-area:chev}
-.tablet .inspector.collapsed .ihead{cursor:pointer}
+/* Painel direito: grip, abas e km formam o cabeçalho; arrastar para baixo recolhe até essa faixa. */
+.unico .ihead{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"grip grip" "tabs tabs" "km chev";gap:4px 8px;align-items:center;padding:4px 10px 8px 12px;touch-action:pan-x;cursor:grab;user-select:none;-webkit-user-select:none}
+.unico .grip{display:block;grid-area:grip;justify-self:center;width:44px;height:5px;border-radius:3px;background:var(--faint);margin:6px 0 4px}
+.unico .ihead .seg{grid-area:tabs;display:grid;grid-template-columns:repeat(5,minmax(0,1fr))}
+.unico .ikm{display:block;grid-area:km;min-width:0;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.unico #collapse{grid-area:chev}
+.unico .inspector.collapsed .ihead{cursor:pointer}
 
-/* Unifilar no tablet: o cabeçalho é o puxador (mesmo gesto do painel direito). */
-.tablet .uni-h{position:relative;touch-action:pan-x;user-select:none;-webkit-user-select:none}
-.tablet .uni-h::before{content:'';position:absolute;left:50%;top:-8px;width:44px;height:5px;margin-left:-22px;border-radius:3px;background:var(--faint);pointer-events:none}
-.tablet .uni.collapsed .uni-h{cursor:pointer}
+/* Unifilar: o cabeçalho é o puxador (mesmo gesto do painel direito). */
+.unico .uni-h{position:relative;touch-action:pan-x;user-select:none;-webkit-user-select:none}
+.unico .uni-h::before{content:'';position:absolute;left:50%;top:-8px;width:44px;height:5px;margin-left:-22px;border-radius:3px;background:var(--faint);pointer-events:none}
+.unico .uni.collapsed .uni-h{cursor:pointer}
+
+/* No layout único os controles das bordas têm 44 px em qualquer ponteiro: o mesmo desenho no desktop e no tablet. */
+.unico .tools .tbtn,.unico .drawer .tbtn{width:44px;height:44px}
+.unico .tools .maplibregl-ctrl-group button{width:44px!important;height:44px!important}
+.unico .drawer .chipbtn,.unico .drawer .seg button{min-height:44px}
+.unico .legend .legtog{min-height:44px;padding:0 10px}
+.unico .legend .legtog.sm{width:44px;padding:0}

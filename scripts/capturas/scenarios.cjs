@@ -5,6 +5,13 @@ const irParaKm = async (pg, km, espera = 3000) => {
   await pg.waitForTimeout(espera);
   await pg.evaluate(() => document.activeElement && document.activeElement.blur());
 };
+/** Escolhe a base do mapa. A escolha fica na gaveta do mapa (botão ⋯): abre, clica e fecha de novo se foi ela quem abriu. */
+const escolherBase = async (pg, b) => {
+  const abriu = !(await pg.isVisible('#base'));
+  if (abriu) { await pg.click('#btnMore'); await pg.waitForTimeout(250); }
+  await pg.click(`#base [data-b=${b}]`);
+  if (abriu) { await pg.click('#btnMore'); await pg.waitForTimeout(250); }
+};
 const aba = async (pg, t) => { await pg.click(`#tabs [data-t=${t}]`); await pg.waitForTimeout(300); };
 
 const zoomPara = async (pg, z) => {
@@ -47,8 +54,8 @@ const CENARIOS = {
   estacas100: async (pg) => { await irParaKm(pg, '170+500'); await zoomPara(pg, 16.4); },
   estacas20: async (pg) => { await irParaKm(pg, '170+500'); await zoomPara(pg, 18.6); },
   ajuda: async (pg, { vp }) => { await irParaKm(pg, '170+500'); await aba(pg, 'seg'); if (!vp.toque) { await pg.click('#btnAjuda'); await pg.waitForTimeout(300); } },
-  zoom21ruas: async (pg) => { await irParaKm(pg, '170+500'); await pg.click('#base [data-b=osm]'); await pg.evaluate(() => window.__pavecad.map().jumpTo({ zoom: 21 })); await pg.waitForTimeout(1500); },
-  zoom21sat: async (pg) => { await irParaKm(pg, '170+500'); await pg.click('#base [data-b=esri]'); await pg.evaluate(() => window.__pavecad.map().jumpTo({ zoom: 21 })); await pg.waitForTimeout(1500); },
+  zoom21ruas: async (pg) => { await irParaKm(pg, '170+500'); await escolherBase(pg, 'osm'); await pg.evaluate(() => window.__pavecad.map().jumpTo({ zoom: 21 })); await pg.waitForTimeout(1500); },
+  zoom21sat: async (pg) => { await irParaKm(pg, '170+500'); await escolherBase(pg, 'esri'); await pg.evaluate(() => window.__pavecad.map().jumpTo({ zoom: 21 })); await pg.waitForTimeout(1500); },
   propor0: async (pg) => { await irParaKm(pg, '170+500', 3500); await pg.keyboard.press('n'); await pg.waitForTimeout(300); },
   propor1: async (pg) => {
     await irParaKm(pg, '170+500', 3500); await pg.keyboard.press('n'); await pg.waitForTimeout(300);
@@ -57,7 +64,7 @@ const CENARIOS = {
   },
   revisaoVazia: async (pg) => { await aba(pg, 'notas'); await pg.waitForTimeout(300); },
   revisaoComProposta: async (pg) => { await criarProposta(pg, 'FSE', 'trecho de teste'); },
-  escalaSat: async (pg) => { await irParaKm(pg, '170+500'); await pg.click('#base [data-b=esri]'); await pg.evaluate(() => window.__pavecad.map().jumpTo({ zoom: 17.5 })); await pg.mouse.move(1, 1); await pg.waitForTimeout(1500); },
+  escalaSat: async (pg) => { await irParaKm(pg, '170+500'); await escolherBase(pg, 'esri'); await pg.evaluate(() => window.__pavecad.map().jumpTo({ zoom: 17.5 })); await pg.mouse.move(1, 1); await pg.waitForTimeout(1500); },
   limiares: async (pg) => { await pg.click('#btnCfg'); await pg.waitForTimeout(300); await pg.click('#cfgTabs [data-ct=lim]'); await pg.waitForTimeout(400); },
   config: async (pg) => { await pg.click('#btnCfg'); await pg.waitForTimeout(500); },
   toque: async (pg) => { await irParaKm(pg, '170+500'); await aba(pg, 'seg'); },
@@ -66,12 +73,12 @@ const CENARIOS = {
   /** Tablet com a gaveta de mapa (alinhar, girar, base) aberta. */
   gaveta: async (pg, { vp }) => {
     await irParaKm(pg, '170+500'); await aba(pg, 'seg');
-    if (vp.toque) { await pg.click('#btnMore'); await pg.waitForTimeout(500); }
+    if (await pg.isVisible('#btnMore')) { await pg.click('#btnMore'); await pg.waitForTimeout(500); }
   },
   /** Tablet com o painel direito e o unifilar recolhidos (gesto de puxar para baixo). */
   recolhidos: async (pg, { vp }) => {
     await irParaKm(pg, '170+500'); await aba(pg, 'seg');
-    if (vp.toque) { await pg.click('#collapse'); await pg.click('#uniToggle'); await pg.waitForTimeout(400); }
+    if (await pg.isVisible('#ikm')) { await pg.click('#collapse'); await pg.click('#uniToggle'); await pg.waitForTimeout(400); }
   },
   segmentoFim: async (pg) => {
     await irParaKm(pg, '170+500'); await aba(pg, 'seg');
@@ -96,7 +103,8 @@ const GRUPOS = {
   g14: ['revisaoVazia', 'revisaoComProposta'],
   g15: ['escalaSat'],
   g12: ['config'],
+  u01: ['inicio', 'segmento', 'gaveta', 'recolhidos', 'propor0'],
   t01: ['inicio', 'segmento', 'segmentoFim', 'gaveta', 'recolhidos'],
 };
 
-module.exports = { CENARIOS, GRUPOS, irParaKm, aba, criarProposta, pontoLivre };
+module.exports = { CENARIOS, GRUPOS, irParaKm, escolherBase, aba, criarProposta, pontoLivre };

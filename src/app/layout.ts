@@ -1,11 +1,12 @@
 import { $, gestoVertical, syncAllSegs } from './ui';
 
-/** Tablet: toque e largura entre 601 e 1366 px. Celulares (até 600 px) e telas com mouse mantêm o layout atual. */
-export const MQ_TABLET = '(pointer: coarse) and (min-width: 601px) and (max-width: 1366px)';
-const mq = window.matchMedia(MQ_TABLET);
-export const isTablet = () => mq.matches;
+/** Layout único: vale para qualquer tela com 601 px de largura ou mais (desktop, tablet e retrato), seja mouse ou toque.
+ *  Celulares (até 600 px) mantêm o layout empilhado. */
+export const MQ_UNICO = '(min-width: 601px)';
+const mq = window.matchMedia(MQ_UNICO);
+export const ehUnico = () => mq.matches;
 
-/** Elementos que mudam de lugar no tablet: a barra única na lateral recebe o zoom e as ferramentas; a gaveta recebe girar e base. */
+/** Elementos que mudam de lugar no layout único: a barra única na lateral recebe o zoom e as ferramentas; a gaveta recebe girar e base. */
 const MOVEIS = [
   { id: 'zoomhost', destino: 'tools' },
   { id: 'toolbar', destino: 'tools' },
@@ -22,14 +23,14 @@ export const gavetaEstaAberta = () => gavetaAberta;
 
 export function setGaveta(abrir: boolean, salvar = true) {
   gavetaAberta = abrir;
-  $('#drawer').classList.toggle('open', abrir && isTablet());
+  $('#drawer').classList.toggle('open', abrir && ehUnico());
   $('#btnMore').setAttribute('aria-expanded', String(abrir));
   if (salvar) try { localStorage.setItem(CHAVE_GAVETA, abrir ? '1' : '0'); } catch { /* sem storage */ }
 }
 
 function aplicar() {
   const t = mq.matches;
-  document.documentElement.classList.toggle('tablet', t);
+  document.documentElement.classList.toggle('unico', t);
   for (const m of MOVEIS) {
     const el = document.getElementById(m.id);
     const marca = marcas.get(m.id);
@@ -83,7 +84,7 @@ export function initPainel() {
   setPainel(salvo, false);
   $('#collapse').addEventListener('click', () => setPainel(!painelRecolhido()));
   const cab = $('#ihead');
-  gestoVertical(cab, { ativo: isTablet, aoBaixo: () => setPainel(true), aoCima: () => setPainel(false) });
+  gestoVertical(cab, { ativo: ehUnico, aoBaixo: () => setPainel(true), aoCima: () => setPainel(false) });
   // tocar na faixa recolhida (fora dos botões) ou numa aba abre de novo
   cab.addEventListener('click', (e) => {
     // o chevron troca o próprio ícone ao clicar, então o alvo do evento já saiu do DOM: usa o caminho original
