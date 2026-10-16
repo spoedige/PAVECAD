@@ -9,6 +9,17 @@ npm test           # vitest (leitura, geometria, domínio, configurações)
 npm run typecheck
 ```
 
+## Testes de interface e capturas
+
+Com o servidor de desenvolvimento rodando (`npm run dev -- --port 5199`) e o Chromium do Playwright instalado:
+
+```
+npm run e2e                       # testes de interface (Playwright) por grupo de correção
+npm run capturas -- g01 antes     # 4 viewports x 3 temas, 2 planilhas; folha de contato em capturas/ (fora do git)
+```
+
+As capturas também rodam um verificador de sobreposição e corte de texto (`scripts/capturas/overlap.js`). O gancho `window.__pavecad` existe só em desenvolvimento.
+
 ## Estrutura
 
 | Pasta | Conteúdo |
