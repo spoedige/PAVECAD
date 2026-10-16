@@ -80,6 +80,19 @@ const CENARIOS = {
     await irParaKm(pg, '170+500'); await aba(pg, 'seg');
     if (await pg.isVisible('#ikm')) { await pg.click('#collapse'); await pg.click('#uniToggle'); await pg.waitForTimeout(400); }
   },
+  /** Combinações do painel (aberto/recolhido) com o unifilar (aberto/recolhido). */
+  painelAbertoUniAberto: async (pg) => { await irParaKm(pg, '170+500'); await aba(pg, 'seg'); },
+  painelRecolhidoUniAberto: async (pg) => { await irParaKm(pg, '170+500'); await aba(pg, 'seg'); await pg.click('#collapse'); await pg.waitForTimeout(400); },
+  painelAbertoUniRecolhido: async (pg) => { await irParaKm(pg, '170+500'); await aba(pg, 'seg'); await pg.click('#uniToggle'); await pg.waitForTimeout(500); },
+  painelRecolhidoUniRecolhido: async (pg) => { await irParaKm(pg, '170+500'); await aba(pg, 'seg'); await pg.click('#collapse'); await pg.click('#uniToggle'); await pg.waitForTimeout(500); },
+  /** Mapa limpo (tecla H): só o zoom e o botão de olho. */
+  mapaLimpo: async (pg) => { await irParaKm(pg, '170+500'); await aba(pg, 'seg'); await pg.keyboard.press('h'); await pg.waitForTimeout(500); },
+  /** Todos os grupos ocultos: cada um vira um botão de 44 px no lugar. */
+  tudoOculto: async (pg) => {
+    await irParaKm(pg, '170+500'); await aba(pg, 'seg');
+    for (const id of ['titulo', 'ferramentas', 'legenda', 'unifilar', 'painel']) await pg.click(`[data-ocultar=${id}]`);
+    await pg.click('#btnMore'); await pg.waitForSelector('#drawer', { state: 'visible' }); await pg.click('[data-ocultar=girar]'); await pg.waitForTimeout(500);
+  },
   segmentoFim: async (pg) => {
     await irParaKm(pg, '170+500'); await aba(pg, 'seg');
     await pg.evaluate(() => { const b = document.querySelector('#t-seg'); b.scrollTop = b.scrollHeight; window.scrollTo(0, document.body.scrollHeight); });
@@ -103,6 +116,7 @@ const GRUPOS = {
   g14: ['revisaoVazia', 'revisaoComProposta'],
   g15: ['escalaSat'],
   g12: ['config'],
+  p01: ['painelAbertoUniAberto', 'painelRecolhidoUniAberto', 'painelAbertoUniRecolhido', 'painelRecolhidoUniRecolhido', 'mapaLimpo', 'tudoOculto'],
   u01: ['inicio', 'segmento', 'gaveta', 'recolhidos', 'propor0'],
   t01: ['inicio', 'segmento', 'segmentoFim', 'gaveta', 'recolhidos'],
 };
