@@ -6,6 +6,7 @@ const { chromium } = require('playwright');
 const RAIZ = path.resolve(__dirname, '..', '..');
 const URL = process.env.PAVECAD_URL || 'http://localhost:5199/';
 const VPS = [
+  { nome: '1568x760', w: 1568, h: 760, toque: false },
   { nome: '1366x768', w: 1366, h: 768, toque: false },
   { nome: '1920x1080', w: 1920, h: 1080, toque: false },
   { nome: 'tablet-h-1024x768', w: 1024, h: 768, toque: true },

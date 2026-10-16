@@ -4,7 +4,7 @@ import { E, H, projName, type AppProj } from './estado';
 import { IC } from './icones';
 import { getMap, grupoAtivo, select } from './mapa';
 import { $, cssv, esc, fmt, gestoVertical, toast } from './ui';
-import { isTablet } from './layout';
+import { ehUnico } from './layout';
 
 interface Linha { y: number; h: number; lane: number }
 interface Bloco { p: AppProj; titleY: number; rows: Linha[] }
@@ -192,8 +192,8 @@ export function initUnifilar() {
   };
   recolher(E.uniCollapsed);
   tg.addEventListener('click', (e) => { e.stopPropagation(); recolher(!E.uniCollapsed); });
-  // tablet: o cabeçalho é o puxador (para baixo recolhe até a barra de posição, para cima ou um toque reabre)
-  gestoVertical(cab, { ativo: isTablet, aoBaixo: () => recolher(true), aoCima: () => recolher(false) });
-  cab.addEventListener('click', (e) => { if (E.uniCollapsed && isTablet() && !(e.target as HTMLElement).closest('button')) recolher(false); });
+  // o cabeçalho é o puxador (para baixo recolhe até a barra de posição, para cima ou um toque reabre)
+  gestoVertical(cab, { ativo: ehUnico, aoBaixo: () => recolher(true), aoCima: () => recolher(false) });
+  cab.addEventListener('click', (e) => { if (E.uniCollapsed && ehUnico() && !(e.target as HTMLElement).closest('button')) recolher(false); });
   H.onView = drawUni;
 }

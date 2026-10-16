@@ -291,8 +291,8 @@ function legendItems(): LegItem[] {
   return slot(E.mode)!.labels.map((l, i) => ({ key: String(i), c: Q()[i], l, s: l }));
 }
 
-// Em tela de toque a legenda começa recolhida (botão pequeno); a escolha do usuário, quando existe, vale sobre o padrão.
-let legendOpen = !window.matchMedia('(pointer: coarse)').matches;
+// No layout único (601 px ou mais) a legenda começa recolhida (botão pequeno); a escolha do usuário, quando existe, vale sobre o padrão.
+let legendOpen = !window.matchMedia('(min-width: 601px)').matches;
 try { const v = localStorage.getItem('pavecad-leg'); if (v !== null) legendOpen = v !== '0'; } catch { /* sem storage */ }
 
 export function renderLegend() {
