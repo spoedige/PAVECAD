@@ -96,15 +96,34 @@ export function reposicionar(list: Proposta[], projs: PV[]): Proposta[] {
   });
 }
 
-/** CSV com ";" para o Excel em português. Traz o código original da solução e o nome exibido pelo catálogo. */
-export function propostasCsv(list: Proposta[], proj: (id: string | null) => PV | undefined, nome: (p: PV) => string, rotulo: (k: string) => string): string {
-  const n = (v: number) => String(+v.toFixed(2)).replace('.', ','), q = (s: unknown) => '"' + String(s || '').replace(/"/g, '""') + '"';
-  const rows = ['planilha;faixa;km_inicial;km_final;extensao_m;largura_m;area_m2;codigo_atual;solucao_atual;codigo_proposto;solucao_proposta;observacao'];
+/** Ponto do eixo da faixa, para o CSV. */
+export interface PontoCsv { lat: number; lon: number; e: number; n: number }
+export type EixoCsv = (p: PV, r: Proposta) => { ini: PontoCsv; fim: PontoCsv } | null;
+
+export const CSV_CABECALHO = [
+  'planilha', 'faixa', 'km_inicial', 'km_final', 'extensao_m', 'largura_m', 'area_m2', 'codigo_atual', 'solucao_atual', 'codigo_proposto', 'solucao_proposta', 'observacao',
+  'lat_inicial', 'lon_inicial', 'lat_final', 'lon_final', 'utm_e_inicial', 'utm_n_inicial', 'utm_e_final', 'utm_n_final',
+];
+
+/** CSV com ";" para o Excel em português (vírgula decimal). Traz o código original da solução e o nome exibido pelo
+ *  catálogo, e as coordenadas do eixo da faixa no início do primeiro segmento e no fim do último
+ *  (graus em SIRGAS 2000 e metros UTM do fuso do projeto). `eol` é "\r\n" no arquivo e "\n" na área de transferência. */
+export function propostasCsv(list: Proposta[], proj: (id: string | null) => PV | undefined, nome: (p: PV) => string, rotulo: (k: string) => string, eixo?: EixoCsv, eol = '\n'): string {
+  const num = (v: number, d = 2) => v.toFixed(d).replace('.', ','), q = (s: unknown) => '"' + String(s || '').replace(/"/g, '""') + '"';
+  const n = (v: number) => String(+v.toFixed(2)).replace('.', ',');
+  const rows = [CSV_CABECALHO.join(';')];
   for (const r of list) {
     const p = proj(r.pid);
     if (!p) continue;
-    const s = runStats(p, r);
-    rows.push([q(nome(p)), r.lane || 'Acost', p.kmLab[r.r0], kmLabel(p.kmNum[r.r1] + 0.02), s.len, n(s.area / s.len), n(s.area), q(r.from), q(rotulo(r.from)), q(r.to), q(rotulo(r.to)), q(r.note)].join(';'));
+    const s = runStats(p, r), e = eixo?.(p, r);
+    const coords = e ? [num(e.ini.lat, 7), num(e.ini.lon, 7), num(e.fim.lat, 7), num(e.fim.lon, 7), num(e.ini.e), num(e.ini.n), num(e.fim.e), num(e.fim.n)] : Array(8).fill('');
+    rows.push([q(nome(p)), r.lane || 'Acost', p.kmLab[r.r0], kmLabel(p.kmNum[r.r1] + 0.02), s.len, n(s.area / s.len), n(s.area), q(r.from), q(rotulo(r.from)), q(r.to), q(rotulo(r.to)), q(r.note), ...coords].join(';'));
   }
-  return rows.join('\n');
+  return rows.join(eol);
+}
+
+/** "propostas_AAAA-MM-DD.csv", com a data local. */
+export function nomeArquivoCsv(d: Date = new Date()): string {
+  const z = (v: number) => String(v).padStart(2, '0');
+  return `propostas_${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}.csv`;
 }

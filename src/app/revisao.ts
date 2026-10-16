@@ -1,7 +1,8 @@
 import type { MapMouseEvent } from 'maplibre-gl';
 import { areaM2, fmtLen, lenM } from '../dominio/medidas';
-import { addProposta, propostasCsv, reposicionar, runAt, runLabel, runStats, type Alvo, type Proposta } from '../dominio/propostas';
+import { addProposta, nomeArquivoCsv, propostasCsv, reposicionar, runAt, runLabel, runStats, type Alvo, type EixoCsv, type Proposta } from '../dominio/propostas';
 import { localizar, type LocP } from '../dominio/localizar';
+import { eixoDaFaixa } from '../geometry/eixo';
 import { trColor, trLabel, trOrder } from '../dominio/solucoes';
 import { kmLabel } from '../formats/km';
 import { E, H, NOTE_CATS, getP, projName, type AppProj, type Nota, type NoteCat } from './estado';
@@ -165,7 +166,7 @@ function propsHtml(): string {
   const rows = Object.entries(sum).map(([k, v]) => `<div class="row"><span class="sw" style="background:${tc(k)}"></span><div class="grow">${esc(trLabel(k))}</div><div class="val num">${fmt(v.area, 0)} <span class="muted" style="font-weight:400;font-size:11px">m² · ${fmt(v.len / 1000, 2)} km·faixa</span></div></div>`).join('');
   return `${orfasHtml}<div>${head}<div class="list">${cards}</div>
     <div class="list" style="margin-top:8px">${rows}<div class="row"><div class="grow muted">Total proposto</div><div class="val num">${fmt(tl.area, 0)} <span class="muted" style="font-weight:400;font-size:11px">m²</span></div></div></div>
-    <div class="btns" style="margin-top:8px"><button class="btn" id="pCsv">Copiar tabela (CSV)</button><button class="btn d" id="pAll">Limpar todas</button></div>${aviso}</div>`;
+    <div class="btns" style="margin-top:8px"><button class="btn" id="pCsv">Copiar tabela (CSV)</button><button class="btn" id="pCsvDown">Baixar CSV</button><button class="btn d" id="pAll">Limpar todas</button></div>${aviso}</div>`;
 }
 
 function bindProps(el: HTMLElement) {
@@ -199,7 +200,21 @@ function bindProps(el: HTMLElement) {
     toast('Propostas removidas');
   };
   const cv = el.querySelector<HTMLElement>('#pCsv');
-  if (cv) cv.onclick = () => copiar(propostasCsv(E.props, (id) => getP(id ?? ''), projName, trLabel), 'Tabela copiada. Cole no Excel');
+  const eixo: EixoCsv = (p, r) => eixoDaFaixa(p as unknown as AppProj, r.lane, r.r0, r.r1);
+  const csv = (eol: string) => propostasCsv(E.props.filter((r) => !r.orfa), (id) => getP(id ?? ''), projName, trLabel, eixo, eol);
+  if (cv) cv.onclick = () => copiar(csv('\n'), 'Tabela copiada. Cole no Excel');
+  const dn = el.querySelector<HTMLElement>('#pCsvDown');
+  if (dn) dn.onclick = () => {
+    // BOM UTF-8 para o Excel reconhecer os acentos; separador ";" e vírgula decimal
+    try {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob(['\uFEFF', csv('\r\n')], { type: 'text/csv;charset=utf-8' }));
+      a.download = nomeArquivoCsv();
+      document.body.appendChild(a); a.click(); a.remove();
+      const z = E.P[0]?.crs;
+      toast(`${nomeArquivoCsv()} gerado${z ? `. Coordenadas em SIRGAS 2000, UTM fuso ${z.zone}S` : ''}`, 4500);
+    } catch { toast('Download indisponível aqui. Use Copiar tabela.'); }
+  };
 }
 
 /* ---------------------------------------------------------------- */
