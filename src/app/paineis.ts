@@ -1,11 +1,11 @@
 import { criticos, INDS_ANALISE, matriz, resumo, violacoes, REGRAS } from '../dominio/analise';
 import { IND, MODE_KEYS, Q5, Q5F, type IndKey, type ModeKey } from '../dominio/indicadores';
-import { TR, TR_ORDER, trColor, trLabel } from '../dominio/solucoes';
+import { trColor, trLabel, trOrder } from '../dominio/solucoes';
 import { edgesOf } from '../geometry/build';
-import { recalcular } from '../mapa/cliente';
-import { E, aplicarGeometria, baseOf, getP, projName, visibleProjects, type AppProj } from './estado';
+import { E, getP, projName, visibleProjects, type AppProj } from './estado';
+import { regeometrar, removerProjeto } from './projetos';
 import { IC } from './icones';
-import { applyLayers, applyPaint, clearFocus, clearSel, fitAll, fitFocus, fitList, getMap, renderLegend, removeProjectFromMap, select, setBase, setFocus, setProjectData, stepSel, updateSelLayer, updateStakes, applyVisibility, temMapTiler } from './mapa';
+import { applyLayers, applyPaint, clearFocus, clearSel, fitAll, fitFocus, fitList, getMap, renderLegend, select, setBase, setFocus, setProjectData, stepSel, updateSelLayer, updateStakes, applyVisibility, temMapTiler } from './mapa';
 import { drawUni, renderGroups } from './unifilar';
 import { refreshPropLayers, renderNotes, resolveProps, startNote } from './revisao';
 import { $, cssv, esc, fmt, syncAllSegs, syncSeg, toast } from './ui';
@@ -132,8 +132,7 @@ export function renderResumo() {
 export function removeProject(id: string) {
   const p = getP(id);
   if (!p) return;
-  removeProjectFromMap(p);
-  E.P = E.P.filter((x) => x !== p);
+  removerProjeto(p, true);
   if (E.sel?.pid === id) { E.sel = null; updateSelLayer(); }
   if (E.focus) clearFocus();
   resolveProps();
@@ -217,7 +216,8 @@ export function renderAna() {
   const V = visibleProjects();
   if (!V.length) { el.innerHTML = '<div class="empty"><b>Sem dados visíveis</b>Mostre ao menos uma planilha.</div>'; return; }
   const key = E.anInd, M = IND[key], acc = matriz(V, key);
-  const keys = [...TR_ORDER.filter((k) => acc[k]), ...Object.keys(acc).filter((k) => !TR[k] && k !== '-'), ...(acc['-'] ? ['-'] : [])];
+  const ordem = trOrder();
+  const keys = [...ordem.filter((k) => acc[k]), ...Object.keys(acc).filter((k) => !ordem.includes(k) && k !== '-'), ...(acc['-'] ? ['-'] : [])];
   const matrix = keys.map((k) => {
     const a = acc[k], tot = a.cnt || 1;
     return `<tr><td class="nm"><span class="sw" style="display:inline-block;margin-right:6px;background:${tc(k)}"></span>${esc(trLabel(k).replace('Fresagem ', 'Fres. '))}</td>
@@ -252,23 +252,6 @@ export function renderAna() {
 /* ---------------------------------------------------------------- */
 /* Ajustes                                                           */
 /* ---------------------------------------------------------------- */
-let recalculando = false;
-async function regeometrar(p: AppProj) {
-  if (recalculando) return;
-  recalculando = true;
-  try {
-    toast('Recalculando a geometria...', 20000);
-    const r = await recalcular(p.id, baseOf(p), p.opts);
-    aplicarGeometria(p, r);
-    if (E.focus) clearFocus();
-    setProjectData(p);
-    applyPaint();
-    updateSelLayer(); refreshPropLayers(); renderAll();
-    toast('Geometria atualizada');
-  } catch (e) { toast('Falha ao recalcular: ' + (e as Error).message, 5000); }
-  finally { recalculando = false; }
-}
-
 export function renderAj() {
   const el = $('#t-aj'), p = getP(E.settingsPid ?? '') ?? E.P[0];
   const opts = p ? `

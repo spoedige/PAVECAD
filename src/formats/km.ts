@@ -29,3 +29,13 @@ export function parseCode(code: string | null | undefined): SolutionCode {
   const p = /\((\d+)%\)/.exec(t[0]);
   return { main: m ? m[0] : '-', comp: t[1] || null, pct: p ? Number(p[1]) : 100, code };
 }
+
+/** Km digitado pelo usuário: "59+740", "59+74" (74 vira 740 m), "59,74" ou "59.74". Devolve null se não entender. */
+export function parseKmTexto(texto: string): number | null {
+  const t = texto.trim().replace(',', '.');
+  const m = /^(\d+)\+(\d{1,3})$/.exec(t);
+  if (m) return Number(m[1]) + Number(m[2].padEnd(3, '0')) / 1000;
+  if (!/^\d+(\.\d+)?$/.test(t)) return null;
+  const v = parseFloat(t);
+  return Number.isFinite(v) ? v : null;
+}

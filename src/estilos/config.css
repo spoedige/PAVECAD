@@ -1,0 +1,45 @@
+/* Tela de configurações: separada do mapa, em tela cheia. Usa os tokens de app.css. */
+.cfg{position:fixed;inset:0;z-index:30;background:var(--bg);color:var(--fg);display:flex;flex-direction:column;font-size:var(--fs)}
+.cfg[hidden]{display:none}
+.cfg-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px max(16px,env(safe-area-inset-right,0px)) 12px max(16px,env(safe-area-inset-left,0px));border-bottom:var(--bw) solid var(--hair);background:var(--solid)}
+.cfg-head h1{font-size:17px;margin:0;font-weight:700;letter-spacing:-.01em;margin-right:auto}
+.cfg-body{flex:1;overflow:auto;padding:18px max(16px,env(safe-area-inset-right,0px)) 40px max(16px,env(safe-area-inset-left,0px))}
+.cfg-wrap{max-width:1040px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+.cfg-warn{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:rgba(255,149,0,.16);border:var(--bw) solid rgba(255,149,0,.5);border-radius:12px;padding:10px 12px}
+.cfg-warn b{font-weight:600}
+.cfg-warn[hidden]{display:none}
+.cfg-err{color:#ff3b30;font-size:12px;min-height:16px;margin:0}
+:root[data-contrast="field"] .cfg-err{color:#d0021b}
+.ctable{width:100%;border-collapse:separate;border-spacing:0;background:var(--solid);border-radius:12px;overflow:hidden;box-shadow:inset 0 0 0 var(--bw) var(--hair)}
+.ctable th{font-size:11px;text-transform:uppercase;letter-spacing:.02em;color:var(--muted);text-align:left;font-weight:600;padding:9px 10px;background:var(--fill)}
+.ctable td{padding:7px 10px;border-top:var(--bw) solid var(--hair);vertical-align:middle}
+.ctable tr.nm td{background:rgba(255,149,0,.09)}
+.ctable code{font:600 12.5px var(--mono)}
+.ctable input[type=text],.ctable input[type=number],.cfg input[type=text].in,.cfg input[type=number].in,.cfg select.in{width:100%;min-width:90px;border:0;border-radius:8px;background:var(--fill);color:var(--fg);padding:6px 8px;min-height:var(--tap);outline:none}
+.ctable input:focus,.cfg .in:focus{box-shadow:inset 0 0 0 2px var(--accent)}
+.ctable input[type=color]{width:42px;height:30px;padding:0;border:0;border-radius:8px;background:transparent;cursor:pointer}
+.badge[hidden]{display:none}
+.badge{display:inline-block;margin-left:6px;font-size:10px;font-weight:700;letter-spacing:.02em;text-transform:uppercase;color:#fff;background:#ff9500;border-radius:6px;padding:1px 6px;vertical-align:1px}
+:root[data-contrast="field"] .badge{background:#b34700}
+.cfg-card{background:var(--solid);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:10px;box-shadow:inset 0 0 0 var(--bw) var(--hair)}
+.cfg-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px}
+.cfg-row{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end}
+.cfg-row label{display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--muted);font-weight:600}
+.cfg-row .in{width:auto;min-width:96px}
+.lims{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.lims .in{text-align:right;min-width:0;padding:6px 6px}
+.leg5{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;color:var(--muted)}
+.leg5 span{display:inline-flex;align-items:center;gap:5px}
+.leg5 i{width:10px;height:10px;border-radius:50%;display:inline-block}
+.xsvg{width:100%;height:auto;display:block}
+.xsvg text{font:500 11px var(--sans);fill:var(--fg)}
+.xsvg .mut{fill:var(--muted)}
+.cfg .tabs-lg{display:inline-flex}
+.cfg .seg button{padding:6px 14px}
+@media (max-width:700px){
+  .ctable thead{display:none}
+  .ctable tr{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:8px;border-top:var(--bw) solid var(--hair)}
+  .ctable td{border:0;padding:2px}
+  .ctable td.cod{grid-column:1/-1}
+  .lims{grid-template-columns:repeat(2,1fr)}
+}

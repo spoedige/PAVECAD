@@ -123,7 +123,10 @@ describe('propostas de solução', () => {
   it('exporta CSV com ponto e vírgula e vírgula decimal', () => {
     const csv = propostasCsv([base('a', 10, 14)], () => pv, (p) => p.meta.name, (k) => k);
     const [head, linha] = csv.split('\n');
-    expect(head.split(';')).toHaveLength(10);
+    expect(head.split(';')).toHaveLength(12);
+    expect(head).toContain('codigo_atual');
+    expect(linha).toContain('"GAP"');
+    expect(linha).toContain('"FS4"');
     expect(linha).toContain(';1;');
     expect(linha).toContain('360'); // 100 m x 3,6 m
     expect(linha).toContain('3,6');
@@ -165,5 +168,19 @@ describe('localização por GPS', () => {
     const [x, y] = toUtm(lp.crs, lp.rows[5].lat, lp.rows[5].lon);
     expect(Math.abs(x - lp.x[5])).toBeLessThan(1e-6);
     expect(Math.abs(y - lp.y[5])).toBeLessThan(1e-6);
+  });
+});
+
+describe('km digitado', () => {
+  it('entende marco e decimal', async () => {
+    const { parseKmTexto } = await import('../src/formats/km');
+    expect(parseKmTexto('59+740')).toBeCloseTo(59.74, 9);
+    expect(parseKmTexto('59+74')).toBeCloseTo(59.74, 9);
+    expect(parseKmTexto('120')).toBe(120);
+    expect(parseKmTexto('59,74')).toBeCloseTo(59.74, 9);
+    expect(parseKmTexto(' 135.5 ')).toBe(135.5);
+    expect(parseKmTexto('abc')).toBeNull();
+    expect(parseKmTexto('')).toBeNull();
+    expect(parseKmTexto('59+7400')).toBeNull();
   });
 });

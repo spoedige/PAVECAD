@@ -1,75 +1,29 @@
 import './estilos/app.css';
-import { carregarLido, carregarPlanilha } from './mapa/cliente';
-import { criarProjeto, E, H, novoId, type AppProj } from './app/estado';
+import './estilos/config.css';
+import { E, H } from './app/estado';
 import {
-  addProjectToMap, alignToRoad, applyLayers, clearSel, fitList, goLabel, initMap, north, removeProjectFromMap, rotate,
-  setBase, stepSel, updateStakes,
+  alignToRoad, applyLayers, clearSel, fitAll, goLabel, initMap, north, rotate, setBase, stepSel, updateStakes,
 } from './app/mapa';
 import { MODE_KEYS, type ModeKey } from './dominio/indicadores';
 import { abrirDb } from './app/persist';
 import { gpsToggle } from './app/gps';
 import { initRevisao, onToolClick, refreshNotesLayer, refreshPropLayers, resolveProps, setTool } from './app/revisao';
+import { abrirArquivos, abrirLidas, carregarConfig, restaurarProjetos } from './app/projetos';
+import { abrirConfig, atualizarAviso, configAberta, initConfig } from './app/config';
 import { renderAll, renderSeg, setField, setMode, setTab, syncBaseSeg } from './app/paineis';
 import { drawUni, initUnifilar } from './app/unifilar';
 import { clearFocus } from './app/mapa';
 import { $, syncAllSegs, syncSeg, toast } from './app/ui';
 
-function addProject(p: AppProj) {
-  const old = E.P.find((x) => x.meta.name === p.meta.name);
-  if (old) { if (E.mapReady) removeProjectFromMap(old); E.P = E.P.filter((x) => x !== old); }
-  E.P.push(p);
-  if (E.mapReady) addProjectToMap(p);
-}
-
-async function incluir(carregar: (id: string) => ReturnType<typeof carregarPlanilha>, rotulo: string): Promise<AppProj | null> {
-  try {
-    const id = novoId();
-    const r = await carregar(id);
-    const p = criarProjeto(id, r.projeto, { opts: r.opts, normals: r.normals, camadas: r.camadas });
-    for (const l of p.log) console.info(`[${p.meta.name}] ${l.level}: ${l.msg}`);
-    addProject(p);
-    const avisos = p.log.filter((l) => l.level === 'warn').length;
-    if (avisos) toast(`${rotulo}: ${avisos} aviso(s) de importação. Veja em Ajustes`, 5000);
-    return p;
-  } catch (err) {
-    toast(`${rotulo}: ${(err as Error).message}`, 6000);
-    return null;
-  }
-}
-
-async function terminar(novos: AppProj[]) {
-  if (!novos.length) return;
-  E.settingsPid ??= novos[0].id;
-  E.activeGroup ??= novos[0].meta.uf;
-  resolveProps();
-  refreshPropLayers();
-  renderAll();
-  fitList(novos);
-  toast(`${novos.length} planilha(s) carregada(s)`);
-}
-
-async function abrir(files: File[]) {
-  const novos: AppProj[] = [];
-  for (const f of files) {
-    toast(`Lendo ${f.name}... arquivos grandes podem levar alguns segundos`, 60000);
-    const buf = await f.arrayBuffer();
-    const p = await incluir((id) => carregarPlanilha(id, buf), f.name);
-    if (p) novos.push(p);
-  }
-  await terminar(novos);
-}
-
 async function carregarExemplos() {
   const { nomesExemplo, lerExemplo } = await import('./app/exemplo');
   toast('Carregando exemplos...', 60000);
-  const novos: AppProj[] = [];
-  for (const n of nomesExemplo()) {
-    const parsed = await lerExemplo(n);
-    const p = await incluir((id) => carregarLido(id, parsed), n);
-    if (p) novos.push(p);
-  }
-  E.activeGroup = novos[0]?.meta.uf ?? E.activeGroup;
-  await terminar(novos);
+  const lista = [];
+  for (const n of nomesExemplo()) lista.push({ parsed: await lerExemplo(n), rotulo: n });
+  const novos = await abrirLidas(lista, false);
+  if (novos[0]) E.activeGroup = novos[0].meta.uf;
+  renderAll();
+  toast(`${novos.length} planilha(s) de exemplo`);
 }
 
 /* ---- controles ---- */
@@ -78,7 +32,7 @@ $('#file').addEventListener('change', (e) => {
   const input = e.target as HTMLInputElement;
   const files = [...(input.files ?? [])];
   input.value = '';
-  if (files.length) void abrir(files);
+  if (files.length) void abrirArquivos(files);
 });
 if (import.meta.env.DEV) {
   $('#btnExample').hidden = false;
@@ -105,7 +59,9 @@ $('#collapse').addEventListener('click', () => {
 window.addEventListener('keydown', (e) => {
   const t = (e.target as HTMLElement).tagName;
   if (t === 'INPUT' || t === 'SELECT' || t === 'TEXTAREA' || e.metaKey || e.ctrlKey || e.altKey) return;
+  if (configAberta()) return;
   const k = e.key;
+  if (k === ',') { abrirConfig(); return; }
   if (k >= '1' && k <= '6') { setMode(MODE_KEYS[+k - 1]); return; }
   if (k === '/') { e.preventDefault(); $('#gokm').focus(); return; }
   if (k === 'Escape') {
@@ -144,8 +100,10 @@ async function boot() {
   try { E.field = localStorage.getItem('pavecad-field') === '1'; } catch { /* sem storage */ }
   if (E.field) { document.documentElement.setAttribute('data-contrast', 'field'); $('#btnField').setAttribute('aria-pressed', 'true'); }
   await abrirDb();
+  await carregarConfig();
   await initRevisao();
   initUnifilar();
+  initConfig();
   renderAll();
   initMap(() => {
     resolveProps();
@@ -154,8 +112,12 @@ async function boot() {
     refreshPropLayers();
     renderAll();
     updateStakes();
+    if (E.P.length) fitAll(true);
   });
   syncAllSegs();
   syncSeg($('#modes'));
+  const n = await restaurarProjetos();
+  if (n) toast(`${n} planilha(s) reaberta(s) deste aparelho`);
+  atualizarAviso();
 }
 void boot();

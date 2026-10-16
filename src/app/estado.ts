@@ -7,6 +7,7 @@ import type { Normais } from '../mapa/worker';
 import type { RowModel } from '../dominio/modelo';
 import type { IndKey, ModeKey } from '../dominio/indicadores';
 import type { Alvo, Proposta } from '../dominio/propostas';
+import type { AjusteLargura } from '../dominio/larguras';
 import type { Lane, Row } from '../formats/types';
 import type { SolutionCode } from '../formats/km';
 import type { MapMouseEvent } from 'maplibre-gl';
@@ -23,6 +24,9 @@ export interface AppProj extends Project {
   polyByFid: Map<number, Feature>;
   bounds: [[number, number], [number, number]];
   markers: maplibregl.Marker[];
+  /** Linhas como vieram da planilha. `rows` já traz os ajustes de largura aplicados. */
+  rowsPlanilha: Row[];
+  ajustes: AjusteLargura[];
 }
 
 export interface Sel { pid: string; row: number; lane: number }
@@ -76,6 +80,8 @@ export const E = {
   settingsPid: null as string | null,
   uniCollapsed: false,
   tab: 'resumo' as 'resumo' | 'seg' | 'ana' | 'notas' | 'aj',
+  /** Ajustes de largura salvos, por nome de planilha. Valem quando a planilha é aberta. */
+  ajustesSalvos: {} as Record<string, AjusteLargura[]>,
 };
 
 /** Ganchos para os módulos de interface, sem import circular com o mapa. */
@@ -85,6 +91,8 @@ export const H = {
   /** Ferramentas ativas consomem o clique; devolve true quando consumiu. */
   onClick: (_e: MapMouseEvent): boolean => false,
   onView: () => {},
+  /** O catálogo mudou (código novo visto, edição, importação). */
+  onCatalogo: () => {},
 };
 
 export const visibleProjects = () => E.P.filter((p) => p.visible);
@@ -106,7 +114,7 @@ export function criarProjeto(
   for (const f of extra.camadas.polys.features) polyByFid.set(f.properties.fid as number, f as unknown as Feature);
   return {
     ...base, ...extra, id, label: base.meta.name, visible: true, model: modelOf(base.rows),
-    polyByFid, bounds: [[x0, y0], [x1, y1]], markers: [],
+    polyByFid, bounds: [[x0, y0], [x1, y1]], markers: [], rowsPlanilha: base.rows, ajustes: [],
   };
 }
 

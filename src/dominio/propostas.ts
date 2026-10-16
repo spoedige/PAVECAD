@@ -96,15 +96,15 @@ export function reposicionar(list: Proposta[], projs: PV[]): Proposta[] {
   });
 }
 
-/** CSV com ";" para o Excel em português. */
+/** CSV com ";" para o Excel em português. Traz o código original da solução e o nome exibido pelo catálogo. */
 export function propostasCsv(list: Proposta[], proj: (id: string | null) => PV | undefined, nome: (p: PV) => string, rotulo: (k: string) => string): string {
   const n = (v: number) => String(+v.toFixed(2)).replace('.', ','), q = (s: unknown) => '"' + String(s || '').replace(/"/g, '""') + '"';
-  const rows = ['planilha;faixa;km_inicial;km_final;extensao_m;largura_m;area_m2;solucao_atual;solucao_proposta;observacao'];
+  const rows = ['planilha;faixa;km_inicial;km_final;extensao_m;largura_m;area_m2;codigo_atual;solucao_atual;codigo_proposto;solucao_proposta;observacao'];
   for (const r of list) {
     const p = proj(r.pid);
     if (!p) continue;
     const s = runStats(p, r);
-    rows.push([q(nome(p)), r.lane || 'Acost', p.kmLab[r.r0], kmLabel(p.kmNum[r.r1] + 0.02), s.len, n(s.area / s.len), n(s.area), q(rotulo(r.from)), q(rotulo(r.to)), q(r.note)].join(';'));
+    rows.push([q(nome(p)), r.lane || 'Acost', p.kmLab[r.r0], kmLabel(p.kmNum[r.r1] + 0.02), s.len, n(s.area / s.len), n(s.area), q(r.from), q(rotulo(r.from)), q(r.to), q(rotulo(r.to)), q(r.note)].join(';'));
   }
   return rows.join('\n');
 }
