@@ -355,16 +355,16 @@ textarea:focus{box-shadow:inset 0 0 0 2px var(--accent)}
 /* ---------------------------------------------------------------- */
 /* Tablet (html.unico, ligado em layout.ts): mapa em tela cheia, barra única à esquerda, gaveta de mapa e topo enxuto.   */
 /* ---------------------------------------------------------------- */
-.tools,.drawer,#btnMore{display:none}
+.tools,.drawer,#btnMore,#btnLimpo{display:none}
 .unico{--painel-w:360px;--tools-w:44px}
-.unico #btnMore{display:grid}
+.unico #btnMore,.unico #btnLimpo{display:grid}
 .unico #btnExample{display:none}
-.unico .tools{display:flex;flex-direction:column;align-items:flex-start;gap:8px;position:absolute;left:var(--g);bottom:calc(var(--uni-h) + 24px);z-index:6}
+.unico .tools{display:flex;flex-direction:column;align-items:flex-start;gap:8px;position:absolute;left:var(--g);bottom:calc(var(--uni-h) + 24px + var(--rest-uni,0px));z-index:6}
 .unico .tools #zoomhost{position:relative}
 .unico .tools .maplibregl-ctrl-scale{position:absolute;left:calc(100% + 8px);top:0}
-.unico .tools #btnMore{width:var(--tools-w);height:var(--tools-w);border-radius:14px}
-.unico .tools #btnMore{background:var(--glass);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);border:var(--bw) solid var(--hair);box-shadow:var(--shadow)}
-.unico .tools #btnMore[aria-expanded="true"]{background:var(--solid)}
+.unico .tools #btnMore,.unico .tools #btnLimpo{width:var(--tools-w);height:var(--tools-w);border-radius:14px}
+.unico .tools #btnMore,.unico .tools #btnLimpo{background:var(--glass);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);border:var(--bw) solid var(--hair);box-shadow:var(--shadow)}
+.unico .tools #btnMore[aria-expanded="true"],.unico .tools #btnLimpo[aria-pressed="true"]{background:var(--solid);color:var(--fg)}
 .unico .inspector{width:var(--painel-w)}
 .unico .sbtns{gap:4px}
 .unico #t-seg .h1{font-size:20px}
@@ -410,7 +410,7 @@ textarea:focus{box-shadow:inset 0 0 0 2px var(--accent)}
   .unico .inspector,.unico .inspector.collapsed{left:var(--g);width:auto}
   .unico .inspector{max-height:calc(100% - var(--hud-b,170px) - 24px - var(--tools-alt,200px) - 12px - var(--uni-alt,190px) - 24px - 12px)}
   .unico .inspector.collapsed{max-height:none}
-  .unico .tools{bottom:calc(var(--uni-alt,190px) + 24px + var(--painel-alt,0px) + 12px)}
+  .unico .tools{bottom:calc(var(--uni-alt,190px) + 24px + var(--painel-alt,0px) + 12px + var(--rest-uni,0px))}
   .unico .dock{right:var(--gr);bottom:calc(var(--uni-alt,190px) + 24px + var(--painel-alt,0px) + 12px)}
   .unico .drawer{bottom:calc(var(--uni-alt,190px) + 24px + var(--painel-alt,0px) + 12px + var(--dock-h,0px) + 8px)}
 }
@@ -420,3 +420,40 @@ textarea:focus{box-shadow:inset 0 0 0 2px var(--accent)}
 .unico .topright{flex-direction:column;align-items:flex-end;gap:8px}
 .unico .topbar{flex-wrap:wrap}
 .unico .topright{margin-left:auto}
+
+/* Ocultar e mostrar grupos. [data-ocultar] é o botão de ocultar de cada grupo; .grestaura é o botão de 44 px que o restaura, no lugar dele. */
+.gocultar,[data-ocultar],.grestaura{display:none}
+.unico .gocultar{display:inline-grid}
+.unico [data-ocultar].tbtn{display:grid}
+.gocultar{width:32px;height:32px;flex:none;border:0;border-radius:50%;background:var(--fill);color:var(--muted);place-items:center;padding:0}
+.gocultar:hover{background:var(--fill2);color:var(--fg)}
+.gocultar svg{width:16px;height:16px}
+@media (pointer: coarse){.gocultar{width:44px;height:44px}}
+.grestaura{width:44px;height:44px;border-radius:14px;place-items:center;padding:0;color:var(--fg);background:var(--glass);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);border:var(--bw) solid var(--hair);box-shadow:var(--shadow);z-index:6}
+.title{display:flex;align-items:center;gap:8px}
+.title .ttx{flex:1;min-width:0}
+.title .gocultar{margin:-4px -6px -4px 0}
+.drawer-h{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:0 0 0 4px;font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.02em}
+.legrow{display:flex;align-items:center;gap:4px}
+.legbtns{display:flex;align-items:center;gap:2px}
+.unico .ihead{grid-template-columns:minmax(0,1fr) auto auto;grid-template-areas:"grip grip grip" "tabs tabs tabs" "km oc chev"}
+.unico .ihead .gocultar{grid-area:oc}
+.grestaura[data-g=unifilar]{position:absolute;left:var(--g);bottom:12px}
+.grestaura[data-g=painel]{position:absolute;right:var(--gr);bottom:calc(var(--uni-alt,0px) + 24px)}
+.grestaura[data-g=girar]{position:relative}
+html.h-unifilar:not(.limpo){--rest-uni:52px}
+/* grupo oculto: some o grupo e aparece o botão de restaurar no lugar dele */
+html.h-titulo .leftcol>:not(.grestaura){display:none}
+html.h-titulo:not(.limpo) .grestaura[data-g=titulo]{display:grid}
+html.h-ferramentas #toolbar{display:none}
+html.h-ferramentas:not(.limpo) .grestaura[data-g=ferramentas]{display:grid}
+html.h-girar #btnMore,html.h-girar #drawer{display:none}
+html.h-girar:not(.limpo) .grestaura[data-g=girar]{display:grid}
+html.h-legenda #legend{display:none}
+html.h-legenda:not(.limpo) .grestaura[data-g=legenda]{display:grid}
+html.h-unifilar #unicard{display:none}
+html.h-unifilar:not(.limpo) .grestaura[data-g=unifilar]{display:grid}
+html.h-painel #inspector{display:none}
+html.h-painel:not(.limpo) .grestaura[data-g=painel]{display:grid}
+/* mapa limpo: só o zoom (com a escala) e o botão de olho ficam; o estado de cada grupo não muda */
+html.limpo .hud,html.limpo .dock,html.limpo .inspector,html.limpo .uni,html.limpo .drawer,html.limpo #btnMore,html.limpo .grestaura{display:none!important}

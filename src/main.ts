@@ -14,6 +14,7 @@ import { abrirConfig, atualizarAviso, configAberta, initConfig } from './app/con
 import { renderAll, renderSeg, setField, setMode, setTab, syncBaseSeg } from './app/paineis';
 import { drawUni, initUnifilar } from './app/unifilar';
 import { initLayout } from './app/layout';
+import { alternarLimpo, initGrupos } from './app/grupos';
 import { clearFocus } from './app/mapa';
 import { $, observarHud, observarRolagem, observarRolagemH, syncAllSegs, syncSeg, toast } from './app/ui';
 
@@ -91,6 +92,7 @@ window.addEventListener('keydown', (e) => {
     return;
   }
   const lk = k.toLowerCase();
+  if (lk === 'h') { alternarLimpo(); return; }
   if (lk === 'p') { setTool('pin'); return; }
   if (lk === 'n') { setTool('prop'); return; }
   if (lk === 'q') { rotate(-15); return; }
@@ -133,6 +135,7 @@ async function boot() {
   initUnifilar();
   initConfig();
   initLayout();
+  initGrupos(() => { drawUni(); agendarReaplicar(); });
   observarHud(agendarReaplicar);
   document.querySelectorAll<HTMLElement>('.tabbody').forEach(observarRolagem);
   observarRolagemH($('#views'));

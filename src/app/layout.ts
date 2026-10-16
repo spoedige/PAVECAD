@@ -102,7 +102,7 @@ export function initPainel() {
   // tocar na faixa recolhida (fora dos botões) ou numa aba abre de novo
   cab.addEventListener('click', (e) => {
     // o chevron troca o próprio ícone ao clicar, então o alvo do evento já saiu do DOM: usa o caminho original
-    if (!painelRecolhido() || e.composedPath().includes($('#collapse'))) return;
+    if (!painelRecolhido() || e.composedPath().some((n) => n === $('#collapse') || (n instanceof HTMLElement && n.dataset.ocultar))) return;
     setPainel(false);
   });
 }
