@@ -1,3 +1,4 @@
+[hidden]:not([hidden=until-found i]){display:none!important}
 /* Layout: mapa em tela cheia, controles e painéis de vidro flutuando por cima. Claro primeiro, escuro por tokens, modo campo de alto contraste para uso ao sol. */
 :root{
   --bg:#f5f5f7; --glass:rgba(255,255,255,.78); --solid:#ffffff; --fg:#1d1d1f; --muted:#6e6e73; --faint:#aeaeb2;

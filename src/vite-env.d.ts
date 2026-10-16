@@ -1,4 +1,5 @@
 /// <reference types="vite/client" />
+/// <reference types="vite-plugin-pwa/client" />
 
 interface ImportMetaEnv {
   /** Chave do MapTiler. Defina no ambiente de build (Vercel) ou em .env.local. Nunca no repositório. */

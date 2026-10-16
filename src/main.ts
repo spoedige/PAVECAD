@@ -1,3 +1,4 @@
+import { registerSW } from 'virtual:pwa-register';
 import './estilos/app.css';
 import './estilos/config.css';
 import { E, H } from './app/estado';
@@ -37,6 +38,8 @@ $('#file').addEventListener('change', (e) => {
 if (import.meta.env.DEV) {
   $('#btnExample').hidden = false;
   $('#btnExample').addEventListener('click', () => void carregarExemplos());
+} else {
+  $('#btnExample').remove(); // só existe em desenvolvimento
 }
 document.querySelectorAll<HTMLButtonElement>('#modes button').forEach((b) => b.addEventListener('click', () => setMode(b.dataset.m as ModeKey)));
 document.querySelectorAll<HTMLButtonElement>('#tabs button').forEach((b) => b.addEventListener('click', () => setTab(b.dataset.t as typeof E.tab)));
@@ -121,3 +124,10 @@ async function boot() {
   atualizarAviso();
 }
 void boot();
+
+/* PWA: cache do app para abrir sem rede. Só ativo no build (no dev não há service worker). */
+registerSW({
+  immediate: true,
+  onOfflineReady: () => toast('Pronto para uso sem internet', 4000),
+  onRegisterError: (e) => console.warn('service worker:', e),
+});
