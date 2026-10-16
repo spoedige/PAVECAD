@@ -32,6 +32,8 @@ export function drawUni() {
   const cv = document.getElementById('uni') as HTMLCanvasElement | null, wrap = document.getElementById('uniwrap'), card = document.getElementById('unicard');
   if (!cv || !wrap || !card) return;
   const G = grupoAtivo(), root = document.documentElement;
+  // oculto (por grupo ou pelo mapa limpo): sem altura, para o painel e o resto descerem para a base
+  if (root.classList.contains('h-unifilar') || root.classList.contains('limpo')) { root.style.setProperty('--uni-h', '0px'); return; }
   if (E.uniCollapsed) { root.style.setProperty('--uni-h', '44px'); card.classList.add('collapsed'); return; }
   card.classList.remove('collapsed');
   if (!G.length) {

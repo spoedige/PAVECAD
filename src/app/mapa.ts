@@ -292,6 +292,7 @@ function legendItems(): LegItem[] {
 }
 
 // No layout único (601 px ou mais) a legenda começa recolhida (botão pequeno); a escolha do usuário, quando existe, vale sobre o padrão.
+const OCULTAR_LEGENDA = `<button class="gocultar" type="button" data-ocultar="legenda" aria-label="Ocultar legenda" title="Ocultar legenda"><svg class="i" viewBox="0 0 24 24"><path d="M3 3l18 18"/><path d="M10.6 6.1A10 10 0 0 1 12 6c6.5 0 10 6 10 6a17 17 0 0 1-3.2 3.9M6.2 7C3.7 8.7 2 12 2 12s3.5 6 10 6c1.6 0 3-.4 4.2-.9"/><path d="M9.9 10a3 3 0 0 0 4.1 4.1"/></svg></button>`;
 let legendOpen = !window.matchMedia('(min-width: 601px)').matches;
 try { const v = localStorage.getItem('pavecad-leg'); if (v !== null) legendOpen = v !== '0'; } catch { /* sem storage */ }
 
@@ -303,9 +304,9 @@ export function renderLegend() {
   const title = I ? `${I.label} · ${I.unit}${I.lim ? ' · ' + I.lim : ''}` : 'Solução';
   let h = '';
   if (!aberta) {
-    h += `<button class="legtog" id="legTog" aria-expanded="false" aria-label="Expandir legenda"><span class="dots">${items.map((it) => `<i style="background:${it.c}"></i>`).join('')}</span>Legenda</button>`;
+    h += `<div class="legrow"><button class="legtog" id="legTog" aria-expanded="false" aria-label="Expandir legenda"><span class="dots">${items.map((it) => `<i style="background:${it.c}"></i>`).join('')}</span>Legenda</button>${OCULTAR_LEGENDA}</div>`;
   } else {
-    h += `<div class="leghead"><h4>${title}</h4><button class="legtog sm" id="legTog" aria-expanded="true" aria-label="Recolher legenda" title="Recolher"><svg class="i" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button></div>`;
+    h += `<div class="leghead"><h4>${title}</h4><span class="legbtns"><button class="legtog sm" id="legTog" aria-expanded="true" aria-label="Recolher legenda" title="Recolher"><svg class="i" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>${OCULTAR_LEGENDA}</span></div>`;
     h += `<ul title="Toque em um item para ocultar. Cor mais clara = 50% da área">` +
       items.map((it) => `<li><button type="button" data-k="${esc(it.key)}" aria-pressed="${!E.dim.has(it.key)}"><span class="sw" style="background:${it.c}"></span>${esc(it.s)}</button></li>`).join('') + '</ul>';
   }

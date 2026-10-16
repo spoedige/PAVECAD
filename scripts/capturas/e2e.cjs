@@ -59,7 +59,7 @@ const TESTES = {
           noCanto: !!document.querySelector('.topright > #toolbar'), emTools: !!document.querySelector('#tools #zoomhost') && !!document.querySelector('#tools #btnMore'), toolbarEmTools: !!document.querySelector('#tools #toolbar'),
           abaixo: tb.top - linha.bottom, direita: innerWidth - tb.right, painelGap: insp.top - tb.bottom,
           zoomX: Math.round(R('#zoomhost .maplibregl-ctrl-group').left), maisX: Math.round(R('#btnMore').left), borda: R('#btnMore').left,
-          topo: [...document.querySelectorAll('.topbar button')].filter((b) => b.checkVisibility()).map((b) => b.id || b.dataset.m || b.dataset.tool),
+          topo: [...document.querySelectorAll('.topbar button')].filter((b) => b.checkVisibility()).map((b) => b.id || b.dataset.m || b.dataset.tool || (b.dataset.ocultar ? 'ocultar-' + b.dataset.ocultar : '')),
           baseNoTopo: !!document.querySelector('.topbar #base'),
         };
       });
@@ -73,7 +73,7 @@ const TESTES = {
       assert.ok(m.painelGap >= 8, 'não cobre o painel direito: ' + m.painelGap);
       assert.equal(m.zoomX, m.maisX, 'o ⋯ alinha com o zoom');
       assert.ok(m.borda <= 20, 'barra lateral encostada na borda esquerda: ' + m.borda);
-      assert.equal(m.topo.filter((x) => !['sol', 'iri', 'atr', 'd0', 'rc', 'def', 'btnAjuda', 'btnCfg', 'btnFile', 'btnGps', 'btnField', 'prop', 'pin'].includes(x)).length, 0, 'topo com botão extra: ' + m.topo);
+      assert.equal(m.topo.filter((x) => !['sol', 'iri', 'atr', 'd0', 'rc', 'def', 'btnAjuda', 'btnCfg', 'btnFile', 'btnGps', 'btnField', 'prop', 'pin', 'ocultar-ferramentas'].includes(x)).length, 0, 'topo com botão extra: ' + m.topo);
       assert.equal(m.baseNoTopo, false, 'a escolha de base saiu do topo');
     }],
     ['gaveta ⋯ abre alinhar, girar, norte e base; estado salvo; Satélite troca a base', TODOS, async (pg) => {
@@ -213,7 +213,7 @@ const TESTES = {
       assert.equal(await pg.getAttribute('#legTog', 'aria-expanded'), 'false', 'a legenda deve começar recolhida em toque');
       const m = await pg.evaluate(() => { const r = document.querySelector('#legend').getBoundingClientRect(), t = document.querySelector('#legTog').getBoundingClientRect(), b = document.querySelector('#btnMore').getBoundingClientRect(); return { w: r.width, h: t.height, aoLado: r.left >= b.right, naoSobre: r.right <= document.querySelector('#inspector').getBoundingClientRect().left }; });
       assert.ok(m.h >= 43.5, 'botão da legenda com 44 px: ' + m.h);
-      assert.ok(m.w < 200, 'botão pequeno: ' + m.w);
+      assert.ok(m.w < 260, 'botão pequeno (legenda + ocultar): ' + m.w);
       assert.ok(m.aoLado, 'ao lado da barra de ferramentas');
       await pg.click('#legTog'); await pg.waitForTimeout(300);
       assert.equal(await pg.getAttribute('#legTog', 'aria-expanded'), 'true');
@@ -349,6 +349,114 @@ const TESTES = {
       assert.equal(c.mais, false, 'no fim da rolagem o fade some');
       const ult = await pg.evaluate(() => { const v = document.querySelector('#views'), u = v.lastElementChild.getBoundingClientRect(), r = v.getBoundingClientRect(); return u.right <= r.right + 1; });
       assert.ok(ult, 'o último chip fica inteiro e alcançável');
+    }],
+  ],
+  t07: [
+    ['ocultar e mostrar cada grupo: some o grupo, aparece o botão de 44 px no lugar e restaura', TODOS, async (pg) => {
+      await irParaKm(pg, '170+500'); await aba(pg, 'seg');
+      const GRUPOS = {
+        titulo: { alvos: ['#titlebox', '.leftcol .search', '#views'] },
+        ferramentas: { alvos: ['#toolbar'] },
+        girar: { alvos: ['#btnMore'], gaveta: true },
+        legenda: { alvos: ['#legend'] },
+        unifilar: { alvos: ['#unicard'] },
+        painel: { alvos: ['#inspector'] },
+      };
+      const vis = (sel) => pg.evaluate((s) => { const e = document.querySelector(s); return !!e && e.checkVisibility(); }, sel);
+      for (const [id, g] of Object.entries(GRUPOS)) {
+        if (g.gaveta) { await pg.click('#btnMore'); await pg.waitForSelector('#drawer', { state: 'visible' }); }
+        for (const a of g.alvos) assert.equal(await vis(a), true, `${id}: ${a} visível antes de ocultar`);
+        assert.equal(await vis(`.grestaura[data-g=${id}]`), false, `${id}: sem botão de restaurar enquanto visível`);
+        await pg.click(`[data-ocultar=${id}]`); await pg.waitForTimeout(250);
+        for (const a of g.alvos) assert.equal(await vis(a), false, `${id}: ${a} oculto`);
+        const r = await pg.evaluate((i) => { const e = document.querySelector(`.grestaura[data-g=${i}]`), b = e.getBoundingClientRect(); return { v: e.checkVisibility(), w: b.width, h: b.height, dentro: b.left >= 0 && b.top >= 0 && b.right <= innerWidth && b.bottom <= innerHeight, rot: e.getAttribute('aria-label'), icone: !!e.querySelector('svg') }; }, id);
+        assert.ok(r.v && r.w >= 43.5 && r.h >= 43.5 && r.dentro, `${id}: botão de 44 px dentro da tela (${r.w}x${r.h})`);
+        assert.ok(r.icone && /^Mostrar /.test(r.rot), `${id}: ícone e rótulo acessível`);
+        assert.ok((await pg.evaluate(() => JSON.parse(localStorage.getItem('pavecad-ocultos')))).includes(id), `${id}: salvo no localStorage`);
+        await pg.click(`.grestaura[data-g=${id}]`); await pg.waitForTimeout(250);
+        for (const a of g.alvos) assert.equal(await vis(a), true, `${id}: ${a} voltou`);
+        assert.equal(await vis(`.grestaura[data-g=${id}]`), false, `${id}: o botão de restaurar some`);
+        assert.ok(!(await pg.evaluate(() => JSON.parse(localStorage.getItem('pavecad-ocultos')))).includes(id), `${id}: removido do localStorage`);
+        if (g.gaveta) { await pg.waitForTimeout(100); if (await vis('#drawer')) await pg.click('#btnMore'); }
+      }
+    }],
+    ['o estado de cada grupo persiste ao recarregar; nenhum controle sobreposto com todos ocultos', TODOS, async (pg) => {
+      await pg.click('[data-ocultar=titulo]'); await pg.click('[data-ocultar=ferramentas]'); await pg.click('[data-ocultar=legenda]'); await pg.click('[data-ocultar=unifilar]'); await pg.click('[data-ocultar=painel]');
+      await pg.click('#btnMore'); await pg.waitForSelector('#drawer', { state: 'visible' }); await pg.click('[data-ocultar=girar]');
+      await pg.waitForTimeout(300);
+      const checa = () => pg.evaluate(() => {
+        const ids = ['titulo', 'ferramentas', 'girar', 'legenda', 'unifilar', 'painel'];
+        const rs = ids.map((i) => [i, document.querySelector(`.grestaura[data-g=${i}]`)]).filter(([, e]) => e.checkVisibility()).map(([i, e]) => [i, e.getBoundingClientRect()]);
+        const outros = ['#zoomhost .maplibregl-ctrl-group', '#btnLimpo', '.topright > .trrow', '#modes'].map((s) => [s, document.querySelector(s)]).filter(([, e]) => e && e.checkVisibility()).map(([s, e]) => [s, e.getBoundingClientRect()]);
+        const todos = rs.concat(outros), ruins = [];
+        for (let i = 0; i < todos.length; i++) for (let j = i + 1; j < todos.length; j++) { const a = todos[i][1], b = todos[j][1]; if (Math.min(a.right, b.right) - Math.max(a.left, b.left) > 1 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 1) ruins.push(todos[i][0] + ' x ' + todos[j][0]); }
+        const fora = todos.filter(([, b]) => b.left < 0 || b.top < 0 || b.right > innerWidth || b.bottom > innerHeight).map(([s]) => s);
+        const visiveis = ['#titlebox', '#toolbar', '#drawer', '#legend', '#unicard', '#inspector'].filter((s) => document.querySelector(s).checkVisibility());
+        return { n: rs.length, ruins, fora, visiveis, classes: [...document.documentElement.classList].filter((c) => c.startsWith('h-')).sort() };
+      });
+      let r = await checa();
+      assert.equal(r.n, 6, 'seis botões de restaurar');
+      assert.deepEqual(r.ruins, [], 'sem sobreposição com tudo oculto');
+      assert.deepEqual(r.fora, [], 'tudo dentro da tela');
+      assert.deepEqual(r.visiveis, []);
+      await pg.reload(); await pg.waitForTimeout(2000);
+      r = await checa();
+      assert.deepEqual(r.classes, ['h-ferramentas', 'h-girar', 'h-legenda', 'h-painel', 'h-titulo', 'h-unifilar'], 'todos continuam ocultos após recarregar');
+      assert.equal(r.n, 6); assert.deepEqual(r.ruins, []); assert.deepEqual(r.visiveis, []);
+      // restaura só dois e recarrega de novo: cada grupo guarda o próprio estado
+      await pg.click('.grestaura[data-g=legenda]'); await pg.click('.grestaura[data-g=painel]');
+      await pg.reload(); await pg.waitForTimeout(2000);
+      r = await checa();
+      assert.deepEqual(r.classes, ['h-ferramentas', 'h-girar', 'h-titulo', 'h-unifilar']);
+      assert.deepEqual(r.visiveis.sort(), ['#inspector', '#legend']);
+    }],
+    ['mapa limpo: botão de olho e tecla H deixam só o zoom e o botão; voltar restaura o estado de cada grupo', TODOS, async (pg) => {
+      await irParaKm(pg, '170+500'); await aba(pg, 'seg');
+      await pg.click('[data-ocultar=ferramentas]'); await pg.click('[data-ocultar=legenda]'); await pg.waitForTimeout(250);
+      const estado = () => pg.evaluate(() => ({
+        limpo: document.documentElement.classList.contains('limpo'), pressed: document.querySelector('#btnLimpo').getAttribute('aria-pressed'),
+        vis: ['#titlebox', '#toolbar', '#legend', '#unicard', '#inspector', '#modes', '.topright > .trrow', '#btnMore'].filter((s) => document.querySelector(s).checkVisibility()),
+        restaura: [...document.querySelectorAll('.grestaura')].filter((e) => e.checkVisibility()).length,
+        botoes: [...document.querySelectorAll('button')].filter((b) => b.checkVisibility() && !b.closest('.maplibregl-ctrl-attrib')).map((b) => b.id || b.getAttribute('aria-label')),
+      }));
+      const antes = await estado();
+      assert.equal(antes.limpo, false);
+      assert.ok(antes.vis.includes('#inspector') && antes.vis.includes('#unicard') && !antes.vis.includes('#toolbar') && !antes.vis.includes('#legend'));
+      assert.equal(antes.restaura, 2);
+      // tecla H
+      await pg.evaluate(() => document.activeElement && document.activeElement.blur());
+      await pg.keyboard.press('h'); await pg.waitForTimeout(300);
+      let e = await estado();
+      assert.equal(e.limpo, true); assert.equal(e.pressed, 'true');
+      assert.deepEqual(e.vis, [], 'nenhum grupo visível no mapa limpo: ' + e.vis);
+      assert.equal(e.restaura, 0, 'nem os botões de restaurar de cada grupo');
+      assert.equal(e.botoes.filter((b) => b !== 'btnLimpo' && !/Zoom|zoom|Aproximar|Afastar/i.test(b || '')).length, 0, 'só zoom e o botão de olho: ' + e.botoes.join(' | '));
+      assert.ok(e.botoes.includes('btnLimpo'), 'o botão de olho continua');
+      assert.ok(e.botoes.length === 3, 'zoom (2) + olho: ' + e.botoes.join(' | '));
+      assert.equal(await pg.isVisible('#zoomhost .maplibregl-ctrl-group'), true);
+      assert.equal(await pg.getAttribute('#btnLimpo', 'aria-label'), 'Mostrar os controles (H)');
+      // tocar de novo restaura exatamente o estado anterior
+      await pg.click('#btnLimpo'); await pg.waitForTimeout(300);
+      e = await estado();
+      assert.equal(e.limpo, false); assert.equal(e.pressed, 'false');
+      assert.deepEqual(e.vis, antes.vis, 'cada grupo volta como estava');
+      assert.equal(e.restaura, 2);
+      // H digitado numa caixa de texto não liga o mapa limpo
+      await pg.click('#gokm'); await pg.keyboard.type('h');
+      assert.equal(await pg.evaluate(() => document.documentElement.classList.contains('limpo')), false, 'H em campo de texto não aciona');
+      // o mapa limpo não é salvo: mudar o estado só vale na sessão
+      await pg.evaluate(() => document.activeElement.blur());
+      await pg.keyboard.press('h'); await pg.waitForTimeout(200);
+      assert.deepEqual(await pg.evaluate(() => JSON.parse(localStorage.getItem('pavecad-ocultos')).sort()), ['ferramentas', 'legenda'], 'os grupos ocultos seguem salvos, o mapa limpo não altera');
+    }],
+    ['no mapa limpo nada se sobrepõe e só zoom e botão de olho ficam à esquerda', TODOS, async (pg) => {
+      await pg.keyboard.press('h'); await pg.waitForTimeout(300);
+      const r = await pg.evaluate(() => {
+        const a = document.querySelector('#zoomhost .maplibregl-ctrl-group').getBoundingClientRect(), b = document.querySelector('#btnLimpo').getBoundingClientRect();
+        return { ruim: Math.min(a.right, b.right) - Math.max(a.left, b.left) > 1 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 1, ox: a.left === b.left, dentro: b.bottom <= innerHeight && a.top >= 0, h: b.height, w: b.width };
+      });
+      assert.equal(r.ruim, false); assert.equal(r.ox, true, 'alinhados'); assert.ok(r.dentro);
+      assert.ok(r.h >= 43.5 && r.w >= 43.5, 'o botão de olho tem 44 px');
     }],
   ],
   g03: [

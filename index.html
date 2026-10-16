@@ -17,7 +17,7 @@
 
     <div class="hud">
     <div class="leftcol">
-      <div class="glass title" id="titlebox"><b id="title">PaveCAD</b><span id="subtitle"></span></div>
+      <div class="glass title" id="titlebox"><div class="ttx"><b id="title">PaveCAD</b><span id="subtitle"></span></div><button class="gocultar" type="button" data-ocultar="titulo" aria-label="Ocultar título e busca" title="Ocultar título e busca"><svg class="i" viewBox="0 0 24 24"><path d="M3 3l18 18"/><path d="M10.6 6.1A10 10 0 0 1 12 6c6.5 0 10 6 10 6a17 17 0 0 1-3.2 3.9M6.2 7C3.7 8.7 2 12 2 12s3.5 6 10 6c1.6 0 3-.4 4.2-.9"/><path d="M9.9 10a3 3 0 0 0 4.1 4.1"/></svg></button></div>
       <div class="glass search">
         <svg class="i" viewBox="0 0 24 24" style="color:var(--faint)"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
         <input id="gokm" class="num" placeholder="Ir para km" inputmode="decimal" aria-label="Ir para km">
@@ -61,6 +61,7 @@
           <button class="tbtn" data-tool="prop" aria-pressed="false" title="Propor nova solução (N)" aria-label="Propor nova solução"><svg class="i" viewBox="0 0 24 24"><path d="M7 7h11l-3-3M17 17H6l3 3"/></svg></button>
           <button class="tbtn" id="btnField" aria-pressed="false" title="Modo campo para uso ao sol (S)" aria-label="Modo campo"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button>
           <button class="tbtn" data-tool="pin" aria-pressed="false" title="Nota em um ponto (P)" aria-label="Nota em um ponto"><svg class="i" viewBox="0 0 24 24"><path d="M12 21s-6-5.2-6-10a6 6 0 1 1 12 0c0 4.8-6 10-6 10z"/><circle cx="12" cy="11" r="2.2"/></svg></button>
+          <button class="tbtn" type="button" data-ocultar="ferramentas" aria-label="Ocultar ferramentas" title="Ocultar ferramentas" style="color:var(--muted)"><svg class="i" viewBox="0 0 24 24"><path d="M3 3l18 18"/><path d="M10.6 6.1A10 10 0 0 1 12 6c6.5 0 10 6 10 6a17 17 0 0 1-3.2 3.9M6.2 7C3.7 8.7 2 12 2 12s3.5 6 10 6c1.6 0 3-.4 4.2-.9"/><path d="M9.9 10a3 3 0 0 0 4.1 4.1"/></svg></button>
         </div>
       </div>
     </div>
@@ -68,9 +69,10 @@
     </div>
 
     <nav class="tools" id="tools" aria-label="Controles do mapa">
+      <button class="tbtn" id="btnLimpo" type="button" aria-pressed="false" aria-label="Mapa limpo: ocultar os controles (H)" title="Mapa limpo (H)"><svg class="i" viewBox="0 0 24 24"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
       <button class="tbtn" id="btnMore" type="button" aria-expanded="false" aria-controls="drawer" title="Alinhar, girar e base do mapa" aria-label="Mais ferramentas do mapa"><svg class="i" viewBox="0 0 24 24"><circle cx="5.5" cy="12" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/><circle cx="18.5" cy="12" r="1.2" fill="currentColor"/></svg></button>
     </nav>
-    <div class="glass drawer" id="drawer" role="group" aria-label="Mais ferramentas do mapa"></div>
+    <div class="glass drawer" id="drawer" role="group" aria-label="Mais ferramentas do mapa"><div class="drawer-h"><span>Mapa</span><button class="gocultar" type="button" data-ocultar="girar" aria-label="Ocultar alinhar e girar" title="Ocultar alinhar e girar"><svg class="i" viewBox="0 0 24 24"><path d="M3 3l18 18"/><path d="M10.6 6.1A10 10 0 0 1 12 6c6.5 0 10 6 10 6a17 17 0 0 1-3.2 3.9M6.2 7C3.7 8.7 2 12 2 12s3.5 6 10 6c1.6 0 3-.4 4.2-.9"/><path d="M9.9 10a3 3 0 0 0 4.1 4.1"/></svg></button></div></div>
     <div class="glass gpschip" id="gpschip" hidden></div>
     <div class="glass toast" id="toast" role="status" aria-live="polite"></div>
     <div class="glass tip" id="tip"></div>
@@ -91,6 +93,7 @@
         <button role="tab" aria-selected="false" data-t="aj">Ajustes</button>
       </div>
       <div class="ikm" id="ikm"></div>
+      <button class="gocultar" type="button" data-ocultar="painel" aria-label="Ocultar painel" title="Ocultar painel"><svg class="i" viewBox="0 0 24 24"><path d="M3 3l18 18"/><path d="M10.6 6.1A10 10 0 0 1 12 6c6.5 0 10 6 10 6a17 17 0 0 1-3.2 3.9M6.2 7C3.7 8.7 2 12 2 12s3.5 6 10 6c1.6 0 3-.4 4.2-.9"/><path d="M9.9 10a3 3 0 0 0 4.1 4.1"/></svg></button>
       <button class="iconbtn" id="collapse" aria-label="Recolher painel" title="Recolher painel"><svg class="i" viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></svg></button>
     </div>
     <div class="tabbody" id="t-resumo"></div>
@@ -102,6 +105,7 @@
 
   <section class="glass uni" id="unicard" aria-label="Unifilar">
     <div class="uni-h"><b>Unifilar</b><span class="chips" id="unigroups"></span><span class="sub" id="unisub"></span>
+      <button class="gocultar" type="button" data-ocultar="unifilar" aria-label="Ocultar unifilar" title="Ocultar unifilar"><svg class="i" viewBox="0 0 24 24"><path d="M3 3l18 18"/><path d="M10.6 6.1A10 10 0 0 1 12 6c6.5 0 10 6 10 6a17 17 0 0 1-3.2 3.9M6.2 7C3.7 8.7 2 12 2 12s3.5 6 10 6c1.6 0 3-.4 4.2-.9"/><path d="M9.9 10a3 3 0 0 0 4.1 4.1"/></svg></button>
       <button class="iconbtn" id="uniToggle" aria-label="Recolher unifilar" title="Recolher unifilar" style="width:26px;height:26px"><svg class="i" viewBox="0 0 24 24" style="width:14px;height:14px"><path d="M6 9l6 6 6-6"/></svg></button></div>
     <div class="uni-wrap" id="uniwrap"><canvas id="uni"></canvas><div id="unihover"><span></span></div></div>
   </section>
