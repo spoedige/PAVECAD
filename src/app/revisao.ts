@@ -7,7 +7,7 @@ import { trColor, trLabel, trOrder } from '../dominio/solucoes';
 import { kmLabel } from '../formats/km';
 import { E, H, NOTE_CATS, getP, projName, type AppProj, type Nota, type NoteCat } from './estado';
 import { IC } from './icones';
-import { getMap, hitAt, setData } from './mapa';
+import { getMap, hitAt, renderLegend, setData } from './mapa';
 import * as db from './persist';
 import { setTab } from './paineis';
 import { $, cssv, esc, fmt, syncSeg, toast } from './ui';
@@ -27,6 +27,8 @@ export function setTool(t: typeof E.tool) {
   if (t !== 'prop') E.propSel = [];
   refreshProp();
   refreshPropLayers();
+  document.body.classList.toggle('modo-propor', t === 'prop');
+  renderLegend();
 }
 
 /** Cliques com ferramenta ativa. */

@@ -63,6 +63,44 @@ const TESTES = {
       assert.ok(r.max <= 0, `há rolagem em ${r.piores.join('; ')} (altura útil ${r.altura}px, ${r.n} casos)`);
     }],
   ],
+  g13: [
+    ['barra Propor solução: acima do unifilar, fora do painel direito e sem cobrir rótulos', '1366x768', async (pg) => {
+      await irParaKm(pg, '170+500', 3500);
+      await pg.keyboard.press('n');
+      const a = await pontoLivre(pg);
+      assert.ok(a);
+      await pg.mouse.click(a.x, a.y);
+      await pg.waitForTimeout(400);
+      assert.match(await pg.textContent('#propbar'), /1 trecho selecionado/);
+      const medir = () => pg.evaluate(() => {
+        const R = (e) => { const b = e.getBoundingClientRect(); return { l: b.left, r: b.right, t: b.top, b: b.bottom, w: b.width }; };
+        const vis = (e) => e && e.checkVisibility() ? R(e) : null;
+        const esq = R(document.querySelector('.leftcol'));
+        const bar = R(document.querySelector('#propbar')), insp = vis(document.querySelector('#inspector')), uni = vis(document.querySelector('#unicard')), leg = vis(document.querySelector('#legend'));
+        const cruza = (x, y) => x.l < y.r && x.r > y.l && x.t < y.b && x.b > y.t;
+        const rotulos = [...document.querySelectorAll('.maplibregl-marker[data-rot]')].filter((e) => !e.classList.contains('rot-oculto') && e.checkVisibility()).map((e) => ({ t: e.textContent, ...R(e) }));
+        return { vw: innerWidth, vh: innerHeight, esq, bar, insp, uni, leg, sobreRotulo: rotulos.filter((r) => cruza(r, bar)).map((r) => r.t), sobreInsp: insp ? cruza(bar, insp) : false, fixed: getComputedStyle(document.querySelector('#propbar')).position };
+      });
+      for (const [w, h] of [[1920, 1080], [1366, 768], [1024, 768], [820, 1180]]) {
+        await pg.setViewportSize({ width: w, height: h });
+        await pg.waitForTimeout(600);
+        const m = await medir();
+        assert.deepEqual(m.sobreRotulo, [], `${w}px: a barra cobre rótulos de km: ${m.sobreRotulo.join(', ')}`);
+        assert.equal(m.sobreInsp, false, `${w}px: a barra cobre o painel direito`);
+        assert.ok(m.bar.l >= 16 - 0.5, `${w}px: margem esquerda ${m.bar.l}`);
+        assert.ok(m.vw - m.bar.r >= 16 - 0.5, `${w}px: margem direita ${m.vw - m.bar.r}`);
+        if (w > 900) {
+          assert.ok(m.uni && m.bar.b <= m.uni.t, `${w}px: a barra deve ficar acima do unifilar (barra ${m.bar.b} / unifilar ${m.uni && m.uni.t})`);
+          assert.ok(m.uni.t - m.bar.b <= 40, `${w}px: a barra deve ficar logo acima do unifilar (${m.uni.t - m.bar.b}px)`);
+          assert.ok(m.insp && m.bar.r <= m.insp.l - 8, `${w}px: a barra deve terminar antes do painel direito`);
+          if (m.leg) assert.ok(m.leg.b <= m.bar.t, `${w}px: a legenda sobe para não ficar sob a barra`);
+          assert.ok((m.leg ? m.leg.t : m.bar.t) >= m.esq.b + 4, `${w}px: a pilha da barra encosta na coluna esquerda (${m.leg ? m.leg.t : m.bar.t} / ${m.esq.b})`);
+        } else {
+          assert.ok(Math.abs(m.bar.w - (m.vw - 32)) <= 1, `${w}px: largura toda com 16 px de margem (${m.bar.w} de ${m.vw - 32})`);
+        }
+      }
+    }],
+  ],
   g12: [
     ['configurações: fundo do app (não preto puro), 960 px centralizado, margem de 16 px e cabeçalho com folga', '1366x768', async (pg) => {
       await pg.emulateMedia({ colorScheme: 'dark' });

@@ -13,7 +13,7 @@ const rect = (e: Element): Ret => { const r = e.getBoundingClientRect(); return 
 const BLOQUEIOS = [
   '.stage .glass:not(.toast):not(.tip)', '.stage .chipbtn', '.stage .pillbtn', '.stage .iconbtn', '.stage .zoomnote',
   '.stage .maplibregl-ctrl-group', '.stage .maplibregl-ctrl-scale', '.stage .maplibregl-ctrl-attrib',
-  '#legend', '#inspector', '#unicard',
+  '#legend', '#propbar', '#inspector', '#unicard',
 ].join(',');
 
 export interface OpcoesRotulos {
