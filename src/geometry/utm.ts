@@ -37,14 +37,16 @@ export interface Crs {
   /** Meridiano central (graus). */
   lon0: number;
   hemisphere: 'S';
+  /** 'fixo' quando o fuso foi informado, 'mediana' quando saiu da mediana das longitudes. */
+  source: 'fixo' | 'mediana';
 }
 
 export function zoneOf(lon: number): number {
   return Math.floor((lon + 180) / 6) + 1;
 }
 
-export function crsForZone(zone: number): Crs {
-  return { epsg: zone >= 18 && zone <= 25 ? 31960 + zone : null, zone, lon0: zone * 6 - 183, hemisphere: 'S' };
+export function crsForZone(zone: number, source: Crs['source'] = 'fixo'): Crs {
+  return { epsg: zone >= 18 && zone <= 25 ? 31960 + zone : null, zone, lon0: zone * 6 - 183, hemisphere: 'S', source };
 }
 
 export function toUtm(crs: Crs, lat: number, lon: number): [number, number] {
