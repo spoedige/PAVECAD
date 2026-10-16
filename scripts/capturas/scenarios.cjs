@@ -68,6 +68,11 @@ const CENARIOS = {
     await irParaKm(pg, '170+500'); await aba(pg, 'seg');
     if (vp.toque) { await pg.click('#btnMore'); await pg.waitForTimeout(500); }
   },
+  /** Tablet com o painel direito e o unifilar recolhidos (gesto de puxar para baixo). */
+  recolhidos: async (pg, { vp }) => {
+    await irParaKm(pg, '170+500'); await aba(pg, 'seg');
+    if (vp.toque) { await pg.click('#collapse'); await pg.click('#uniToggle'); await pg.waitForTimeout(400); }
+  },
   segmentoFim: async (pg) => {
     await irParaKm(pg, '170+500'); await aba(pg, 'seg');
     await pg.evaluate(() => { const b = document.querySelector('#t-seg'); b.scrollTop = b.scrollHeight; window.scrollTo(0, document.body.scrollHeight); });
@@ -91,7 +96,7 @@ const GRUPOS = {
   g14: ['revisaoVazia', 'revisaoComProposta'],
   g15: ['escalaSat'],
   g12: ['config'],
-  t01: ['inicio', 'segmento', 'segmentoFim', 'gaveta'],
+  t01: ['inicio', 'segmento', 'segmentoFim', 'gaveta', 'recolhidos'],
 };
 
 module.exports = { CENARIOS, GRUPOS, irParaKm, aba, criarProposta, pontoLivre };
