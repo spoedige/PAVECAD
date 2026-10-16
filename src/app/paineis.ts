@@ -152,6 +152,7 @@ export function renderSeg() {
   if (!s) { el.innerHTML = '<div class="empty"><b>Nenhum segmento selecionado</b>Clique em uma faixa no mapa ou no unifilar.</div>'; return; }
   const p = getP(s.pid);
   if (!p) { E.sel = null; return renderSeg(); }
+  const tinhaFoco = !!document.activeElement?.closest('#t-seg .xs');
   const r = p.rows[s.row], md = p.model[s.row], N = r.widths.length, isSh = s.lane === 0;
   const L = isSh ? null : r.lanes[s.lane - 1], tr = isSh ? md.sh : md.tr[s.lane - 1];
   const chips: string[] = [];
@@ -168,11 +169,11 @@ export function renderSeg() {
   widths.forEach((w, k) => {
     acc += w; ticks.push(acc);
     const isS = k >= N, t = isS ? md.sh : md.tr[k], nd = t.main === '-', on = isS ? isSh : s.lane === k + 1;
-    xs += `<div class="${on ? 'sel' : ''} ${nd ? 'nodata' : ''}" style="width:${(w / total) * 100}%;background:${tc(t.main)}">${isS ? 'Ac' : 'Fx ' + (k + 1)}</div>`;
+    const rot = `${isS ? 'Acostamento' : 'Faixa ' + (k + 1)}, ${fmt(w, 2)} m, ${nd ? 'sem intervenção' : trLabel(t.main)}`;
+    xs += `<button type="button" data-l="${isS ? 0 : k + 1}" aria-pressed="${on}" aria-label="${esc(rot)}" title="${esc(rot)}" class="${on ? 'sel' : ''} ${nd ? 'nodata' : ''}" style="width:${(w / total) * 100}%;background:${tc(t.main)}">${isS ? 'Ac' : 'Fx ' + (k + 1)}</button>`;
   });
   const xt = ticks.map((e, i) => `<span style="left:${(e / total) * 100}%;transform:translateX(${i === 0 ? '0' : i === ticks.length - 1 ? '-100%' : '-50%'})">${fmt(e, 1)} m</span>`).join('');
   const treat = isSh || !L ? [] : L.treat.map((v, i) => [TREAT_LABELS[i], v] as const).filter(([, v]) => v !== 0 && v !== null);
-  const lanesBtns = Array.from({ length: N }, (_, k) => `<button data-l="${k + 1}" aria-pressed="${s.lane === k + 1}">Fx ${k + 1}</button>`).join('') + (r.shoulder > 0 ? `<button data-l="0" aria-pressed="${isSh}">Acost.</button>` : '');
   const dr = r.drain, drainTxt = dr && (dr[0] || dr[1]) ? `tipo ${dr[0] || dr[1]}, lado ${p.opts.drainSide === 'in' ? 'interno' : 'externo'}` : null;
   const extra: [string, string][] = [];
   if (L?.fsTipo) extra.push(['Fresagem', L.fsTipo === 'C' ? 'Contínua' : 'Descontínua']);
@@ -186,9 +187,8 @@ export function renderSeg() {
     <div class="shead"><div><h2 class="h1 num">km ${esc(p.kmLab[s.row])}</h2>
         <p class="lead num">${esc(projName(p))} · hod. ${fmt(r.hod, 3)} km${r.obs || r.platform ? ' · ' + [r.obs, r.platform].filter(Boolean).map(esc).join(' · ') : ''}</p></div>
       <div class="sbtns"><button class="iconbtn" id="sPrev" aria-label="Segmento anterior" title="Anterior (←)">${IC.prev}</button><button class="iconbtn" id="sNext" aria-label="Próximo segmento" title="Próximo (→)">${IC.next}</button><button class="iconbtn" id="sCopy" aria-label="Copiar localização" title="Copiar">${IC.copy}</button></div></div>
-    <div class="seg" id="laneSeg" role="group" aria-label="Faixa" style="align-self:flex-start">${lanesBtns}</div>
     <div><div class="sect">Solução</div><div class="chips">${chips.join('')}</div>${tr.code ? `<p class="note num" style="margin-top:7px">Código na planilha: ${esc(tr.code)}</p>` : ''}</div>
-    <div><div class="sect">Seção a partir da coordenada</div><div class="xs">${xs}</div><div class="xsticks num">${xt}</div></div>
+    <div><div class="sect">Seção a partir da coordenada <span style="text-transform:none;font-weight:500">↑ ↓ trocam de faixa</span></div><div class="xs" role="group" aria-label="Faixa do segmento">${xs}</div><div class="xsticks num">${xt}</div></div>
     ${isSh || !L ? '' : `<div><div class="sect">Parâmetros</div><div class="params">${param('iri')}${param('def', 'Defeitos')}${param('atr')}${param('d0')}${param('rc')}
       <div class="param"><div class="k">D120</div><div class="v num">${fmt(L.d120, 2)}<small>0,01 mm</small></div></div></div></div>
     <div><div class="sect">Tratamentos lançados</div>${treat.length ? `<div class="list">${treat.map(([k, v]) => `<div class="row"><div class="grow">${k}</div><div class="val num">${typeof v === 'number' ? fmt(v, v % 1 ? 2 : 0) : esc(v)}</div></div>`).join('')}</div>` : '<p class="note">Nenhum lançamento na coluna de soluções.</p>'}</div>`}
@@ -206,8 +206,9 @@ export function renderSeg() {
     const c = (f.geometry as GeoJSON.Polygon).coordinates[0];
     startNote('pin', [[(c[0][0] + c[2][0]) / 2, (c[0][1] + c[2][1]) / 2]]);
   };
-  el.querySelectorAll<HTMLElement>('#laneSeg button').forEach((b) => b.addEventListener('click', () => select(s.pid, s.row, +b.dataset.l!)));
-  syncSeg($('#laneSeg'));
+  el.querySelectorAll<HTMLElement>('.xs button').forEach((b) => b.addEventListener('click', () => select(s.pid, s.row, +b.dataset.l!)));
+  // a seleção refaz o painel: devolve o foco do teclado à faixa escolhida
+  if (tinhaFoco) el.querySelector<HTMLElement>('.xs [aria-pressed="true"]')?.focus();
 }
 
 /* ---------------------------------------------------------------- */
