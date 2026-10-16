@@ -59,11 +59,31 @@ $('#collapse').addEventListener('click', () => {
   $('#collapse').innerHTML = `<svg class="i" viewBox="0 0 24 24"><path d="${c ? 'M6 9l6 6 6-6' : 'M6 15l6-6 6 6'}"/></svg>`;
 });
 
+/* ---- lista de atalhos ---- */
+const ajudaAberta = () => !$('#ajuda').hidden;
+function abrirAjuda() {
+  $('#ajuda').hidden = false;
+  $('#ajudaFundo').hidden = false;
+  $('#btnAjuda').setAttribute('aria-expanded', 'true');
+  $('#ajudaFechar').focus();
+}
+function fecharAjuda() {
+  $('#ajuda').hidden = true;
+  $('#ajudaFundo').hidden = true;
+  $('#btnAjuda').setAttribute('aria-expanded', 'false');
+  $('#btnAjuda').focus();
+}
+$('#btnAjuda').addEventListener('click', () => (ajudaAberta() ? fecharAjuda() : abrirAjuda()));
+$('#ajudaFechar').addEventListener('click', fecharAjuda);
+$('#ajudaFundo').addEventListener('click', fecharAjuda);
+window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && ajudaAberta()) { e.stopPropagation(); e.preventDefault(); fecharAjuda(); } }, true);
+
 window.addEventListener('keydown', (e) => {
   const t = (e.target as HTMLElement).tagName;
   if (t === 'INPUT' || t === 'SELECT' || t === 'TEXTAREA' || e.metaKey || e.ctrlKey || e.altKey) return;
-  if (configAberta()) return;
+  if (configAberta() || ajudaAberta()) return;
   const k = e.key;
+  if (k === '?' && !matchMedia('(pointer: coarse)').matches) { abrirAjuda(); return; }
   if (k === ',') { abrirConfig(); return; }
   if (k >= '1' && k <= '6') { setMode(MODE_KEYS[+k - 1]); return; }
   if (k === '/') { e.preventDefault(); $('#gokm').focus(); return; }
