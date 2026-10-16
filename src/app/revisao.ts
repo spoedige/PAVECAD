@@ -1,8 +1,9 @@
 import type { MapMouseEvent } from 'maplibre-gl';
 import { areaM2, fmtLen, lenM } from '../dominio/medidas';
-import { addProposta, propostasCsv, PROP_OPTS, runAt, runLabel, runStats, type Alvo, type Proposta } from '../dominio/propostas';
+import { addProposta, propostasCsv, PROP_OPTS, reposicionar, runAt, runLabel, runStats, type Alvo, type Proposta } from '../dominio/propostas';
 import { localizar, type LocP } from '../dominio/localizar';
 import { trColor, trLabel } from '../dominio/solucoes';
+import { kmLabel } from '../formats/km';
 import { E, H, NOTE_CATS, getP, projName, type AppProj, type Nota, type NoteCat } from './estado';
 import { IC } from './icones';
 import { getMap, hitAt, setData } from './mapa';
@@ -46,8 +47,11 @@ export function onToolClick(e: MapMouseEvent): boolean {
 /* ---------------------------------------------------------------- */
 /* Propostas de solução                                              */
 /* ---------------------------------------------------------------- */
+/** Reposiciona as propostas pelo km. Registros antigos (só com índices) ganham o km e são regravados. */
 export function resolveProps() {
-  for (const r of E.props) r.pid = E.P.find((x) => x.meta.name === r.pname)?.id ?? null;
+  const antes = new Map(E.props.map((r) => [r.id, r.km0 === undefined]));
+  E.props = reposicionar(E.props, E.P);
+  for (const r of E.props) if (antes.get(r.id) && !r.orfa && r.pid) gravarProp(r);
 }
 
 function propToggle(p: AppProj, row: number, lane: number) {
@@ -84,8 +88,10 @@ export function refreshProp() {
   $('#pApply').onclick = () => {
     const total = E.propSel.length;
     for (const s of E.propSel) {
-      const rec: Proposta = { pid: s.pid, pname: s.pname, lane: s.lane, r0: s.r0, r1: s.r1, from: s.from, id: 'q' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), to: E.propTo, note: E.propNote.trim(), t: new Date().toISOString() };
-      const r = addProposta(E.props, rec);
+      const pj = getP(s.pid ?? '');
+      if (!pj) continue;
+      const rec: Proposta = { pid: s.pid, pname: s.pname, lane: s.lane, r0: s.r0, r1: s.r1, km0: pj.kmNum[s.r0], km1: pj.kmNum[s.r1], from: s.from, id: 'q' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), to: E.propTo, note: E.propNote.trim(), t: new Date().toISOString() };
+      const r = addProposta(E.props, rec, pj.kmNum);
       E.props = r.list;
       r.removidas.forEach((id) => db.apagar('props', id));
       r.novas.forEach(gravarProp);
@@ -99,9 +105,10 @@ export function refreshProp() {
   };
 }
 
-/** O vínculo com a planilha é o nome; o id em runtime não vai para o banco. */
+/** Salva o vínculo pelo nome da planilha e pelo km. Índices, pid e marca de órfã são derivados e não vão para o banco. */
 function gravarProp(r: Proposta) {
-  const c = { ...r, pid: null };
+  const { pid: _pid, orfa: _orfa, r0: _r0, r1: _r1, ...c } = r;
+  void _pid; void _orfa; void _r0; void _r1;
   db.gravar('props', c);
 }
 
@@ -137,18 +144,24 @@ function propsHtml(): string {
     const q = runStats(getP(r.pid!)!, r), s = (sum[r.to] = sum[r.to] || { len: 0, area: 0 });
     s.len += q.len; s.area += q.area; tl = { len: tl.len + q.len, area: tl.area + q.area };
   }
+  const orfas = E.props.filter((r) => r.orfa);
+  const semPlanilha = E.props.filter((r) => !r.orfa && !r.pid).length;
+  const orfasHtml = orfas.length ? `<div><div class="sect">Propostas órfãs <span style="text-transform:none;font-weight:500">${orfas.length}</span></div>
+    <p class="note" style="margin-bottom:8px">O km (ou a faixa) dessas propostas não existe mais na planilha carregada. Elas ficam guardadas e fora do mapa e dos totais até você removê-las.</p>
+    <div class="list">${orfas.map((r) => `<div class="note-card"><div class="note-top" style="cursor:default"><span class="sw" style="background:${tc(r.to)};width:12px;height:12px"></span><span class="t"><b>${esc(trLabel(r.from))} → ${esc(trLabel(r.to))}</b><span>Órfã · ${esc(r.pname)} · ${r.lane ? 'Fx ' + r.lane : 'Acost.'} · km ${kmLabel(r.km0)} a ${kmLabel(r.km1 + 0.02)}${r.note ? ' · ' + esc(r.note) : ''}</span></span></div><div class="btns"><button class="btn d" data-pd="${r.id}" style="min-height:28px;padding:3px 10px">${IC.trash} Remover</button></div></div>`).join('')}</div></div>` : '';
+  const aviso = semPlanilha ? `<p class="note" style="margin-top:8px">${semPlanilha} proposta${semPlanilha > 1 ? 's' : ''} de planilhas ainda não carregadas. ${semPlanilha > 1 ? 'Voltam' : 'Volta'} ao abrir o arquivo.</p>` : '';
   const head = `<div class="sect">Propostas de solução <span style="text-transform:none;font-weight:500">${vp.length}</span></div>`;
   if (!vp.length) {
-    return `<div>${head}<div class="empty" style="padding:14px 8px"><b>Nenhuma proposta</b>Use o botão de propor solução no alto do mapa, clique em uma solução ou em vários trechos e escolha a nova.</div><div class="btns"><button class="btn p" id="pStart">Propor solução</button></div></div>`;
+    return `${orfasHtml}<div>${head}<div class="empty" style="padding:14px 8px"><b>Nenhuma proposta</b>Use o botão de propor solução no alto do mapa, clique em uma solução ou em vários trechos e escolha a nova.</div><div class="btns"><button class="btn p" id="pStart">Propor solução</button></div>${aviso}</div>`;
   }
   const cards = vp.map((r) => {
     const p = getP(r.pid!)!, q = runStats(p, r);
     return `<div class="note-card"><button class="note-top" data-pf="${r.id}"><span class="sw" style="background:${tc(r.to)};width:12px;height:12px"></span><span class="t"><b>${esc(trLabel(r.from))} → ${esc(trLabel(r.to))}</b><span>${esc(projName(p))} · ${r.lane ? 'Fx ' + r.lane : 'Acost.'} · ${runLabel(p, r)} · ${fmt(q.len, 0)} m · ${fmt(q.area, 0)} m²${r.note ? ' · ' + esc(r.note) : ''}</span></span></button><div class="btns"><button class="btn d" data-pd="${r.id}" style="min-height:28px;padding:3px 10px">${IC.trash} Remover</button></div></div>`;
   }).join('');
   const rows = Object.entries(sum).map(([k, v]) => `<div class="row"><span class="sw" style="background:${tc(k)}"></span><div class="grow">${esc(trLabel(k))}</div><div class="val num">${fmt(v.area, 0)} <span class="muted" style="font-weight:400;font-size:11px">m² · ${fmt(v.len / 1000, 2)} km·faixa</span></div></div>`).join('');
-  return `<div>${head}<div class="list">${cards}</div>
+  return `${orfasHtml}<div>${head}<div class="list">${cards}</div>
     <div class="list" style="margin-top:8px">${rows}<div class="row"><div class="grow muted">Total proposto</div><div class="val num">${fmt(tl.area, 0)} <span class="muted" style="font-weight:400;font-size:11px">m²</span></div></div></div>
-    <div class="btns" style="margin-top:8px"><button class="btn" id="pCsv">Copiar tabela (CSV)</button><button class="btn d" id="pAll">Limpar todas</button></div></div>`;
+    <div class="btns" style="margin-top:8px"><button class="btn" id="pCsv">Copiar tabela (CSV)</button><button class="btn d" id="pAll">Limpar todas</button></div>${aviso}</div>`;
 }
 
 function bindProps(el: HTMLElement) {
@@ -306,7 +319,7 @@ export function importarNotas(gj: { features?: { geometry?: GeoJSON.Geometry; pr
 /** Carrega do IndexedDB e liga os controles. */
 export async function initRevisao() {
   E.notes = await db.todos<Nota>('notes');
-  E.props = (await db.todos<Proposta>('props')).map((r) => ({ ...r, pid: null }));
+  E.props = (await db.todos<Proposta>('props')).map((r) => ({ ...r, pid: null, orfa: false }));
   document.querySelectorAll<HTMLElement>('[data-tool]').forEach((b) => b.addEventListener('click', () => setTool(b.dataset.tool as typeof E.tool)));
   H.onNoteHit = openNote;
 
