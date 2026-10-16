@@ -30,8 +30,10 @@ export function observarHud(aoMudar?: () => void) {
   const m = document.querySelector<HTMLElement>('.hud-main');
   if (!m) return;
   const set = () => { document.documentElement.style.setProperty('--hudm-h', Math.round(m.getBoundingClientRect().height) + 'px'); aoMudar?.(); };
+  let pend = false;
+  const agenda = () => { if (pend) return; pend = true; requestAnimationFrame(() => { pend = false; set(); }); };
   if (window.ResizeObserver) {
-    const ro = new ResizeObserver(set);
+    const ro = new ResizeObserver(agenda);
     ro.observe(m);
     for (const q of ['#inspector', '#legend', '#propbar', '#unicard', '.leftcol']) { const e = document.querySelector(q); if (e) ro.observe(e); }
   }

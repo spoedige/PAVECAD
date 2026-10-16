@@ -93,12 +93,16 @@ const CENARIOS = {
     for (const id of ['titulo', 'ferramentas', 'legenda', 'unifilar', 'painel']) await pg.click(`[data-ocultar=${id}]`);
     await pg.click('#btnMore'); await pg.waitForSelector('#drawer', { state: 'visible' }); await pg.click('[data-ocultar=girar]'); await pg.waitForTimeout(500);
   },
+  /** Coluna esquerda com 4 planilhas (GO e MG) e satélite como base: título, busca e chips não podem se cortar nem sobrepor. */
+  colunaEsquerda: async (pg) => { await escolherBase(pg, 'esri'); await irParaKm(pg, '34+780', 3500); await aba(pg, 'seg'); await pg.mouse.move(1, 1); await pg.waitForTimeout(800); },
   segmentoFim: async (pg) => {
     await irParaKm(pg, '170+500'); await aba(pg, 'seg');
     await pg.evaluate(() => { const b = document.querySelector('#t-seg'); b.scrollTop = b.scrollHeight; window.scrollTo(0, document.body.scrollHeight); });
     await pg.waitForTimeout(400);
   },
 };
+
+CENARIOS.colunaEsquerda.exemplos = true;
 
 const GRUPOS = {
   g01: ['inicio'],
@@ -117,6 +121,7 @@ const GRUPOS = {
   g15: ['escalaSat'],
   g12: ['config'],
   p01: ['painelAbertoUniAberto', 'painelRecolhidoUniAberto', 'painelAbertoUniRecolhido', 'painelRecolhidoUniRecolhido', 'mapaLimpo', 'tudoOculto'],
+  c01: ['colunaEsquerda'],
   u01: ['inicio', 'segmento', 'gaveta', 'recolhidos', 'propor0'],
   t01: ['inicio', 'segmento', 'segmentoFim', 'gaveta', 'recolhidos'],
 };

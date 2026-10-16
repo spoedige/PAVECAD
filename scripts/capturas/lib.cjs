@@ -16,7 +16,8 @@ const TEMAS = ['claro', 'escuro', 'campo'];
 const FIXTURES = ['U_BR-050_GO_Crescente.xlsx', 'U_BR-050_GO_Decrescente.xlsx'].map((f) => path.join(RAIZ, 'testes/fixtures', f));
 const TILE = { sat: fs.readFileSync(path.join(__dirname, 'tile-sat.png')), osm: fs.readFileSync(path.join(__dirname, 'tile-osm.png')) };
 
-async function abrir(browser, vp) {
+/** opts.exemplos: carrega os JSON de referencia/dados pelo botão de exemplo (só em desenvolvimento) em vez das 2 planilhas GO, e tira a marginal para ficar com 4 planilhas (GO e MG, crescente e decrescente). */
+async function abrir(browser, vp, opts = {}) {
   const ctx = await browser.newContext({
     viewport: { width: vp.w, height: vp.h }, hasTouch: vp.toque, isMobile: vp.toque, deviceScaleFactor: 1,
     geolocation: { latitude: -17.291, longitude: -47.757 }, permissions: ['geolocation'],
@@ -35,8 +36,21 @@ async function abrir(browser, vp) {
   await ctx.route(/fonts\.(googleapis|gstatic)\.com/, (route) => route.abort());
   await pg.goto(URL);
   await pg.waitForTimeout(1200);
-  await pg.setInputFiles('#file', FIXTURES);
-  await pg.waitForFunction(() => window.__pavecad && window.__pavecad.E.P.length === 2, null, { timeout: 90000 });
+  if (opts.exemplos) {
+    pg.on('dialog', (d) => d.accept());
+    await pg.evaluate(() => document.querySelector('#btnExample').click());
+    await pg.waitForFunction(() => window.__pavecad && window.__pavecad.E.P.length >= 4, null, { timeout: 90000 });
+    await pg.waitForTimeout(1500);
+    // deixa só as quatro principais (sem a marginal)
+    await pg.evaluate(async () => {
+      const E = window.__pavecad.E;
+      for (const p of [...E.P]) if (/Marginal/i.test(p.meta.via) && E.P.length > 4) { const b = document.querySelector(`[data-del="${p.id}"]`); if (b) b.click(); await new Promise((r) => setTimeout(r, 300)); }
+    });
+    await pg.waitForTimeout(500);
+  } else {
+    await pg.setInputFiles('#file', FIXTURES);
+    await pg.waitForFunction(() => window.__pavecad && window.__pavecad.E.P.length === 2, null, { timeout: 90000 });
+  }
   await pg.waitForTimeout(2500);
   return { ctx, pg, log };
 }
