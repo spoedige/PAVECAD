@@ -95,21 +95,27 @@ describe('propostas de solução', () => {
     expect(runStats(pv, { lane: 0, r0: 10, r1: 10 }).area).toBeCloseTo(20 * 2.5, 6);
   });
 
-  const base = (id: string, r0: number, r1: number, lane = 1): Proposta => ({ id, pname: pv.meta.name, pid: 'p1', lane, r0, r1, from: 'GAP', to: 'FS4', note: '', t: '' });
+  const base = (id: string, r0: number, r1: number, lane = 1): Proposta => ({ id, pname: pv.meta.name, pid: 'p1', lane, r0, r1, km0: pv.kmNum[r0], km1: pv.kmNum[r1], from: 'GAP', to: 'FS4', note: '', t: '' });
 
   it('proposta nova substitui só a parte sobreposta', () => {
-    const a = addProposta([], base('a', 10, 30));
-    const b = addProposta(a.list, base('b', 15, 20));
+    const a = addProposta([], base('a', 10, 30), pv.kmNum);
+    const b = addProposta(a.list, base('b', 15, 20), pv.kmNum);
     expect(b.removidas).toEqual(['a']);
     const faixas = b.list.map((x) => [x.r0, x.r1]).sort((x, y) => x[0] - y[0]);
     expect(faixas).toEqual([[10, 14], [15, 20], [21, 30]]);
     expect(b.novas).toHaveLength(3);
+    // os pedaços restantes continuam ancorados no km
+    const esq = b.list.find((x) => x.r0 === 10)!, dir = b.list.find((x) => x.r0 === 21)!;
+    expect(esq.km0).toBeCloseTo(pv.kmNum[10], 6);
+    expect(esq.km1).toBeCloseTo(pv.kmNum[14], 6);
+    expect(dir.km0).toBeCloseTo(pv.kmNum[21], 6);
+    expect(dir.km1).toBeCloseTo(pv.kmNum[30], 6);
   });
 
   it('não mexe em outra faixa nem em área sem sobreposição', () => {
-    const a = addProposta([], base('a', 10, 30, 1));
-    const b = addProposta(a.list, base('b', 15, 20, 2));
-    const c = addProposta(b.list, base('c', 40, 50, 1));
+    const a = addProposta([], base('a', 10, 30, 1), pv.kmNum);
+    const b = addProposta(a.list, base('b', 15, 20, 2), pv.kmNum);
+    const c = addProposta(b.list, base('c', 40, 50, 1), pv.kmNum);
     expect(c.removidas).toEqual([]);
     expect(c.list).toHaveLength(3);
   });

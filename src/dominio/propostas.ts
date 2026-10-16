@@ -10,8 +10,14 @@ export interface Proposta {
   pid: string | null;
   /** 0 = acostamento. */
   lane: number;
+  /** Índices das linhas na planilha carregada. São derivados: recalculados pelo km a cada carga. */
   r0: number;
   r1: number;
+  /** Km (marco normalizado, número) do primeiro e do último segmento de 20 m. É o que fica salvo. */
+  km0: number;
+  km1: number;
+  /** Planilha carregada, mas sem esse km (ou sem essa faixa): a proposta é mostrada como órfã. */
+  orfa?: boolean;
   from: string;
   to: string;
   note: string;
@@ -19,6 +25,8 @@ export interface Proposta {
 }
 
 export type Alvo = Pick<Proposta, 'pid' | 'pname' | 'lane' | 'r0' | 'r1' | 'from'>;
+
+export const kmKey = (km: number) => Math.round(km * 1000);
 export const PROP_OPTS = ['FS3', 'FS4', 'FSE', 'MFS', 'RP', 'REC', 'Micro', 'GAP', '-'];
 
 const cell = (p: PV, row: number, lane: number) => (lane ? p.model[row].tr[lane - 1] : p.model[row].sh);
@@ -43,18 +51,49 @@ export function runStats(p: PV, s: Pick<Alvo, 'lane' | 'r0' | 'r1'>) {
 
 export const runLabel = (p: PV, s: Pick<Alvo, 'r0' | 'r1'>) => `km ${p.kmLab[s.r0]} a ${kmLabel(p.kmNum[s.r1] + 0.02)}`;
 
-/** Uma proposta nova sobre área já proposta substitui só a parte sobreposta. */
-export function addProposta(list: Proposta[], rec: Proposta) {
+/** Uma proposta nova sobre área já proposta substitui só a parte sobreposta.
+ *  `kmNum` é o km de cada linha da planilha da proposta, para ancorar os pedaços restantes. */
+export function addProposta(list: Proposta[], rec: Proposta, kmNum: ArrayLike<number>) {
   const out: Proposta[] = [], removidas: string[] = [], novas: Proposta[] = [];
   for (const e of list) {
-    if (e.pname !== rec.pname || e.lane !== rec.lane || e.r1 < rec.r0 || e.r0 > rec.r1) { out.push(e); continue; }
+    if (e.orfa || e.pname !== rec.pname || e.lane !== rec.lane || e.r1 < rec.r0 || e.r0 > rec.r1) { out.push(e); continue; }
     removidas.push(e.id);
-    if (e.r0 < rec.r0) { const l = { ...e, id: e.id + 'a', r1: rec.r0 - 1 }; out.push(l); novas.push(l); }
-    if (e.r1 > rec.r1) { const r = { ...e, id: e.id + 'b', r0: rec.r1 + 1 }; out.push(r); novas.push(r); }
+    if (e.r0 < rec.r0) { const l = { ...e, id: e.id + 'a', r1: rec.r0 - 1, km1: kmNum[rec.r0 - 1] }; out.push(l); novas.push(l); }
+    if (e.r1 > rec.r1) { const r = { ...e, id: e.id + 'b', r0: rec.r1 + 1, km0: kmNum[rec.r1 + 1] }; out.push(r); novas.push(r); }
   }
   out.push(rec);
   novas.push(rec);
   return { list: out, removidas, novas };
+}
+
+/** Reposiciona as propostas pelo km, não pelo índice. Chamar ao abrir ou recarregar planilhas.
+ *  - planilha não carregada: fica guardada, sem pid e sem marca de órfã;
+ *  - planilha carregada sem o km (ou sem a faixa): órfã, preservada para o usuário decidir;
+ *  - registros antigos, sem km, são ancorados pelos índices salvos (migração única). */
+export function reposicionar(list: Proposta[], projs: PV[]): Proposta[] {
+  const idx = new Map<string, Map<number, number>>();
+  const indice = (p: PV) => {
+    let m = idx.get(p.id);
+    if (!m) {
+      m = new Map();
+      p.kmNum.forEach((k, i) => { const key = kmKey(k); if (!m!.has(key)) m!.set(key, i); });
+      idx.set(p.id, m);
+    }
+    return m;
+  };
+  return list.map((r) => {
+    const p = projs.find((x) => x.meta.name === r.pname);
+    if (!p) return { ...r, pid: null, orfa: false };
+    let { km0, km1 } = r;
+    if (km0 === undefined || km1 === undefined) {
+      if (r.r0 >= 0 && r.r1 < p.rows.length && r.r0 <= r.r1) { km0 = p.kmNum[r.r0]; km1 = p.kmNum[r.r1]; }
+      else return { ...r, pid: null, orfa: true };
+    }
+    const m = indice(p), i0 = m.get(kmKey(km0)), i1 = m.get(kmKey(km1));
+    const temFaixa = (i: number) => (r.lane ? r.lane <= p.rows[i].widths.length : p.rows[i].shoulder > 0);
+    if (i0 === undefined || i1 === undefined || i0 > i1 || !temFaixa(i0) || !temFaixa(i1)) return { ...r, km0, km1, pid: null, orfa: true };
+    return { ...r, km0, km1, pid: p.id, r0: i0, r1: i1, orfa: false };
+  });
 }
 
 /** CSV com ";" para o Excel em português. */
