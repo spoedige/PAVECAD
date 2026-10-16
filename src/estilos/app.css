@@ -192,9 +192,11 @@ button.row:hover{background:var(--fill)}
 .scale{display:flex;gap:2px;margin-top:7px}
 .scale i{flex:1;height:3px;border-radius:2px;background:var(--fill2)}
 .xs{display:flex;height:34px;gap:2px}
-.xs div{display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45);min-width:0;overflow:hidden;white-space:nowrap;border-radius:7px}
-.xs div.sel{box-shadow:0 0 0 2px var(--solid),0 0 0 4px var(--accent)}
-.xs div.nodata{color:var(--muted);text-shadow:none}
+.xs button{border:0;padding:0;font-family:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45);min-width:0;overflow:hidden;white-space:nowrap;border-radius:7px}
+.xs button:hover{filter:brightness(1.06)}
+.xs button.sel,.xs button[aria-pressed="true"]{box-shadow:0 0 0 2px var(--solid),0 0 0 4px var(--accent)}
+.xs button:focus-visible{outline:3px solid var(--focus);outline-offset:3px}
+.xs button.nodata{color:#3a3a3c;text-shadow:none}
 .xsticks{position:relative;height:16px;margin-top:4px;font-size:10.5px;color:var(--muted)}
 .xsticks span{position:absolute;top:0;white-space:nowrap}
 .tag{display:inline-block;font-size:10.5px;font-weight:600;border-radius:5px;padding:1px 6px;background:var(--fill2);color:var(--muted);vertical-align:middle}
