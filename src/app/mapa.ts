@@ -296,10 +296,12 @@ try { legendOpen = localStorage.getItem('pavecad-leg') !== '0'; } catch { /* sem
 
 export function renderLegend() {
   const el = $('#legend'), items = legendItems();
+  // com a barra Propor solução aberta a legenda fica compacta, para a pilha de baixo caber em telas baixas
+  const aberta = legendOpen && E.tool !== 'prop';
   const I = slot(E.mode);
   const title = I ? `${I.label} · ${I.unit}${I.lim ? ' · ' + I.lim : ''}` : 'Solução';
   let h = '';
-  if (!legendOpen) {
+  if (!aberta) {
     h += `<button class="legtog" id="legTog" aria-expanded="false" aria-label="Expandir legenda"><span class="dots">${items.map((it) => `<i style="background:${it.c}"></i>`).join('')}</span>Legenda</button>`;
   } else {
     h += `<div class="leghead"><h4>${title}</h4><button class="legtog sm" id="legTog" aria-expanded="true" aria-label="Recolher legenda" title="Recolher"><svg class="i" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button></div>`;

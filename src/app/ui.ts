@@ -33,7 +33,7 @@ export function observarHud(aoMudar?: () => void) {
   if (window.ResizeObserver) {
     const ro = new ResizeObserver(set);
     ro.observe(m);
-    for (const q of ['#inspector', '#legend', '#unicard', '.leftcol']) { const e = document.querySelector(q); if (e) ro.observe(e); }
+    for (const q of ['#inspector', '#legend', '#propbar', '#unicard', '.leftcol']) { const e = document.querySelector(q); if (e) ro.observe(e); }
   }
   set();
 }

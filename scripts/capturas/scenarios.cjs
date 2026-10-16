@@ -53,7 +53,7 @@ const CENARIOS = {
   propor1: async (pg) => {
     await irParaKm(pg, '170+500', 3500); await pg.keyboard.press('n'); await pg.waitForTimeout(300);
     const a = await pontoLivre(pg);
-    if (a) { await pg.mouse.click(a.x, a.y); await pg.waitForTimeout(500); }
+    if (a) { await pg.mouse.click(a.x, a.y); await pg.mouse.move(1, 1); await pg.waitForTimeout(600); }
   },
   revisaoVazia: async (pg) => { await aba(pg, 'notas'); await pg.waitForTimeout(300); },
   revisaoComProposta: async (pg) => { await criarProposta(pg, 'FSE', 'trecho de teste'); },
@@ -75,6 +75,7 @@ const GRUPOS = {
   g09: ['limiares'],
   g10: ['propor0', 'propor1'],
   g11: ['revisaoComProposta'],
+  g13: ['propor1'],
   g14: ['revisaoVazia', 'revisaoComProposta'],
   g12: ['config'],
 };
