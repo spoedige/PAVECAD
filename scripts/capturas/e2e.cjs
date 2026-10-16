@@ -258,6 +258,41 @@ const TESTES = {
       assert.equal(await estado(pg, 'E => E.uniCollapsed'), true, 'recolhido volta recolhido');
     }],
   ],
+  t05: [
+    ['painel ancorado embaixo: aberto e recolhido ficam a 8 px do topo do unifilar e abrem para cima', TODOS, async (pg) => {
+      await irParaKm(pg, '170+500'); await aba(pg, 'seg');
+      const m = () => pg.evaluate(() => {
+        const i = document.querySelector('#inspector').getBoundingClientRect(), u = document.querySelector('#unicard').getBoundingClientRect();
+        return { i: { t: i.top, b: i.bottom, h: i.height }, uniTopo: u.top, vh: innerHeight, colapsado: document.querySelector('#inspector').classList.contains('collapsed') };
+      });
+      const a = await m();
+      assert.ok(Math.abs(a.uniTopo - a.i.b - 8) <= 1.5, `aberto: base do painel a ${a.uniTopo - a.i.b}px do unifilar`);
+      await pg.click('#collapse'); await pg.waitForTimeout(300);
+      const r = await m();
+      assert.equal(r.colapsado, true);
+      assert.ok(Math.abs(r.uniTopo - r.i.b - 8) <= 1.5, `recolhido: a faixa deve encostar no unifilar (${r.uniTopo - r.i.b}px)`);
+      assert.ok(r.i.t > r.vh / 2, `a faixa não pode flutuar no meio ou no topo (topo em ${r.i.t} de ${r.vh})`);
+      assert.ok(r.i.h < 140, 'faixa baixa: ' + r.i.h);
+      assert.ok(Math.abs(r.i.b - a.i.b) <= 1.5, 'a base não muda ao recolher: abre para cima');
+      assert.ok(a.i.h > r.i.h + 100, 'aberto cresce para cima: ' + a.i.h + ' x ' + r.i.h);
+      // com o unifilar recolhido a faixa desce junto e continua encostada
+      await pg.click('#uniToggle'); await pg.waitForTimeout(400);
+      const u = await m();
+      assert.ok(Math.abs(u.uniTopo - u.i.b - 8) <= 1.5, `com o unifilar recolhido (${u.uniTopo - u.i.b}px)`);
+      assert.ok(u.i.t > u.vh / 2);
+      await pg.click('#collapse'); await pg.waitForTimeout(300);
+      const f = await m();
+      assert.ok(Math.abs(f.uniTopo - f.i.b - 8) <= 1.5, 'reaberto continua ancorado');
+    }],
+    ['painel ancorado: o topo do painel aberto fica abaixo do cluster do canto superior direito e nada se sobrepõe', TODOS, async (pg) => {
+      await irParaKm(pg, '170+500'); await aba(pg, 'seg');
+      const r = await pg.evaluate(() => {
+        const i = document.querySelector('#inspector').getBoundingClientRect(), t = document.querySelector('.topbar > .topright').getBoundingClientRect();
+        return { gap: i.top - t.bottom };
+      });
+      assert.ok(r.gap >= 8, 'o painel aberto não cobre Planilhas e engrenagem: ' + r.gap);
+    }],
+  ],
   g03: [
     ['a seção é o seletor de faixa (clique, aria-pressed, teclado)', '1366x768', async (pg) => {
       await irParaKm(pg, '170+500'); await aba(pg, 'seg');
