@@ -63,6 +63,57 @@ const TESTES = {
       assert.ok(r.max <= 0, `há rolagem em ${r.piores.join('; ')} (altura útil ${r.altura}px, ${r.n} casos)`);
     }],
   ],
+  g08: [
+    ['zoom até o limite em Ruas e Satélite sem pedir tiles acima do 19', '1366x768', async (pg, { log }) => {
+      for (const [base, nome] of [['osm', 'Ruas'], ['esri', 'Satélite']]) {
+        await pg.evaluate(() => window.__pavecad.map().jumpTo({ zoom: 15 }));
+        await pg.click(`#base [data-b=${base}]`);
+        await irParaKm(pg, '170+500', 1500);
+        await pg.evaluate(() => window.__pavecad.map().jumpTo({ zoom: 16 }));
+        await pg.waitForTimeout(800);
+        log.tiles.length = 0;
+        // zoom de verdade: rolagem do mouse sobre o mapa até travar no limite
+        const box = await pg.locator('#map').boundingBox();
+        await pg.mouse.move(box.x + box.width * 0.5, box.y + box.height * 0.55);
+        for (let i = 0; i < 40; i++) { await pg.mouse.wheel(0, -600); await pg.waitForTimeout(60); }
+        await pg.waitForTimeout(1500);
+        const z = await pg.evaluate(() => window.__pavecad.map().getZoom());
+        assert.ok(z >= 20.9, `${nome}: o zoom deveria chegar a 21 (chegou a ${z.toFixed(2)})`);
+        assert.equal(await pg.evaluate(() => window.__pavecad.map().getMaxZoom()), 21);
+        const zs = log.tiles.map((t) => t.z).filter((v) => v !== null);
+        assert.ok(zs.length > 0, `${nome}: nenhum tile pedido`);
+        assert.ok(Math.max(...zs) <= 19, `${nome}: pediu tile de zoom ${Math.max(...zs)}`);
+        assert.ok(zs.includes(19), `${nome}: deveria usar o tile 19 ampliado`);
+        // a base continua desenhada (a camada raster está visível) no zoom máximo
+        const vis = await pg.evaluate((b) => window.__pavecad.map().getLayoutProperty(b, 'visibility'), base);
+        assert.equal(vis, 'visible');
+        // sem erros de tile no console
+        const erros = log.erros.filter((e) => !/Failed to load resource/i.test(e) && /\btiles?\b|map data|\bsource\b/i.test(e));
+        assert.equal(erros.length, 0, erros.join(' | '));
+      }
+    }],
+  ],
+  // Precisa de um servidor com VITE_MAPTILER_KEY definida: PAVECAD_URL=http://localhost:5198/ node scripts/capturas/e2e.cjs g08k
+  g08k: [
+    ['com chave do MapTiler: tiles até 21 (ruas) e 20 (satélite), mapa até 21', '1366x768', async (pg, { log }) => {
+      assert.equal(await pg.evaluate(() => !!window.__pavecad.map().getSource('mt-ruas')), true, 'sem a chave no ambiente deste servidor');
+      for (const [base, camada, esperado] of [['osm', 'mt-ruas', 21], ['esri', 'mt-sat', 20]]) {
+        await pg.evaluate(() => window.__pavecad.map().jumpTo({ zoom: 15 }));
+        await pg.click(`#base [data-b=${base}]`);
+        await irParaKm(pg, '170+500', 1200);
+        await pg.evaluate(() => window.__pavecad.map().jumpTo({ zoom: 16 }));
+        await pg.waitForTimeout(600);
+        log.tiles.length = 0;
+        await pg.evaluate(() => window.__pavecad.map().jumpTo({ zoom: 21 }));
+        await pg.waitForTimeout(1800);
+        assert.equal(await pg.evaluate((c) => window.__pavecad.map().getLayoutProperty(c, 'visibility'), camada), 'visible', camada + ' deveria estar visível');
+        const zs = log.tiles.filter((t) => /maptiler/.test(t.url)).map((t) => t.z);
+        assert.ok(zs.length > 0, 'nenhum tile do MapTiler pedido');
+        assert.equal(Math.max(...zs), esperado, `${camada}: maior zoom pedido`);
+        assert.equal(await pg.evaluate(() => window.__pavecad.map().getMaxZoom()), 21);
+      }
+    }],
+  ],
   g07: [
     ['em toque, botões do painel, das ferramentas e da rotação têm 44 px ou mais', 'tablet-h-1024x768', async (pg) => {
       await pg.evaluate(() => window.__pavecad.E.P.length);
