@@ -182,6 +182,8 @@ button.row:hover{background:var(--fill)}
 .bar i{display:block;height:100%;border-radius:2px}
 .chips{display:flex;flex-wrap:wrap;gap:6px}
 .chip{display:inline-flex;align-items:center;gap:6px;border-radius:999px;background:var(--fill);padding:4px 10px;font-size:12px;font-weight:500}
+.vazio{margin:0;font-size:12px;color:var(--muted);line-height:1.4}
+.linkbtn{border:0;background:none;color:var(--accent);padding:0;font:inherit;font-weight:600;cursor:pointer;text-decoration:underline;text-underline-offset:2px}
 .empty{color:var(--muted);padding:28px 8px;text-align:center;line-height:1.6}
 .empty b{display:block;color:var(--fg);font-size:15px;margin-bottom:4px}
 .btn{border:0;border-radius:10px;background:var(--fill);padding:7px 12px;font-weight:500;min-height:max(34px,var(--tap));display:inline-flex;align-items:center;gap:6px;justify-content:center}
@@ -335,6 +337,7 @@ textarea:focus{box-shadow:inset 0 0 0 2px var(--accent)}
   .search{height:44px}
   .search .go{width:44px!important;height:44px!important;margin:0 -6px 0 0}
   .xs{height:44px}
+  #inspector .linkbtn{display:inline-flex;align-items:center}
   .matrix .cell{min-height:44px;min-width:44px!important}
   .matrix td.nm{font-size:11px;word-break:normal;overflow-wrap:anywhere}
   .tbtn{width:44px;height:44px}

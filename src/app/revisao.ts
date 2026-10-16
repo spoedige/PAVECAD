@@ -159,7 +159,7 @@ function propsHtml(): string {
   const aviso = semPlanilha ? `<p class="note" style="margin-top:8px">${semPlanilha} proposta${semPlanilha > 1 ? 's' : ''} de planilhas ainda não carregadas. ${semPlanilha > 1 ? 'Voltam' : 'Volta'} ao abrir o arquivo.</p>` : '';
   const head = `<div class="sect">Propostas de solução <span style="text-transform:none;font-weight:500">${vp.length}</span></div>`;
   if (!vp.length) {
-    return `${orfasHtml}<div>${head}<div class="empty" style="padding:14px 8px"><b>Nenhuma proposta</b>Use o botão de propor solução no alto do mapa, clique em uma solução ou em vários trechos e escolha a nova.</div><div class="btns"><button class="btn p" id="pStart">Propor solução</button></div>${aviso}</div>`;
+    return `${orfasHtml}<div>${head}<p class="vazio">Nenhuma proposta. <button class="linkbtn" id="pStart" type="button">Propor solução</button> (N)</p>${aviso}</div>`;
   }
   const cards = vp.map((r) => {
     const p = getP(r.pid!)!, q = runStats(p, r);
@@ -260,8 +260,8 @@ export function renderNotes() {
     <div><div class="sect">Anotações <span style="text-transform:none;font-weight:500">${E.notes.length}</span></div>
       ${list.length ? `<div class="list">${list.map((n) => `<div class="note-card"><button class="note-top" data-n="${n.id}"><span class="sw" style="background:${NOTE_CATS[n.cat].c};width:12px;height:12px"></span>
         <span class="t"><b>${esc(n.text || 'Sem texto')}</b><span>${NOTE_CATS[n.cat].l} · ${noteSummary(n)}${n.loc ? ' · ' + esc(n.loc.name) + ' km ' + esc(n.loc.km) : ''} · ${new Date(n.t).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}${n.photos?.length ? ' · ' + n.photos.length + ' foto(s)' : ''}</span></span></button></div>`).join('')}</div>`
-        : (ed ? '' : '<div class="empty"><b>Nenhuma anotação</b>Use a ferramenta de ponto no alto do mapa. As notas ficam neste aparelho.</div>')}</div>
-    <div><div class="sect">Exportar e importar</div><div class="btns"><button class="btn" id="exCopy" ${E.notes.length ? '' : 'disabled'}>Copiar GeoJSON</button><button class="btn" id="exDown" ${E.notes.length ? '' : 'disabled'}>Baixar</button><button class="btn" id="exImp">Importar</button></div>
+        : (ed ? '' : '<p class="vazio">Nenhuma anotação. Use o ponto no mapa (P).</p>')}</div>
+    <div><div class="sect">Exportar e importar</div><div class="btns"><button class="btn" id="exCopy" ${E.notes.length ? '' : 'disabled'}>Copiar GeoJSON</button><button class="btn" id="exDown" ${E.notes.length ? '' : 'disabled'}>Baixar GeoJSON</button><button class="btn" id="exImp">Importar</button></div>
       <p class="note" style="margin-top:7px">As anotações ficam no armazenamento deste navegador. Exporte para levar a outro aparelho ou compartilhar.</p></div>`;
 
   if (ed) {

@@ -63,6 +63,20 @@ const TESTES = {
       assert.ok(r.max <= 0, `há rolagem em ${r.piores.join('; ')} (altura útil ${r.altura}px, ${r.n} casos)`);
     }],
   ],
+  g14: [
+    ['Revisão: estados vazios em uma linha e botão "Baixar GeoJSON"', '1366x768', async (pg) => {
+      await aba(pg, 'notas');
+      assert.equal(await pg.locator('#t-notas .empty').count(), 0, 'sem cartão grande de estado vazio');
+      const vazios = await pg.evaluate(() => [...document.querySelectorAll('#t-notas .vazio')].map((e) => ({ t: e.textContent.trim(), h: Math.round(e.getBoundingClientRect().height) })));
+      assert.equal(vazios.length, 2, 'um estado vazio para propostas e outro para anotações');
+      for (const v of vazios) assert.ok(v.h <= 20, `"${v.t}" ocupa ${v.h}px (mais de uma linha)`);
+      assert.ok(vazios.some((v) => /Nenhuma proposta/.test(v.t)) && vazios.some((v) => /Nenhuma anotação/.test(v.t)));
+      assert.equal((await pg.textContent('#exDown')).trim(), 'Baixar GeoJSON');
+      // o atalho do estado vazio continua abrindo a ferramenta
+      await pg.click('#pStart');
+      assert.equal(await pg.isVisible('#propbar'), true);
+    }],
+  ],
   g13: [
     ['barra Propor solução: acima do unifilar, fora do painel direito e sem cobrir rótulos', '1366x768', async (pg) => {
       await irParaKm(pg, '170+500', 3500);
