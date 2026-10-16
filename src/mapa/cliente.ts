@@ -1,4 +1,5 @@
 import type { GeoOptions } from '../geometry/build';
+import { getLimites } from '../dominio/indicadores';
 import type { ParsedProject } from '../formats/types';
 import type { Project } from '../geometry/project';
 import type { Req, Res } from './worker';
@@ -30,7 +31,7 @@ function chamar(req: Pedido, transfer: Transferable[] = []): Promise<Ok> {
   const id = ++seq;
   return new Promise((ok, erro) => {
     espera.set(id, { ok, erro });
-    iniciar().postMessage({ ...req, id }, transfer);
+    iniciar().postMessage({ ...req, id, limites: getLimites() }, transfer);
   });
 }
 

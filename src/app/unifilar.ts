@@ -1,5 +1,5 @@
 import { IND, Q5, Q5F } from '../dominio/indicadores';
-import { TR_ORDER, trColor } from '../dominio/solucoes';
+import { trColor, trOrder } from '../dominio/solucoes';
 import { E, H, projName, type AppProj } from './estado';
 import { IC } from './icones';
 import { getMap, grupoAtivo, select } from './mapa';
@@ -74,7 +74,7 @@ export function drawUni() {
     g.fillStyle = muted; g.fillText(txt, Math.min(x - 8, W - tw - 1), top - 5);
     g.fillStyle = cssv('--hair'); g.fillRect(x, top - 2, 1, bottom - top + 4);
   }
-  const keys = [...TR_ORDER, '-'], tc = (k: string) => trColor(k, E.field, none);
+  const keys = [...trOrder(), '-'], tc = (k: string) => trColor(k, E.field, none);
   const M = E.mode === 'sol' ? null : IND[E.mode];
   for (const b of blocks) {
     g.textBaseline = 'alphabetic';

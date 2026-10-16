@@ -3,9 +3,9 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import type { GeoJSONSource, MapMouseEvent, PointLike } from 'maplibre-gl';
 import { edgesOf, offsetLL } from '../geometry/build';
 import { IND, Q5, Q5F, type IndKey } from '../dominio/indicadores';
-import { TR, TR_ORDER, trColor, trLabel } from '../dominio/solucoes';
+import { trColor, trLabel, trOrder, trShort } from '../dominio/solucoes';
 import type { Nota } from './estado';
-import { kmLabel } from '../formats/km';
+import { kmLabel, parseKmTexto } from '../formats/km';
 import { E, H, NOTE_CATS, getP, projName, visibleProjects, type AppProj, type FocoPred } from './estado';
 import { $, cssv, esc, fmt, toast } from './ui';
 
@@ -220,7 +220,7 @@ function colorExpr(): Expr {
   const none = cssv('--none');
   if (E.mode === 'sol') {
     const m: Expr[] = ['match', ['get', 'main']];
-    for (const k of Object.keys(TR)) m.push(k, trColor(k, E.field, none));
+    for (const k of trOrder()) m.push(k, trColor(k, E.field, none));
     m.push(none);
     return m;
   }
@@ -261,7 +261,7 @@ export function paintProject(p: AppProj) {
 
 export function propColorExpr(): Expr {
   const m: Expr[] = ['match', ['get', 'to']];
-  for (const k of Object.keys(TR)) m.push(k, trColor(k, E.field, cssv('--none')));
+  for (const k of trOrder()) m.push(k, trColor(k, E.field, cssv('--none')));
   m.push(cssv('--none'));
   return m;
 }
@@ -283,19 +283,20 @@ export function applyPaint() {
 /* ---------------------------------------------------------------- */
 /* Legenda                                                           */
 /* ---------------------------------------------------------------- */
-interface LegItem { key: string; c: string; l: string }
+interface LegItem { key: string; c: string; l: string; s: string }
 
 function legendItems(): LegItem[] {
   if (E.mode === 'sol') {
     const present = new Set<string>();
     for (const p of visibleProjects()) for (const m of p.model) { m.tr.forEach((t) => present.add(t.main)); present.add(m.sh.main); }
     const none = cssv('--none');
-    const keys = [...TR_ORDER, ...[...present].filter((k) => !TR[k] && k !== '-')].filter((k) => present.has(k));
-    const it = keys.map((k) => ({ key: k, c: trColor(k, E.field, none), l: trLabel(k) }));
-    it.push({ key: '-', c: none, l: 'Sem intervenção' });
+    const ordem = trOrder();
+    const keys = [...ordem, ...[...present].filter((k) => !ordem.includes(k) && k !== '-')].filter((k) => present.has(k));
+    const it = keys.map((k) => ({ key: k, c: trColor(k, E.field, none), l: trLabel(k), s: trShort(k) }));
+    it.push({ key: '-', c: none, l: 'Sem intervenção', s: 'Sem intervenção' });
     return it;
   }
-  return slot(E.mode)!.labels.map((l, i) => ({ key: String(i), c: Q()[i], l }));
+  return slot(E.mode)!.labels.map((l, i) => ({ key: String(i), c: Q()[i], l, s: l }));
 }
 
 let legendOpen = true;
@@ -305,14 +306,13 @@ export function renderLegend() {
   const el = $('#legend'), items = legendItems();
   const I = slot(E.mode);
   const title = I ? `${I.label} · ${I.unit}${I.lim ? ' · ' + I.lim : ''}` : 'Solução';
-  const abrev = (s: string) => s.replace('Fresagem funcional', 'Fres. funcional').replace('Fresagem estrutural', 'Fres. estrutural').replace('Microrrevestimento', 'Micro').replace('Reparo profundo', 'Reparo prof.');
   let h = '';
   if (!legendOpen) {
     h += `<button class="legtog" id="legTog" aria-expanded="false" aria-label="Expandir legenda"><span class="dots">${items.map((it) => `<i style="background:${it.c}"></i>`).join('')}</span>Legenda</button>`;
   } else {
     h += `<div class="leghead"><h4>${title}</h4><button class="legtog sm" id="legTog" aria-expanded="true" aria-label="Recolher legenda" title="Recolher"><svg class="i" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button></div>`;
     h += `<ul title="Toque em um item para ocultar. Cor mais clara = 50% da área">` +
-      items.map((it) => `<li><button type="button" data-k="${esc(it.key)}" aria-pressed="${!E.dim.has(it.key)}"><span class="sw" style="background:${it.c}"></span>${esc(abrev(it.l))}</button></li>`).join('') + '</ul>';
+      items.map((it) => `<li><button type="button" data-k="${esc(it.key)}" aria-pressed="${!E.dim.has(it.key)}"><span class="sw" style="background:${it.c}"></span>${esc(it.s)}</button></li>`).join('') + '</ul>';
   }
   el.innerHTML = h;
   el.querySelectorAll<HTMLButtonElement>('li button').forEach((b) =>
@@ -508,13 +508,8 @@ export function alignToRoad() {
 
 /** "59+740" ou "59,74". */
 export function goLabel(text: string) {
-  const m = /^(\d+)\+(\d{1,3})$/.exec(text.trim().replace(',', '.'));
-  let t: number;
-  if (m) t = +m[1] + +m[2].padEnd(3, '0') / 1000;
-  else {
-    t = parseFloat(text.trim().replace(',', '.'));
-    if (isNaN(t)) { toast('Use o formato 59+740 ou 59,74'); return; }
-  }
+  const t = parseKmTexto(text);
+  if (t === null) { toast('Use o formato 59+740 ou 59,74'); return; }
   // Procura primeiro no grupo ativo; se o km não existir lá, nos demais visíveis.
   const procurar = (lista: AppProj[]) => {
     let best: { p: AppProj; i: number; d: number } | null = null;

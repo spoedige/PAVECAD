@@ -30,6 +30,7 @@
           <button data-b="esri" aria-pressed="false">Satélite</button>
         </div>
         <input id="file" type="file" accept=".xlsx,.xlsm" multiple hidden>
+        <button class="iconbtn" id="btnCfg" aria-label="Configurações" title="Configurações (,)" style="position:relative;background:var(--glass)"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span class="dot" id="cfgDot" style="display:none;position:absolute;top:4px;right:4px;width:9px;height:9px;border-radius:50%;background:#ff9500"></span></button>
         <button class="pillbtn" id="btnExample" type="button" hidden title="Só em desenvolvimento: lê referencia/dados">Carregar exemplo</button>
         <button class="pillbtn primary" id="btnFile" type="button"><svg class="i" viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></svg>Planilhas</button>
       </div>
@@ -92,6 +93,20 @@
     <div class="uni-wrap" id="uniwrap"><canvas id="uni"></canvas><div id="unihover"><span></span></div></div>
   </section>
 </div>
+<section class="cfg" id="cfg" hidden role="dialog" aria-modal="true" aria-labelledby="cfgTitle">
+  <div class="cfg-head">
+    <h1 id="cfgTitle">Configurações</h1>
+    <div class="seg" id="cfgTabs" role="tablist">
+      <button role="tab" aria-selected="true" data-ct="sol">Soluções</button>
+      <button role="tab" aria-selected="false" data-ct="larg">Larguras</button>
+      <button role="tab" aria-selected="false" data-ct="lim">Limiares</button>
+      <button role="tab" aria-selected="false" data-ct="dados">Dados</button>
+    </div>
+    <button class="btn p" id="cfgClose" type="button">Voltar ao mapa</button>
+  </div>
+  <div class="cfg-body"><div class="cfg-wrap" id="cfgBody"></div></div>
+</section>
+<input id="catIn" type="file" accept=".json,application/json" hidden>
 <input id="photoIn" type="file" accept="image/*" capture="environment" hidden>
 <input id="importIn" type="file" accept=".geojson,.json,application/json" hidden>
 <script type="module" src="/src/main.ts"></script>

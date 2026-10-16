@@ -1,8 +1,8 @@
 import type { MapMouseEvent } from 'maplibre-gl';
 import { areaM2, fmtLen, lenM } from '../dominio/medidas';
-import { addProposta, propostasCsv, PROP_OPTS, reposicionar, runAt, runLabel, runStats, type Alvo, type Proposta } from '../dominio/propostas';
+import { addProposta, propostasCsv, reposicionar, runAt, runLabel, runStats, type Alvo, type Proposta } from '../dominio/propostas';
 import { localizar, type LocP } from '../dominio/localizar';
-import { trColor, trLabel } from '../dominio/solucoes';
+import { trColor, trLabel, trOrder } from '../dominio/solucoes';
 import { kmLabel } from '../formats/km';
 import { E, H, NOTE_CATS, getP, projName, type AppProj, type Nota, type NoteCat } from './estado';
 import { IC } from './icones';
@@ -75,7 +75,7 @@ export function refreshProp() {
   bar.hidden = false;
   const tot = totalAlvos(E.propSel), n = E.propSel.length;
   bar.innerHTML = `<div class="pb-top"><b>Propor solução</b><span class="muted num">${n ? `${n} trecho${n > 1 ? 's' : ''} · ${fmt(tot.len, 0)} m · ${fmt(tot.area, 0)} m²` : 'Clique em uma solução no mapa'}</span></div>
-    <div class="pb-row"><div class="seg" id="pmSeg" role="group" aria-label="Seleção"><button data-pm="run" aria-pressed="${E.propMode === 'run'}">Solução inteira</button><button data-pm="one" aria-pressed="${E.propMode === 'one'}">20 m</button></div><select id="pTo" aria-label="Nova solução">${PROP_OPTS.map((k) => `<option value="${k}">${k === '-' ? 'Sem intervenção' : esc(trLabel(k))}</option>`).join('')}</select></div>
+    <div class="pb-row"><div class="seg" id="pmSeg" role="group" aria-label="Seleção"><button data-pm="run" aria-pressed="${E.propMode === 'run'}">Solução inteira</button><button data-pm="one" aria-pressed="${E.propMode === 'one'}">20 m</button></div><select id="pTo" aria-label="Nova solução">${[...trOrder(), '-'].map((k) => `<option value="${k}">${k === '-' ? 'Sem intervenção' : esc(trLabel(k))}</option>`).join('')}</select></div>
     <div class="pb-row"><input id="pNote" class="pb-in" placeholder="Observação (opcional)" value="${esc(E.propNote)}" aria-label="Observação"><button class="btn p" id="pApply" ${n ? '' : 'disabled'}>Aplicar</button><button class="btn" id="pClear" ${n ? '' : 'disabled'}>Limpar</button><button class="iconbtn" id="pClose" aria-label="Fechar">${IC.x}</button></div>`;
   const to = $<HTMLSelectElement>('#pTo');
   to.value = E.propTo;
