@@ -91,7 +91,7 @@ svg.i{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.8;stro
 .maplibregl-ctrl-group button+button{border-top:var(--bw) solid var(--hair)!important}
 :root[data-theme="dark"]:not([data-contrast]) .maplibregl-ctrl-icon{filter:invert(1)}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]):not([data-contrast]) .maplibregl-ctrl-icon{filter:invert(1)}}
-.maplibregl-ctrl-scale{background:transparent!important;border-color:var(--muted)!important;color:var(--muted)!important;font-size:10px!important;padding:0 4px!important;border-width:0 1.5px 1.5px!important}
+.maplibregl-ctrl-scale{background:var(--glass)!important;-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);border:1.5px solid var(--fg)!important;border-top:0!important;color:var(--fg)!important;font-size:11px!important;font-weight:600;line-height:1.3;padding:2px 7px!important;border-radius:0 0 7px 7px;box-shadow:var(--shadow)}
 .maplibregl-ctrl-attrib{background:var(--glass)!important;color:var(--muted)!important;font-size:10px}
 .maplibregl-ctrl-attrib a{color:var(--muted)!important}
 .zoomnote{margin:0;font-size:11px;color:var(--muted);max-width:190px;line-height:1.35;padding:2px 2px 0}
