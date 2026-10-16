@@ -6,6 +6,7 @@ import { IND, Q5, Q5F, type IndKey } from '../dominio/indicadores';
 import { trColor, trLabel, trOrder, trShort } from '../dominio/solucoes';
 import type { Nota } from './estado';
 import { kmLabel, parseKmTexto } from '../formats/km';
+import { baseSources, MAP_MAX_ZOOM } from '../mapa/base';
 import { agendarRotulos, PRIO, prioDeEstaca, resolverRotulos } from './rotulos';
 import { E, H, NOTE_CATS, getP, projName, visibleProjects, type AppProj, type FocoPred } from './estado';
 import { $, cssv, esc, fmt, toast } from './ui';
@@ -18,19 +19,6 @@ const EMPTY: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: 
  *  Sem chave, a base cai no OpenStreetMap (ruas) e na Esri (satélite). */
 const MT_KEY: string = (import.meta.env.VITE_MAPTILER_KEY ?? '').trim();
 export const temMapTiler = () => !!MT_KEY;
-
-function baseSources(): Record<string, maplibregl.RasterSourceSpecification> {
-  const src: Record<string, maplibregl.RasterSourceSpecification> = {
-    osm: { type: 'raster', tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'], tileSize: 256, maxzoom: 19, attribution: '© OpenStreetMap' },
-    esri: { type: 'raster', tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'], tileSize: 256, maxzoom: 19, attribution: 'Esri' },
-  };
-  if (MT_KEY) {
-    const attr = '© MapTiler © OpenStreetMap contributors';
-    src['mt-ruas'] = { type: 'raster', tiles: [`https://api.maptiler.com/maps/streets-v2/256/{z}/{x}/{y}.png?key=${MT_KEY}`], tileSize: 256, maxzoom: 21, attribution: attr };
-    src['mt-sat'] = { type: 'raster', tiles: [`https://api.maptiler.com/tiles/satellite-v2/{z}/{x}/{y}.jpg?key=${MT_KEY}`], tileSize: 256, maxzoom: 20, attribution: attr };
-  }
-  return src;
-}
 
 let map: maplibregl.Map;
 export const getMap = () => map;
@@ -46,7 +34,7 @@ export function initMap(onReady: () => void) {
     container: 'map',
     style: {
       version: 8,
-      sources: baseSources(),
+      sources: baseSources(MT_KEY),
       layers: [
         { id: 'bg', type: 'background', paint: { 'background-color': cssv('--map') } },
         { id: 'osm', type: 'raster', source: 'osm', layout: { visibility: 'none' } },
@@ -57,7 +45,7 @@ export function initMap(onReady: () => void) {
         ] : []),
       ],
     },
-    center: [-48.1, -18.4], zoom: 6, maxZoom: 21, attributionControl: { compact: true },
+    center: [-48.1, -18.4], zoom: 6, maxZoom: MAP_MAX_ZOOM, attributionControl: { compact: true },
     dragRotate: true, pitchWithRotate: false, maxPitch: 0, doubleClickZoom: true,
   });
   const zh = $('#zoomhost');
