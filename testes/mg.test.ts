@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { buildGeometry } from '../src/geometry/build';
 import { prepareProject } from '../src/geometry/project';
 import { fromUtm } from '../src/geometry/utm';
+import { buildCamadas } from '../src/mapa/camadas';
 import { segmentsOf } from '../src/formats';
 import { projetoDeReferencia } from './helpers';
 
@@ -56,6 +57,16 @@ describe('BR-050/MG (referencia/dados)', () => {
       sinais.add(Math.sign(s));
     }
     expect(sinais.size).toBe(1);
+  });
+
+  it('gera as camadas do mapa em tempo razoável', () => {
+    const p = prepareProject(pc, { zone: 22 });
+    const t0 = performance.now();
+    const c = buildCamadas(p, buildGeometry(p), 'p1');
+    const ms = performance.now() - t0;
+    console.info(`MG Crescente: ${c.polys.features.length} polígonos, ${c.lines.features.length} linhas, ${Math.round(ms)} ms`);
+    expect(c.polys.features.length).toBeGreaterThan(14000);
+    expect(ms).toBeLessThan(15000);
   });
 
   it('lê as outras pistas', () => {

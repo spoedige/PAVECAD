@@ -141,3 +141,13 @@ export function lonLat(p: Project, pt: XY): [number, number] {
   const [lat, lon] = fromUtm(p.crs, pt[0], pt[1]);
   return [Number(lon.toFixed(7)), Number(lat.toFixed(7))];
 }
+
+export type GeoCore = Pick<Geometry, 'opts' | 'normals'>;
+
+/** Ponto deslocado `off` metros à direita do eixo da linha i, em metros projetados. */
+export function offsetXY(p: Project, g: GeoCore, i: number, off: number): XY {
+  const n = g.normals[i]!;
+  return [p.x[i] + off * n.e, p.y[i] + off * n.n];
+}
+
+export const offsetLL = (p: Project, g: GeoCore, i: number, off: number) => lonLat(p, offsetXY(p, g, i, off));

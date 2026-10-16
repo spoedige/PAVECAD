@@ -4,7 +4,7 @@ Mapa de soluções de restauração a partir de planilhas de unifilar. Vite + Ty
 
 ```
 npm install
-npm run dev        # página de leitura de planilhas
+npm run dev        # mapa; carregue planilhas .xlsx em "Planilhas"
 npm test           # vitest (leitura e geometria)
 npm run typecheck
 ```
@@ -15,6 +15,9 @@ npm run typecheck
 |---|---|
 | `src/formats/` | Registro `FORMATS` (um item por padrão de planilha), modelo normalizado, trechos e marcos. Primeiro padrão: RoadRunner. |
 | `src/geometry/` | Núcleo de geometria sem dependência de mapa: UTM SIRGAS 2000, normais, polígonos por faixa e drenos. `geojson.ts` adapta para MapLibre. |
+| `src/mapa/` | Camadas GeoJSON (`camadas.ts`) e worker que lê a planilha e calcula a geometria fora da thread da tela. |
+| `src/app/` | Mapa MapLibre, legenda, dicas, estacas, rotação e estado da aplicação. |
+| `src/dominio/` | Indicadores e classes, catálogo padrão de soluções, modelo por linha. |
 | `testes/` | Testes com as planilhas BR-050/GO em `testes/fixtures/`. |
 | `referencia/` | Protótipo (`fontes/template3.html`, `index3.html`), leitor Python, handoffs e JSON das 5 planilhas de exemplo. Não é código do app. |
 
