@@ -291,8 +291,9 @@ function legendItems(): LegItem[] {
   return slot(E.mode)!.labels.map((l, i) => ({ key: String(i), c: Q()[i], l, s: l }));
 }
 
-let legendOpen = true;
-try { legendOpen = localStorage.getItem('pavecad-leg') !== '0'; } catch { /* sem storage */ }
+// Em tela de toque a legenda começa recolhida (botão pequeno); a escolha do usuário, quando existe, vale sobre o padrão.
+let legendOpen = !window.matchMedia('(pointer: coarse)').matches;
+try { const v = localStorage.getItem('pavecad-leg'); if (v !== null) legendOpen = v !== '0'; } catch { /* sem storage */ }
 
 export function renderLegend() {
   const el = $('#legend'), items = legendItems();

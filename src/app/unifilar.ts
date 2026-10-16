@@ -3,7 +3,8 @@ import { trColor, trOrder } from '../dominio/solucoes';
 import { E, H, projName, type AppProj } from './estado';
 import { IC } from './icones';
 import { getMap, grupoAtivo, select } from './mapa';
-import { $, cssv, esc, fmt, toast } from './ui';
+import { $, cssv, esc, fmt, gestoVertical, toast } from './ui';
+import { isTablet } from './layout';
 
 interface Linha { y: number; h: number; lane: number }
 interface Bloco { p: AppProj; titleY: number; rows: Linha[] }
@@ -17,6 +18,8 @@ function rr(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: num
   g.beginPath();
   if (g.roundRect) g.roundRect(x, y, w, h, r); else g.rect(x, y, w, h);
 }
+
+const card0 = () => $('#unicard');
 
 export function renderGroups() {
   const gs = [...new Set(E.P.filter((p) => p.visible).map((p) => p.meta.uf))], el = $('#unigroups');
@@ -177,11 +180,20 @@ export function initUnifilar() {
   uw.addEventListener('mouseleave', () => { $('#unihover').style.display = 'none'; });
   window.addEventListener('resize', drawUni);
   if (window.ResizeObserver) new ResizeObserver(() => drawUni()).observe(uw);
-  const tg = $('#uniToggle');
-  tg.addEventListener('click', () => {
-    E.uniCollapsed = !E.uniCollapsed;
-    tg.innerHTML = (E.uniCollapsed ? IC.up : IC.down).replace('class="i"', 'class="i" style="width:14px;height:14px"');
+  const tg = $('#uniToggle'), cab = card0().querySelector<HTMLElement>('.uni-h')!;
+  try { E.uniCollapsed = localStorage.getItem('pavecad-uni') === '1'; } catch { /* sem storage */ }
+  const recolher = (c: boolean) => {
+    E.uniCollapsed = c;
+    tg.innerHTML = (c ? IC.up : IC.down).replace('class="i"', 'class="i" style="width:14px;height:14px"');
+    tg.setAttribute('aria-label', c ? 'Expandir unifilar' : 'Recolher unifilar');
+    tg.setAttribute('title', c ? 'Expandir unifilar' : 'Recolher unifilar');
+    try { localStorage.setItem('pavecad-uni', c ? '1' : '0'); } catch { /* sem storage */ }
     drawUni();
-  });
+  };
+  recolher(E.uniCollapsed);
+  tg.addEventListener('click', (e) => { e.stopPropagation(); recolher(!E.uniCollapsed); });
+  // tablet: o cabeçalho é o puxador (para baixo recolhe até a barra de posição, para cima ou um toque reabre)
+  gestoVertical(cab, { ativo: isTablet, aoBaixo: () => recolher(true), aoCima: () => recolher(false) });
+  cab.addEventListener('click', (e) => { if (E.uniCollapsed && isTablet() && !(e.target as HTMLElement).closest('button')) recolher(false); });
   H.onView = drawUni;
 }
