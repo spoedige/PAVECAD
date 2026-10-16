@@ -352,20 +352,15 @@ textarea:focus{box-shadow:inset 0 0 0 2px var(--accent)}
 /* Tablet (html.unico, ligado em layout.ts): mapa em tela cheia, barra única à esquerda, gaveta de mapa e topo enxuto.   */
 /* ---------------------------------------------------------------- */
 .tools,.drawer,#btnMore{display:none}
-.unico{--painel-w:360px;--tools-w:52px}
+.unico{--painel-w:360px;--tools-w:44px}
 .unico #btnMore{display:grid}
 .unico #btnExample{display:none}
 .unico .tools{display:flex;flex-direction:column;align-items:flex-start;gap:8px;position:absolute;left:var(--g);bottom:calc(var(--uni-h) + 24px);z-index:6}
 .unico .tools #zoomhost{position:relative}
 .unico .tools .maplibregl-ctrl-scale{position:absolute;left:calc(100% + 8px);top:0}
-.unico .tools .toolbar{flex-direction:column;width:var(--tools-w);align-items:center}
-.unico .tools .tsep{display:none}
-.unico .tools [id=btnGps]{order:1}
-.unico .tools [data-tool=prop]{order:2}
-.unico .tools #btnField{order:3}
-.unico .tools [data-tool=pin]{order:4}
-.unico .tools #btnMore{order:5}
-.unico .tools #btnMore[aria-expanded="true"]{background:var(--fill2)}
+.unico .tools #btnMore{width:var(--tools-w);height:var(--tools-w);border-radius:14px}
+.unico .tools #btnMore{background:var(--glass);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);border:var(--bw) solid var(--hair);box-shadow:var(--shadow)}
+.unico .tools #btnMore[aria-expanded="true"]{background:var(--solid)}
 .unico .inspector{width:var(--painel-w)}
 .unico .sbtns{gap:4px}
 .unico #t-seg .h1{font-size:20px}
@@ -379,8 +374,8 @@ textarea:focus{box-shadow:inset 0 0 0 2px var(--accent)}
 .unico .drawer .seg button{flex:1}
 
 /* Painel direito: grip, abas e km formam o cabeçalho; arrastar para baixo recolhe até essa faixa. */
-.unico .ihead{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"grip grip" "tabs tabs" "km chev";gap:4px 8px;align-items:center;padding:4px 10px 8px 12px;touch-action:pan-x;cursor:grab;user-select:none;-webkit-user-select:none}
-.unico .grip{display:block;grid-area:grip;justify-self:center;width:44px;height:5px;border-radius:3px;background:var(--faint);margin:6px 0 4px}
+.unico .ihead{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"grip grip" "tabs tabs" "km chev";gap:2px 8px;align-items:center;padding:4px 10px 6px 12px;touch-action:pan-x;cursor:grab;user-select:none;-webkit-user-select:none}
+.unico .grip{display:block;grid-area:grip;justify-self:center;width:44px;height:5px;border-radius:3px;background:var(--faint);margin:3px 0 2px}
 .unico .ihead .seg{grid-area:tabs;display:grid;grid-template-columns:repeat(5,minmax(0,1fr))}
 .unico .ikm{display:block;grid-area:km;min-width:0;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .unico #collapse{grid-area:chev}
@@ -392,7 +387,7 @@ textarea:focus{box-shadow:inset 0 0 0 2px var(--accent)}
 .unico .uni.collapsed .uni-h{cursor:pointer}
 
 /* No layout único os controles das bordas têm 44 px em qualquer ponteiro: o mesmo desenho no desktop e no tablet. */
-.unico .tools .tbtn,.unico .drawer .tbtn{width:44px;height:44px}
+.unico .tools .tbtn,.unico .drawer .tbtn,.unico .toolbar .tbtn{width:44px;height:44px}
 .unico .tools .maplibregl-ctrl-group button{width:44px!important;height:44px!important}
 .unico .drawer .chipbtn,.unico .drawer .seg button{min-height:44px}
 .unico .legend .legtog{min-height:44px;padding:0 10px}
@@ -402,7 +397,8 @@ textarea:focus{box-shadow:inset 0 0 0 2px var(--accent)}
    layout.ts), com 12 px de folga, e o painel cresce para cima até logo abaixo da barra superior (max-height). Recolhido, vira só o
    cabeçalho (abas e km) na mesma base e abre para cima. Nada do painel fica no topo. */
 .unico .inspector,.unico .inspector.collapsed{top:auto;right:var(--gr);bottom:calc(var(--uni-alt,190px) + 12px + 12px);height:auto}
-.unico .inspector{max-height:calc(100% - var(--hudm-h,96px) - 24px - var(--uni-alt,190px) - 24px)}
+.unico .inspector{max-height:calc(100% - var(--hudm-h,96px) - 20px - var(--uni-alt,190px) - 24px)}
+.unico .inspector .tabbody{padding-top:2px}
 .unico .inspector.collapsed{max-height:none}
 /* Menos de 900 px (retrato ou janela estreita): folha inferior em largura total acima do unifilar. A barra lateral, a legenda e a gaveta
    sobem junto, para ficar acima da folha, e a folha respeita a altura da barra lateral e do topo. */
@@ -414,3 +410,9 @@ textarea:focus{box-shadow:inset 0 0 0 2px var(--accent)}
   .unico .dock{right:var(--gr);bottom:calc(var(--uni-alt,190px) + 24px + var(--painel-alt,0px) + 12px)}
   .unico .drawer{bottom:calc(var(--uni-alt,190px) + 24px + var(--painel-alt,0px) + 12px + var(--dock-h,0px) + 8px)}
 }
+
+/* Ferramentas (GPS, propor, campo e nota) numa barra compacta no canto superior direito, sob Planilhas e a engrenagem. */
+.trrow{display:flex;gap:8px;align-items:center}
+.unico .topright{flex-direction:column;align-items:flex-end;gap:8px}
+.unico .topbar{flex-wrap:wrap}
+.unico .topright{margin-left:auto}
