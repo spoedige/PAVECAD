@@ -12,6 +12,13 @@ const escolherBase = async (pg, b) => {
   await pg.click(`#base [data-b=${b}]`);
   if (abriu) { await pg.click('#btnMore'); await pg.waitForTimeout(250); }
 };
+/** Escolhe a nitidez do satélite (maxima ou segura) na gaveta do mapa. */
+const escolherNitidez = async (pg, n) => {
+  const abriu = !(await pg.isVisible('#nitidez'));
+  if (abriu) { await pg.click('#btnMore'); await pg.waitForTimeout(250); }
+  await pg.click(`#nitidez [data-n=${n}]`);
+  if (abriu) { await pg.click('#btnMore'); await pg.waitForTimeout(250); }
+};
 const aba = async (pg, t) => { await pg.click(`#tabs [data-t=${t}]`); await pg.waitForTimeout(300); };
 
 const zoomPara = async (pg, z) => {
@@ -155,4 +162,4 @@ const GRUPOS = {
   t01: ['inicio', 'segmento', 'segmentoFim', 'gaveta', 'recolhidos'],
 };
 
-module.exports = { CENARIOS, GRUPOS, irParaKm, escolherBase, aba, criarProposta, pontoLivre };
+module.exports = { CENARIOS, GRUPOS, irParaKm, escolherBase, escolherNitidez, aba, criarProposta, pontoLivre };

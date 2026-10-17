@@ -3,7 +3,7 @@ import './estilos/app.css';
 import './estilos/config.css';
 import { E, H } from './app/estado';
 import {
-  agendarReaplicar, alignToRoad, applyLayers, clearSel, fitAll, getMap, goLabel, initMap, north, rotate, select, setBase, stepSel, updateStakes,
+  agendarReaplicar, alignToRoad, applyLayers, clearSel, fitAll, getMap, goLabel, initMap, north, rotate, select, setBase, setNitidez, stepSel, syncNitidezUi, updateStakes,
 } from './app/mapa';
 import type { ModeKey } from './dominio/indicadores';
 import { abrirDb } from './app/persist';
@@ -47,6 +47,7 @@ document.querySelectorAll<HTMLButtonElement>('#modes button').forEach((b) => b.a
 document.querySelectorAll<HTMLButtonElement>('#tabs button').forEach((b) => b.addEventListener('click', () => setTab(b.dataset.t as typeof E.tab)));
 document.querySelectorAll<HTMLButtonElement>('#base button').forEach((b) =>
   b.addEventListener('click', () => { setBase(b.dataset.b as typeof E.base); syncBaseSeg(); renderAll(); }));
+document.querySelectorAll<HTMLButtonElement>('#nitidez button').forEach((b) => b.addEventListener('click', () => setNitidez(b.dataset.n as 'maxima' | 'segura')));
 $('#rotL').addEventListener('click', () => rotate(-15));
 $('#rotR').addEventListener('click', () => rotate(15));
 $('#rotN').addEventListener('click', north);
@@ -136,6 +137,7 @@ async function boot() {
   initUnifilar();
   initConfig();
   initLayout();
+  syncNitidezUi();
   initGrupos(() => { drawUni(); agendarReaplicar(); });
   observarHud(agendarReaplicar);
   document.querySelectorAll<HTMLElement>('.tabbody').forEach(observarRolagem);

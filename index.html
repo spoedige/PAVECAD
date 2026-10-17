@@ -47,10 +47,19 @@
       </div>
       <div class="topright">
         <div class="trrow">
-          <div class="seg glass" id="base" role="group" aria-label="Base do mapa">
-            <button data-b="none" aria-pressed="true">Liso</button>
-            <button data-b="osm" aria-pressed="false">Ruas</button>
-            <button data-b="esri" aria-pressed="false">Satélite</button>
+          <div class="basegrp" id="basegrp">
+            <div class="seg glass" id="base" role="group" aria-label="Base do mapa">
+              <button data-b="none" aria-pressed="true">Liso</button>
+              <button data-b="osm" aria-pressed="false">Ruas</button>
+              <button data-b="esri" aria-pressed="false">Satélite</button>
+            </div>
+            <div class="nitidez" id="nitidezBox">
+              <span class="nitidez-rot" id="nitidezRot">Nitidez do satélite</span>
+              <div class="seg" id="nitidez" role="group" aria-labelledby="nitidezRot" title="Máxima: tile da Esri até o zoom 19 (mais nítido, mas em parte do interior a Esri não tem imagem ali). Segura: até o 17 (amplia o tile 17).">
+                <button type="button" data-n="maxima" aria-pressed="true">Máxima</button>
+                <button type="button" data-n="segura" aria-pressed="false">Segura</button>
+              </div>
+            </div>
           </div>
           <input id="file" type="file" accept=".xlsx,.xlsm" multiple hidden>
           <button class="iconbtn" id="btnAjuda" type="button" aria-label="Atalhos de teclado" aria-haspopup="dialog" title="Atalhos de teclado (?)" style="background:var(--glass);font-weight:700;font-size:15px">?</button>
