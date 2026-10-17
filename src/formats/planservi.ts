@@ -1,3 +1,4 @@
+import { reconstruir, type Reconstrucao } from './reconstrucao';
 import type { FormatDef, Lane, LogEntry, ParsedProject, Qualidade, Row, SheetBook } from './types';
 import { distM } from '../dominio/medidas';
 
@@ -262,17 +263,22 @@ function montarProjeto(S: unknown[][], m: Mapa, dados: LinhaDado[], fim: unknown
     const row = linhaDe(d.r, false, null);
     if (row) { rows.push(row); kms.push(d.r[m.col.km] as number); }
   }
+  let temTerminal = false;
   if (fim && rows.length) {
     const ult = rows[rows.length - 1];
     const t = linhaDe(fim, true, ult);
     if (t) {
       rows.push(t);
+      temTerminal = true;
       log.push({ level: 'info', code: 'planservi-linha-final', msg: `A última linha (sem número, km ${t.marco ?? t.hod}) deu a coordenada do fim do último segmento` });
     }
   }
   if (!rows.length) throw new Error(`nenhuma linha com número na coluna 1 da aba ${ABA}`);
   if (outrosNumeros.size) log.push({ level: 'warn', code: 'planservi-estrutural-numero', msg: `Estrutural com número diferente de 1 (${[...outrosNumeros].join(', ')}): tratado como sem intervenção` });
   for (const t of ignoradas) log.push({ level: 'info', code: 'planservi-aba-ignorada', msg: t });
+
+  const rec = reconstruir(rows.map((r) => ({ km: r.hod * 1000, lat: r.lat, lon: r.lon })), temTerminal);
+  aplicarReconstrucao(rows, rec);
 
   const codes: Record<string, number> = {};
   const conta = (cod: string | null) => { if (cod) codes[cod] = (codes[cod] || 0) + 1; };
@@ -283,6 +289,7 @@ function montarProjeto(S: unknown[][], m: Mapa, dados: LinhaDado[], fim: unknown
   return {
     meta: { name: nome, uf: topo.rodovia, via: `${topo.th ? topo.th + ' · ' : ''}${s}`, travel: s === 'Crescente' ? 1 : -1, kmi: km0, kmf: km1, format: 'planservi' },
     rows, log, codes,
+    qualidade: qualidadeDe(rows, rec),
   };
 }
 
@@ -312,20 +319,53 @@ export function qualidade(rows: Row[], outro: Row[]): Qualidade {
   return { saltos, sentidos, faixaSalto: [SALTO_MIN, SALTO_MAX], maxSentidos: ENTRE_SENTIDOS_MAX };
 }
 
+/** Troca as coordenadas reconstruídas e marca onde a linha foi cortada. */
+function aplicarReconstrucao(rows: Row[], rec: Reconstrucao) {
+  for (const c of rec.corrigidos) { rows[c.i].lat = Number(c.lat.toFixed(7)); rows[c.i].lon = Number(c.lon.toFixed(7)); }
+  for (const c of rec.cortes) rows[c.i].quebra = true;
+}
+
+/** Relatório da reconstrução. Os saltos e a distância entre sentidos entram depois, medidos nas coordenadas já corrigidas. */
+function qualidadeDe(rows: Row[], rec: Reconstrucao): Qualidade {
+  const r1 = (v: number) => Math.round(v * 10) / 10;
+  return {
+    saltos: [], sentidos: [], faixaSalto: [SALTO_MIN, SALTO_MAX], maxSentidos: ENTRE_SENTIDOS_MAX,
+    corrigidos: rec.corrigidos.map((c) => ({ i: c.i, km: kmTxt(rows[c.i]), tipo: c.tipo, causa: c.causa, deslocamento: r1(c.deslocamento), orig: c.orig })),
+    cortes: rec.cortes.map((c) => ({ i: c.i, km: kmTxt(rows[c.i - 1]), kmFim: kmTxt(rows[c.i]), dist: r1(c.dist), esperado: r1(c.esperado) })),
+    avisos: rec.avisos.map((a) => ({ tipo: a.tipo, km: kmTxt(rows[a.i0]), kmFim: kmTxt(rows[a.i1]), dist: r1(a.dist), esperado: r1(a.esperado) })),
+  };
+}
+
 const lista = (itens: string[], max = 40) => (itens.length > max ? itens.slice(0, max).join(', ') + ` e mais ${itens.length - max}` : itens.join(', '));
+
+const ROTULO_TIPO: Record<string, string> = { repetido: 'ponto repetido', salto: 'salto', retrocedendo: 'retrocedendo', inicial: 'ponto inicial', final: 'ponto final' };
 
 function logQualidade(q: Qualidade, s: Sentido): LogEntry[] {
   const out: LogEntry[] = [];
+  if (q.corrigidos?.length) {
+    out.push({
+      level: 'warn', code: 'planservi-corrigidos',
+      msg: `${s}: ${q.corrigidos.length} coordenada${q.corrigidos.length > 1 ? 's' : ''} reconstruída${q.corrigidos.length > 1 ? 's' : ''} pelo km (a planilha original não muda). Km (tipo, deslocamento): ${lista(q.corrigidos.map((x) => `${x.km} (${ROTULO_TIPO[x.tipo]}${x.causa && x.causa !== 'terminal' ? ', ' + ROTULO_TIPO[x.causa] : ''}, ${String(x.deslocamento).replace('.', ',')} m)`))}`,
+    });
+  }
+  if (q.cortes?.length) {
+    out.push({
+      level: 'warn', code: 'planservi-corte',
+      msg: `${s}: ${q.cortes.length} descontinuidade${q.cortes.length > 1 ? 's' : ''} real${q.cortes.length > 1 ? 'is' : ''} de coordenada; o traçado foi cortado em trechos separados, sem interpolar. Entre km (passo, esperado): ${lista(q.cortes.map((x) => `${x.km} e ${x.kmFim} (${String(x.dist).replace('.', ',')} m, ${String(x.esperado).replace('.', ',')} m)`))}`,
+    });
+  }
+  const parados = q.avisos?.filter((x) => x.tipo === 'estacionario') ?? [];
+  if (parados.length) out.push({ level: 'info', code: 'planservi-parado', msg: `${s}: ${parados.length} trecho${parados.length > 1 ? 's' : ''} com coordenadas quase paradas enquanto o km avança (não corrigido): ${lista(parados.map((x) => `${x.km} a ${x.kmFim} (${String(x.dist).replace('.', ',')} m em ${String(x.esperado).replace('.', ',')} m de km)`), 12)}` });
   if (q.saltos.length) {
     out.push({
       level: 'warn', code: 'planservi-salto',
-      msg: `${s}: ${q.saltos.length} salto${q.saltos.length > 1 ? 's' : ''} de coordenada fora de ${q.faixaSalto[0]} a ${q.faixaSalto[1]} m (tolerância de 0,5 m) entre linhas. Km (distância): ${lista(q.saltos.map((x) => `${x.km} (${x.dist} m)`))}. Nada foi corrigido`,
+      msg: `${s}: ${q.saltos.length} salto${q.saltos.length > 1 ? 's' : ''} de coordenada fora de ${q.faixaSalto[0]} a ${q.faixaSalto[1]} m (tolerância de 0,5 m) entre linhas. Km (distância): ${lista(q.saltos.map((x) => `${x.km} (${x.dist} m)`))}. Esses não foram corrigidos`,
     });
   } else out.push({ level: 'info', code: 'planservi-salto', msg: `${s}: nenhum salto de coordenada fora de ${q.faixaSalto[0]} a ${q.faixaSalto[1]} m` });
   if (q.sentidos.length) {
     out.push({
       level: 'warn', code: 'planservi-entre-sentidos',
-      msg: `${s}: ${q.sentidos.length} ponto${q.sentidos.length > 1 ? 's' : ''} com mais de ${q.maxSentidos} m entre os sentidos. Km (distância): ${lista(q.sentidos.map((x) => `${x.km} (${x.dist} m)`))}. Nada foi corrigido`,
+      msg: `${s}: ${q.sentidos.length} ponto${q.sentidos.length > 1 ? 's' : ''} com mais de ${q.maxSentidos} m entre os sentidos. Km (distância): ${lista(q.sentidos.map((x) => `${x.km} (${x.dist} m)`))}. Esses não foram corrigidos`,
     });
   }
   return out;
@@ -361,8 +401,7 @@ export const planservi: FormatDef = {
     if (wb.names.some((n) => n.normalize('NFC') === 'IRI')) ignoradas.push('Aba IRI ignorada: tem referências quebradas (#REF!). O IRI vem das colunas de indicadores da SOLUÇÃO_FINAL');
     const cres = montarProjeto(S, m, dados, fim, 'Crescente', topo, ignoradas);
     const decr = montarProjeto(S, m, dados, fim, 'Decrescente', topo, ignoradas);
-    const qC = qualidade(cres.rows, decr.rows), qD = qualidade(decr.rows, cres.rows);
-    cres.qualidade = qC; decr.qualidade = qD;
+    const qC = Object.assign(cres.qualidade!, qualidade(cres.rows, decr.rows)), qD = Object.assign(decr.qualidade!, qualidade(decr.rows, cres.rows));
     cres.log.push(...logQualidade(qC, 'Crescente'));
     decr.log.push(...logQualidade(qD, 'Decrescente'));
     for (const p of [cres, decr]) {

@@ -244,20 +244,39 @@ export function refreshNotesLayer() {
 
 const noteSummary = (n: Nota) => (n.type === 'pin' ? 'Ponto' : n.type === 'line' ? `Linha · ${fmtLen(lenM(n.coords))}` : `Área · ${fmt(areaM2(n.coords), 0)} m²`);
 
-/** Verificação de qualidade feita na importação (Planservi): saltos de coordenada e distância entre sentidos, com o km de cada ocorrência.
- *  Só sinaliza; nenhuma linha foi corrigida nem descartada. */
+/** Verificação de qualidade das coordenadas (Planservi): pontos reconstruídos, cortes, saltos que restaram, distância entre sentidos e
+ *  polígonos desenhados só como linha central, com o km de cada ocorrência. A planilha original não é alterada. */
 const qualAbertas = new Set<string>();
+const MAX_OC = 60;
+const ROT_TIPO: Record<string, string> = { repetido: 'ponto repetido', salto: 'salto', retrocedendo: 'retrocedendo', inicial: 'ponto inicial', final: 'ponto final' };
+const ROT_INV: Record<string, string> = { curto: 'segmento com menos de 1 m', cruzado: 'polígono cruzado', 'sem-area': 'polígono sem área' };
 function qualidadeHtml(): string {
-  const com = E.P.filter((p) => p.qualidade);
+  const com = E.P.filter((p) => p.qualidade || p.camadas.invalidos?.length);
   if (!com.length) return '';
   const linhas = com.map((p) => {
-    const q = p.qualidade!;
-    const n = q.saltos.length + q.sentidos.length;
-    const oc = (tipo: string, i: number, km: string, rot: string) => `<button class="row" data-q="${p.id}:${i}" aria-label="Ir ao km ${esc(km)}"><div class="grow"><b class="num">km ${esc(km)}</b> <span class="muted">${esc(rot)}</span></div>${IC.next}</button>`;
-    return `<details class="qual" data-qp="${p.id}"><summary><span><b>${esc(projName(p))}</b><span class="muted num" style="display:block;font-size:11px;font-weight:400">${q.saltos.length} salto${q.saltos.length === 1 ? '' : 's'} fora de ${q.faixaSalto[0]} a ${q.faixaSalto[1]} m · ${q.sentidos.length} acima de ${q.maxSentidos} m entre os sentidos</span></span><span class="num ${n ? '' : 'muted'}">${n}</span></summary>
-      ${n ? `<div class="list" style="margin-top:8px">${q.saltos.map((x) => oc('salto', x.i, x.km, `salto de ${x.dist.toLocaleString('pt-BR')} m até o km ${x.kmFim}`)).join('')}${q.sentidos.map((x) => oc('sentidos', x.i, x.km, `${x.dist} m entre os sentidos`)).join('')}</div>` : '<p class="vazio" style="margin-top:8px">Nenhuma ocorrência.</p>'}</details>`;
+    const q = p.qualidade, inv = p.camadas.invalidos ?? [];
+    const corr = q?.corrigidos ?? [], cortes = q?.cortes ?? [], saltos = q?.saltos ?? [], sentidos = q?.sentidos ?? [];
+    const n = corr.length + cortes.length + saltos.length + sentidos.length + inv.length;
+    const oc = (i: number, km: string, rot: string) => `<button class="row" data-q="${p.id}:${i}" aria-label="Ir ao km ${esc(km)}"><div class="grow"><b class="num">km ${esc(km)}</b> <span class="muted">${esc(rot)}</span></div>${IC.next}</button>`;
+    const nbr = (v: number) => v.toLocaleString('pt-BR');
+    const itens = [
+      ...corr.map((x) => oc(x.i, x.km, `${ROT_TIPO[x.tipo] ?? x.tipo}${x.causa && x.causa !== 'terminal' ? ' (' + (ROT_TIPO[x.causa] ?? x.causa) + ')' : ''}, andou ${nbr(x.deslocamento)} m em relação à planilha`)),
+      ...cortes.map((x) => oc(x.i, x.kmFim, `corte: passo de ${nbr(x.dist)} m entre o km ${x.km} e o ${x.kmFim} (esperado ${nbr(x.esperado)} m)`)),
+      ...saltos.map((x) => oc(x.i, x.kmFim, `salto de ${nbr(x.dist)} m até o km ${x.kmFim}`)),
+      ...sentidos.map((x) => oc(x.i, x.km, `${x.dist} m entre os sentidos`)),
+      ...inv.map((x) => oc(x.row, p.kmLab[x.row], `${ROT_INV[x.motivo] ?? x.motivo}${x.lane ? ' na Fx ' + x.lane : ' no acostamento'}: só a linha central`)),
+    ];
+    const resumo = [
+      corr.length ? `${corr.length} corrigida${corr.length === 1 ? '' : 's'}` : '',
+      cortes.length ? `${cortes.length} corte${cortes.length === 1 ? '' : 's'}` : '',
+      saltos.length ? `${saltos.length} salto${saltos.length === 1 ? '' : 's'} fora de ${q!.faixaSalto[0]} a ${q!.faixaSalto[1]} m` : '',
+      sentidos.length ? `${sentidos.length} acima de ${q!.maxSentidos} m entre os sentidos` : '',
+      inv.length ? `${inv.length} polígono${inv.length === 1 ? '' : 's'} só em linha` : '',
+    ].filter(Boolean).join(' · ') || 'Nenhuma ocorrência';
+    return `<details class="qual" data-qp="${p.id}"><summary><span><b>${esc(projName(p))}</b><span class="muted num" style="display:block;font-size:11px;font-weight:400">${esc(resumo)}</span></span><span class="num ${n ? '' : 'muted'}">${n}</span></summary>
+      ${n ? `<div class="list" style="margin-top:8px">${itens.slice(0, MAX_OC).join('')}${itens.length > MAX_OC ? `<p class="note" style="padding:8px 10px;margin:0">e mais ${itens.length - MAX_OC} ocorrências, no log da aba Ajustes.</p>` : ''}</div>` : '<p class="vazio" style="margin-top:8px">Nenhuma ocorrência.</p>'}</details>`;
   }).join('');
-  return `<div><div class="sect">Qualidade da importação</div>${linhas}<p class="note" style="margin-top:7px">Só sinalizado: nenhuma coordenada foi corrigida nem descartada. O mesmo resumo está no log da aba Ajustes.</p></div>`;
+  return `<div><div class="sect">Qualidade das coordenadas</div>${linhas}<p class="note" style="margin-top:7px">Pontos reconstruídos pelo km quando a coordenada da planilha estava repetida, saltando ou retrocedendo. A planilha original não muda. O mesmo resumo está no log da aba Ajustes.</p></div>`;
 }
 
 export function renderNotes() {

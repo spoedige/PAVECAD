@@ -155,7 +155,9 @@ export function addProjectToMap(p: AppProj) {
   map.addSource('drain-' + id, { type: 'geojson', data: p.camadas.drains as Expr });
   map.addLayer({ id: 'lines-' + id, type: 'line', source: 'lines-' + id, maxzoom: 16.7, layout: { 'line-cap': 'butt' }, paint: { 'line-width': 2.4, 'line-offset': offs, 'line-color': '#888' } }, before);
   map.addLayer({ id: 'poly-' + id, type: 'fill', source: 'poly-' + id, minzoom: 14, paint: { 'fill-color': '#888', 'fill-opacity': 0.9 } }, before);
-  map.addLayer({ id: 'pline-' + id, type: 'line', source: 'poly-' + id, minzoom: 16, paint: { 'line-color': '#000', 'line-width': 0.8 } }, before);
+  map.addLayer({ id: 'pline-' + id, type: 'line', source: 'poly-' + id, minzoom: 16, filter: ['==', ['geometry-type'], 'Polygon'], paint: { 'line-color': '#000', 'line-width': 0.8 } }, before);
+  // polígono que falhou na validação (curto, cruzado): só a linha central do segmento
+  map.addLayer({ id: 'cline-' + id, type: 'line', source: 'poly-' + id, minzoom: 14, filter: ['==', ['geometry-type'], 'LineString'], layout: { 'line-cap': 'butt' }, paint: { 'line-color': '#888', 'line-width': 3 } }, before);
   map.addLayer({ id: 'drainR-' + id, type: 'line', source: 'drain-' + id, minzoom: 11, filter: ['!=', ['get', 't'], 'P'], layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#e0267f', 'line-width': 3 } }, before);
   map.addLayer({ id: 'drainP-' + id, type: 'line', source: 'drain-' + id, minzoom: 11, filter: ['==', ['get', 't'], 'P'], layout: { 'line-join': 'round' }, paint: { 'line-color': '#e0267f', 'line-width': 3, 'line-dasharray': [1.6, 1.2] } }, before);
   buildMarkers(p);
@@ -172,7 +174,7 @@ export function setProjectData(p: AppProj) {
 }
 
 export function removeProjectFromMap(p: AppProj) {
-  for (const l of ['lines-', 'poly-', 'pline-', 'drainR-', 'drainP-']) if (map.getLayer(l + p.id)) map.removeLayer(l + p.id);
+  for (const l of ['lines-', 'poly-', 'pline-', 'cline-', 'drainR-', 'drainP-']) if (map.getLayer(l + p.id)) map.removeLayer(l + p.id);
   for (const s of ['poly-', 'lines-', 'drain-']) if (map.getSource(s + p.id)) map.removeSource(s + p.id);
   p.markers.forEach((m) => m.remove());
   p.markers = [];
@@ -180,7 +182,7 @@ export function removeProjectFromMap(p: AppProj) {
 
 export function applyVisibility(p: AppProj) {
   const v = p.visible ? 'visible' : 'none', d = p.visible && E.layers.drain ? 'visible' : 'none';
-  for (const l of ['lines-', 'poly-', 'pline-']) if (map.getLayer(l + p.id)) map.setLayoutProperty(l + p.id, 'visibility', v);
+  for (const l of ['lines-', 'poly-', 'pline-', 'cline-']) if (map.getLayer(l + p.id)) map.setLayoutProperty(l + p.id, 'visibility', v);
   for (const l of ['drainR-', 'drainP-']) if (map.getLayer(l + p.id)) map.setLayoutProperty(l + p.id, 'visibility', d);
   p.markers.forEach((m) => (m.getElement().style.display = p.visible ? '' : 'none'));
 }
@@ -258,6 +260,8 @@ export function paintProject(p: AppProj) {
   const S = (l: string, k: string, v: Expr) => { if (map.getLayer(l)) map.setPaintProperty(l, k, v); };
   S('poly-' + id, 'fill-color', ce);
   S('poly-' + id, 'fill-opacity', ['interpolate', ['linear'], ['zoom'], 15.2, 0, 16.6, op]);
+  S('cline-' + id, 'line-color', ce);
+  S('cline-' + id, 'line-opacity', f ? 1 : 0.94);
   S('lines-' + id, 'line-color', ce);
   S('lines-' + id, 'line-opacity', ['interpolate', ['linear'], ['zoom'], 15.6, lop, 16.6, 0]);
   S('lines-' + id, 'line-width', ['interpolate', ['linear'], ['zoom'], 8, f ? 3 : 2, 13, f ? 3.4 : 2.4, 16, f ? 3.4 : 2.4]);
@@ -363,7 +367,7 @@ export function hitAt(pt: PointLike & { x: number; y: number }): Hit | null {
       if (dp) return { drain: { p: dp, t: pr.t, r0: +pr.r0, r1: +pr.r1 } };
     }
   }
-  const ly = vis.flatMap((p) => ['poly-' + p.id, 'lines-' + p.id]).filter(has);
+  const ly = vis.flatMap((p) => ['poly-' + p.id, 'cline-' + p.id, 'lines-' + p.id]).filter(has);
   const f = ly.length ? map.queryRenderedFeatures(b, { layers: ly }) : [];
   if (!f.length) return null;
   const pr = f[0].properties, p = getP(pr.pid);

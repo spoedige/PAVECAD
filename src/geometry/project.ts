@@ -32,7 +32,7 @@ export interface PrepareOptions {
 
 export function prepareProject(p: ParsedProject, opt: PrepareOptions = {}): Project {
   const rows = p.rows;
-  const segs = segmentsOf(rows.map((r) => r.hod));
+  const segs = segmentsOf(rows.map((r) => r.hod), rows.map((r) => r.quebra));
   const segOf = new Int32Array(rows.length);
   segs.forEach((s, si) => {
     for (let i = s.a; i <= s.b; i++) segOf[i] = si;

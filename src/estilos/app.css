@@ -497,3 +497,9 @@ details.qual .list{max-height:240px;overflow-y:auto}
 .desl-passo input{flex:1;min-width:70px;min-height:44px;border:0;border-radius:10px;background:var(--fill);color:var(--fg);padding:6px 8px;text-align:right;outline:none}
 .desl-passo input:focus{box-shadow:inset 0 0 0 2px var(--accent)}
 .desl .btns .btn{min-height:44px}
+
+/* Selo de coordenadas reconstruídas */
+.selo{color:#b35a00;font-weight:600;font-size:11px}
+:root[data-contrast="field"] .selo{color:#8a3d00}
+@media (prefers-color-scheme: dark){:root:not([data-contrast="field"]) .selo{color:#ffb454}}
+.prow .nm .selo{display:inline;white-space:normal;overflow:visible}

@@ -12,6 +12,8 @@ export interface Camadas {
   polys: FC;
   lines: FC;
   drains: FC;
+  /** Polígonos que falharam na validação e foram desenhados só como linha central. */
+  invalidos: { row: number; lane: number; motivo: string }[];
 }
 
 /** Converte a geometria em camadas GeoJSON para o MapLibre. Sem acesso a DOM: roda no worker. */
@@ -66,5 +68,6 @@ export function buildCamadas(p: Project, g: Geometry, pid: string): Camadas {
       }
     }
   }
-  return { polys, lines: { type: 'FeatureCollection', features: lines }, drains: drainsToGeoJSON(p, g.drains, pid) };
+  const invalidos = g.polys.filter((q) => q.invalido).map((q) => ({ row: q.row, lane: q.lane, motivo: q.invalido! }));
+  return { polys, lines: { type: 'FeatureCollection', features: lines }, drains: drainsToGeoJSON(p, g.drains, pid), invalidos };
 }

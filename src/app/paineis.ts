@@ -17,6 +17,11 @@ import { $, cssv, esc, fmt, syncAllSegs, syncSeg, toast, toastAcao } from './ui'
 const Q = () => (E.field ? Q5F : Q5);
 const tc = (k: string) => trColor(k, E.field, cssv('--none'));
 const TREAT_LABELS = ['Estrutural', 'Fresagem funcional', 'Fresagem estrutural', 'Selagem', 'Microfresagem', 'Fresagem fina', 'Revestimento'];
+/** Selo da planilha com coordenadas reconstruídas na importação (Planservi). */
+const selo = (p: AppProj) => {
+  const n = p.qualidade?.corrigidos?.length ?? 0;
+  return n ? `<b class="selo" title="Coordenadas reconstruídas pelo km na importação. A planilha original não muda. Detalhe na aba Revisão">coordenadas corrigidas: ${n}</b>` : '';
+};
 const dirBadge = (p: AppProj) => /Marginal/i.test(p.meta.via) ? '<span class="dirb m">MARG</span>' : p.meta.travel > 0 ? '<span class="dirb">CRESC</span>' : '<span class="dirb d">DECRESC</span>';
 const flyTo = (p: AppProj, i: number, zoom = 17.2) => { const r = p.rows[i]; getMap().flyTo({ center: [r.lon, r.lat], zoom: Math.max(getMap().getZoom(), zoom), duration: 800 }); };
 
@@ -112,7 +117,7 @@ export function renderResumo() {
     <div><div class="sect">Planilhas <button class="btn" id="addFiles" style="min-height:28px;padding:3px 10px;font-size:12px">+ Adicionar</button></div>
       <div class="list">${E.P.map((p) => `<div class="prow">
         <button class="iconbtn" data-eye="${p.id}" aria-label="${p.visible ? 'Ocultar' : 'Mostrar'} ${esc(projName(p))}" style="width:30px;height:30px">${p.visible ? IC.eye : IC.eyeoff}</button>
-        <button class="nm" data-fly="${p.id}"><b>${esc(projName(p))}</b><span class="num">km ${fmt(p.meta.kmi, 0)} a ${fmt(p.meta.kmf, 0)} · ${p.rows.length.toLocaleString('pt-BR')} seg · ${p.meta.format === 'planservi' ? 'Planservi' : 'RoadRunner'}</span></button>
+        <button class="nm" data-fly="${p.id}"><b>${esc(projName(p))}</b><span class="num">km ${fmt(p.meta.kmi, 0)} a ${fmt(p.meta.kmf, 0)} · ${p.rows.length.toLocaleString('pt-BR')} seg · ${p.meta.format === 'planservi' ? 'Planservi' : 'RoadRunner'}</span>${selo(p) ? `<span>${selo(p)}</span>` : ''}</button>
         ${dirBadge(p)}
         <button class="iconbtn" data-del="${p.id}" aria-label="Remover ${esc(projName(p))}" style="width:30px;height:30px">${IC.trash}</button></div>`).join('')}</div></div>
     <div><h2 class="h1 num">${fmt(R.ext, 1)} km</h2><p class="lead num">${V.length} planilha${V.length !== 1 ? 's' : ''} ${V.length !== 1 ? 'visíveis' : 'visível'} · ${R.nR.toLocaleString('pt-BR')} segmentos de 20 m${R.drKm ? ` · ${fmt(R.drKm, 1)} km de dreno` : ''}</p>
@@ -352,6 +357,7 @@ export function renderAj() {
         <div class="btns"><button class="btn" type="button" id="d-zero">Zerar</button><button class="btn" type="button" id="d-outras">Aplicar a outras planilhas…</button></div>
         <p class="note">Move a planilha inteira no mapa, nos polígonos, no CSV de propostas e na localização por GPS. Fica salvo no aparelho junto com a planilha.</p>
       </div>
+      ${selo(p) ? `<p class="note" style="margin-top:7px">${selo(p)}. Veja o detalhe em Revisão, em Qualidade das coordenadas.</p>` : ''}
       <p class="note num" style="margin-top:7px">Sistema de coordenadas: SIRGAS 2000 UTM ${p.crs.zone}S${p.crs.epsg ? ` (EPSG ${p.crs.epsg})` : ''}, ${p.crs.source === 'fixo' ? 'fixado' : 'pela mediana das longitudes'}.</p>
       ${p.log.length ? `<details style="margin-top:8px"><summary>Log de importação (${p.log.length})</summary><div class="formula">${p.log.map((l) => `${l.level === 'warn' ? '! ' : '· '}${esc(l.msg)}`).join('\n')}</div></details>` : ''}</div>` : '';
   el.innerHTML = `

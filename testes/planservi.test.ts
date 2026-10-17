@@ -49,11 +49,20 @@ describe.each([[A, 'SP-333', 'TH50'], [B, 'SP-333', 'TH51']])('%s', (arq, rod, t
   });
 
   it('cada sentido usa as suas coordenadas e o km da coluna B; o marco vem da estaca', () => {
+    // as coordenadas reconstruídas (ponto fora do lugar) trocam o valor; o original fica no relatório
+    const refeitas = (p: typeof cres) => new Set((p.qualidade!.corrigidos ?? []).map((c) => c.i));
+    const fc = refeitas(cres), fd = refeitas(decr);
     dados.forEach(({ linha }, i) => {
-      expect(cres.rows[i].lat).toBeCloseTo(raw(S, linha, 'E') as number, 6);
-      expect(cres.rows[i].lon).toBeCloseTo(raw(S, linha, 'F') as number, 6);
-      expect(decr.rows[i].lat).toBeCloseTo(raw(S, linha, 'G') as number, 6);
-      expect(decr.rows[i].lon).toBeCloseTo(raw(S, linha, 'H') as number, 6);
+      if (fc.has(i)) {
+        expect(cres.qualidade!.corrigidos!.find((c) => c.i === i)!.orig[0]).toBeCloseTo(raw(S, linha, 'E') as number, 6);
+      } else {
+        expect(cres.rows[i].lat).toBeCloseTo(raw(S, linha, 'E') as number, 6);
+        expect(cres.rows[i].lon).toBeCloseTo(raw(S, linha, 'F') as number, 6);
+      }
+      if (!fd.has(i)) {
+        expect(decr.rows[i].lat).toBeCloseTo(raw(S, linha, 'G') as number, 6);
+        expect(decr.rows[i].lon).toBeCloseTo(raw(S, linha, 'H') as number, 6);
+      }
       expect(cres.rows[i].hod).toBe(raw(S, linha, 'B'));
       expect(cres.rows[i].marco).toBe(String(raw(S, linha, 'C')).replace(/\s/g, ''));
     });
@@ -137,20 +146,22 @@ describe('amostra TH50: dreno nos dois sentidos e salto de coordenada', () => {
     expect(cres.rows[dc[0]].drain).toEqual(['?', null]);
   });
 
-  it('o salto do crescente é sinalizado, com o km de cada ocorrência, e nada é corrigido', () => {
-    const salto = cres.qualidade!.saltos.filter((s) => s.dist > 60);
-    expect(salto).toHaveLength(2); // entrada e saída do ponto deslocado
-    expect(salto[0].dist).toBeGreaterThan(90);
-    expect(salto[0].dist).toBeLessThan(110);
-    const [i0] = [salto[0].i];
-    expect(cres.rows[i0].lat).toBeCloseTo(raw(S, 8 + i0, 'E') as number, 6); // coordenada original mantida
-    const msg = cres.log.find((l) => l.code === 'planservi-salto' && l.level === 'warn')!.msg;
-    expect(msg).toContain(salto[0].km);
-    expect(msg).toMatch(/Nada foi corrigido/);
+  it('o ponto deslocado do crescente é reconstruído pelo km e o relatório guarda a coordenada original', () => {
+    const c = cres.qualidade!.corrigidos!.filter((x) => x.deslocamento > 60);
+    expect(c).toHaveLength(1);
+    expect(c[0].deslocamento).toBeGreaterThan(70);
+    expect(c[0].deslocamento).toBeLessThan(115);
+    expect(['salto', 'retrocedendo']).toContain(c[0].tipo);
+    expect(c[0].orig[0]).toBeCloseTo(raw(S, 8 + c[0].i, 'E') as number, 6); // coordenada original mantida no relatório
+    // a nova posição fica a um passo plausível dos vizinhos
+    for (const j of [c[0].i - 1, c[0].i]) {
+      expect(distM([cres.rows[j].lon, cres.rows[j].lat], [cres.rows[j + 1].lon, cres.rows[j + 1].lat])).toBeLessThan(31);
+    }
+    expect(cres.qualidade!.saltos.filter((s) => s.dist > 60)).toHaveLength(0);
+    const msg = cres.log.find((l) => l.code === 'planservi-corrigidos')!.msg;
+    expect(msg).toContain(c[0].km);
     expect(cres.rows).toHaveLength(61); // nenhuma linha descartada
-    // o ponto deslocado também se afasta do decrescente acima de 100 m
-    expect(cres.qualidade!.sentidos.some((s) => s.i === i0)).toBe(true);
-    expect(cres.log.some((l) => l.code === 'planservi-entre-sentidos')).toBe(true);
+    expect(cres.qualidade!.sentidos.some((s) => s.i === c[0].i)).toBe(false); // e já não se afasta do decrescente
   });
 
   it('a verificação usa a faixa de 10 a 30 m e 100 m entre os sentidos', () => {
@@ -168,8 +179,8 @@ describe('amostra TH50: dreno nos dois sentidos e salto de coordenada', () => {
 describe('amostra TH51: salto no decrescente, EX e RE', () => {
   const [cres, decr] = parseSpreadsheetAll(bytes(B));
   it('o salto do decrescente aparece só nele', () => {
-    expect(decr.qualidade!.saltos.some((s) => s.dist > 90)).toBe(true);
-    expect(cres.qualidade!.saltos.some((s) => s.dist > 90)).toBe(false);
+    expect(decr.qualidade!.corrigidos!.some((c) => c.deslocamento > 90)).toBe(true);
+    expect(cres.qualidade!.corrigidos!.some((c) => c.deslocamento > 90)).toBe(false);
     expect(decr.rows.map((r) => !!r.drain).filter(Boolean).length).toBe(2);
     expect(cres.rows.map((r) => !!r.drain).filter(Boolean).length).toBe(1);
   });
