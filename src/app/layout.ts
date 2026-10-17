@@ -10,7 +10,7 @@ export const ehUnico = () => mq.matches;
 const MOVEIS = [
   { id: 'zoomhost', destino: 'tools', inicio: true },
   { id: 'rotbar', destino: 'drawer', inicio: false },
-  { id: 'base', destino: 'drawer', inicio: false },
+  { id: 'basegrp', destino: 'drawer', inicio: false },
 ];
 const marcas = new Map<string, Comment>();
 

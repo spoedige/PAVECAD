@@ -478,3 +478,12 @@ details.qual summary{gap:10px}
 details.qual summary>span:first-child{min-width:0}
 details.qual .list .row{min-height:36px}
 details.qual .list{max-height:240px;overflow-y:auto}
+
+/* Gaveta do mapa: a escolha de base e a nitidez do satélite andam juntas. */
+.basegrp{display:flex;flex-direction:column;gap:8px}
+.nitidez{display:none}
+.unico .nitidez{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:0 2px 0 4px}
+.unico .nitidez[hidden]{display:none}
+.nitidez-rot{font-size:12px;font-weight:600;color:var(--muted);white-space:nowrap}
+.unico .nitidez .seg{flex:none}
+.unico .nitidez .seg button{min-height:44px;padding:6px 12px}

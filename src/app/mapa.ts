@@ -6,10 +6,10 @@ import { IND, Q5, Q5F, type IndKey } from '../dominio/indicadores';
 import { trColor, trLabel, trOrder, trShort } from '../dominio/solucoes';
 import type { Nota } from './estado';
 import { kmLabel, parseKmTexto } from '../formats/km';
-import { baseSources, MAP_MAX_ZOOM } from '../mapa/base';
+import { baseSources, CHAVE_NITIDEZ, MAP_MAX_ZOOM, nitidezSalva, recarregarEsri, type Nitidez } from '../mapa/base';
 import { agendarRotulos, PRIO, prioDeEstaca, resolverRotulos } from './rotulos';
 import { E, H, NOTE_CATS, getP, projName, visibleProjects, type AppProj, type FocoPred } from './estado';
-import { $, cssv, esc, fmt, toast } from './ui';
+import { $, cssv, esc, fmt, syncSeg, toast } from './ui';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Expr = any;
@@ -19,6 +19,8 @@ const EMPTY: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: 
  *  Sem chave, a base cai no OpenStreetMap (ruas) e na Esri (satélite). */
 const MT_KEY: string = (import.meta.env.VITE_MAPTILER_KEY ?? '').trim();
 export const temMapTiler = () => !!MT_KEY;
+let nitidez: Nitidez = nitidezSalva();
+export const getNitidez = () => nitidez;
 
 let map: maplibregl.Map;
 export const getMap = () => map;
@@ -34,7 +36,7 @@ export function initMap(onReady: () => void) {
     container: 'map',
     style: {
       version: 8,
-      sources: baseSources(MT_KEY),
+      sources: baseSources(MT_KEY, nitidez),
       layers: [
         { id: 'bg', type: 'background', paint: { 'background-color': cssv('--map') } },
         { id: 'osm', type: 'raster', source: 'osm', layout: { visibility: 'none' } },
@@ -114,6 +116,23 @@ export function initMap(onReady: () => void) {
   map.on('move', () => H.onView());
   new MutationObserver(() => setTimeout(applyPaint, 20)).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => setTimeout(applyPaint, 40));
+}
+
+/** Nitidez do satélite da Esri (sem chave do MapTiler): "maxima" pede tiles até o 19, "segura" até o 17. Salva no aparelho. */
+export function setNitidez(n: Nitidez, salvar = true) {
+  nitidez = n;
+  if (salvar) try { localStorage.setItem(CHAVE_NITIDEZ, n); } catch { /* sem storage */ }
+  syncNitidezUi();
+  if (E.mapReady && map.getSource('esri')) recarregarEsri(map, n);
+}
+
+/** Chave na gaveta do mapa. Com MapTiler o satélite não é o da Esri e a chave some. */
+export function syncNitidezUi() {
+  const box = document.getElementById('nitidezBox');
+  if (!box) return;
+  box.hidden = temMapTiler();
+  box.querySelectorAll<HTMLElement>('[data-n]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.n === nitidez)));
+  syncSeg(document.getElementById('nitidez'));
 }
 
 export function setBase(b: typeof E.base) {

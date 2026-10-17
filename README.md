@@ -38,6 +38,11 @@ As capturas também rodam um verificador de sobreposição e corte de texto (`sc
 
 A base usa o MapTiler quando `VITE_MAPTILER_KEY` está definida no ambiente de build (painel da Vercel, ou `.env.local` em desenvolvimento; veja `.env.example`). Sem a chave, cai no OpenStreetMap (ruas) e na Esri (satélite). A chave nunca entra no repositório. Como todo token de tiles em app de navegador, ela fica visível no bundle: restrinja-a ao domínio do app no painel do MapTiler.
 
+### Nitidez do satélite (sem chave)
+
+Na gaveta do mapa (botão ⋯), ao lado de Liso, Ruas e Satélite, a chave **Nitidez do satélite** controla até que nível a Esri é consultada; a escolha fica salva no aparelho e a troca recarrega só a imagem de satélite, sem mexer em zoom nem posição.
+**Máxima** (padrão) pede tiles até o zoom 19, a imagem mais nítida em zoom alto; **Segura** pede até o 17 e amplia o resultado, para as regiões do interior em que a Esri não tem imagem nos zooms 18 e 19 e devolve a mensagem "Map data not yet available". Com `VITE_MAPTILER_KEY` a chave não aparece e o satélite do MapTiler segue como era (tiles até o 20).
+
 ## Deploy na Vercel
 
 1. Na Vercel: **Add New > Project**, importe `spoedige/pavecad`. O `vercel.json` já define o framework (Vite), o build (`npm run build`) e a saída (`dist`), além dos cabeçalhos do service worker.
