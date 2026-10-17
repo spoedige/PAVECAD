@@ -618,52 +618,53 @@ const TESTES = {
     }],
   ],
   t10: [
-    ['nitidez do satélite: Máxima pede tile até o 19, Segura até o 17; preserva centro e zoom, recarrega só a Esri e fica salva', '1366x768', async (pg, { log }) => {
+    ['nitidez do satélite: Segura é o padrão (tile 17), Máxima pede até o 19; preserva centro e zoom, recarrega só a Esri e fica salva', '1366x768', async (pg, { log }) => {
       const estadoMapa = () => pg.evaluate(() => { const m = window.__pavecad.map(), c = m.getCenter(); return { lng: c.lng, lat: c.lat, zoom: m.getZoom(), rumo: m.getBearing(), esri: m.getLayoutProperty('esri', 'visibility'), max: m.getSource('esri').maxzoom, osm: m.getSource('osm').__marca || null, esriMarca: m.getSource('esri').__marca || null }; });
       const pressed = () => pg.evaluate(() => [...document.querySelectorAll('#nitidez button')].map((b) => b.dataset.n + ':' + b.getAttribute('aria-pressed')).join(','));
       const zsEsri = () => log.tiles.filter((t) => /arcgisonline/.test(t.url) && t.z !== null).map((t) => t.z);
       const pedir = async (acao) => { log.tiles.length = 0; if (acao) await acao(); await pg.waitForTimeout(1800); return zsEsri(); };
+      const mesmoLugar = (a, b, msg) => { for (const k of ['lng', 'lat', 'zoom', 'rumo']) assert.ok(Math.abs(a[k] - b[k]) < 1e-9, `${msg}: ${k} ${a[k]} x ${b[k]}`); };
 
       await escolherBase(pg, 'esri'); await irParaKm(pg, '170+500', 1500);
       await pg.evaluate(() => { const m = window.__pavecad.map(); m.jumpTo({ zoom: 21 }); m.getSource('osm').__marca = 'osm'; m.getSource('esri').__marca = 'esri-antes'; });
-      assert.equal(await pressed(), 'maxima:true,segura:false', 'o padrão é Máxima');
+      assert.equal(await pressed(), 'segura:true,maxima:false', 'o padrão é Segura');
       assert.equal(await pg.evaluate(() => localStorage.getItem('pavecad-nitidez')), null, 'sem escolha salva ainda');
-      log.tiles.length = 0; await pg.evaluate(() => window.__pavecad.map().jumpTo({ zoom: 20.9 })); await pg.evaluate(() => window.__pavecad.map().jumpTo({ zoom: 21 }));
-      let zs = await pedir();
-      let e0 = await estadoMapa();
-      assert.equal(e0.max, 19);
+      let zs = await pedir(() => pg.evaluate(() => { const m = window.__pavecad.map(); m.jumpTo({ zoom: 20.9 }); m.jumpTo({ zoom: 21 }); }));
+      const e0 = await estadoMapa();
+      assert.equal(e0.max, 17, 'padrão: a Esri vai até o tile 17');
       assert.ok(e0.zoom >= 20.99, 'zoom 21: ' + e0.zoom);
+      assert.ok(!zs.length || Math.max(...zs) <= 17, `Segura (padrão): tiles até o 17 (pediu ${[...new Set(zs)].join(', ')})`); // os tiles do g08 cobrem o pedido do zero
 
-      // Segura: a fonte da Esri é recriada com tile até o 17; centro, zoom e rumo ficam onde estavam
-      zs = await pedir(() => escolherNitidez(pg, 'segura'));
+      // Máxima: a fonte da Esri é recriada com tile até o 19; centro, zoom e rumo ficam onde estavam
+      zs = await pedir(() => escolherNitidez(pg, 'maxima'));
       const e1 = await estadoMapa();
-      assert.equal(e1.max, 17, 'a fonte da Esri agora vai até o 17');
+      assert.equal(e1.max, 19, 'a fonte da Esri agora vai até o 19');
       assert.ok(zs.length > 0, 'pediu tiles depois da troca');
-      assert.ok(Math.max(...zs) <= 17 && zs.includes(17), `Segura: tiles até o 17 (pediu ${[...new Set(zs)].join(', ')})`);
-      for (const k of ['lng', 'lat', 'zoom', 'rumo']) assert.ok(Math.abs(e1[k] - e0[k]) < 1e-9, `${k} preservado: ${e0[k]} x ${e1[k]}`);
+      assert.ok(Math.max(...zs) <= 19 && zs.includes(19), `Máxima: tiles até o 19 (pediu ${[...new Set(zs)].join(', ')})`);
+      mesmoLugar(e0, e1, 'Máxima');
       assert.equal(e1.esri, 'visible', 'a camada do satélite continua visível');
       assert.equal(e1.osm, 'osm', 'a fonte das ruas não foi recarregada');
       assert.equal(e1.esriMarca, null, 'a fonte da Esri foi recriada');
-      assert.equal(await pressed(), 'maxima:false,segura:true');
-      assert.equal(await pg.evaluate(() => localStorage.getItem('pavecad-nitidez')), 'segura', 'salvo no localStorage');
+      assert.equal(await pressed(), 'segura:false,maxima:true');
+      assert.equal(await pg.evaluate(() => localStorage.getItem('pavecad-nitidez')), 'maxima', 'salvo no localStorage');
 
-      // Máxima de volta: tile 19
-      zs = await pedir(() => escolherNitidez(pg, 'maxima'));
+      // Segura de volta: tile 17
+      zs = await pedir(() => escolherNitidez(pg, 'segura'));
       const e2 = await estadoMapa();
-      assert.equal(e2.max, 19);
-      assert.ok(Math.max(...zs) <= 19 && zs.includes(19), `Máxima: tiles até o 19 (pediu ${[...new Set(zs)].join(', ')})`);
-      for (const k of ['lng', 'lat', 'zoom', 'rumo']) assert.ok(Math.abs(e2[k] - e0[k]) < 1e-9, `${k} preservado na volta`);
-      assert.equal(await pg.evaluate(() => localStorage.getItem('pavecad-nitidez')), 'maxima');
+      assert.equal(e2.max, 17);
+      assert.ok(Math.max(...zs) <= 17 && zs.includes(17), `Segura: tiles até o 17 (pediu ${[...new Set(zs)].join(', ')})`);
+      mesmoLugar(e0, e2, 'volta à Segura');
+      assert.equal(await pg.evaluate(() => localStorage.getItem('pavecad-nitidez')), 'segura');
 
       // a escolha sobrevive ao recarregar
-      await escolherNitidez(pg, 'segura');
+      await escolherNitidez(pg, 'maxima');
       await pg.reload(); await pg.waitForTimeout(2500);
-      assert.equal(await pressed(), 'maxima:false,segura:true', 'a chave volta em Segura');
+      assert.equal(await pressed(), 'segura:false,maxima:true', 'a chave volta em Máxima');
       await escolherBase(pg, 'esri');
       await pg.evaluate((c) => window.__pavecad.map().jumpTo({ center: [c.lng, c.lat], zoom: 21 }), e0);
       zs = await pedir(() => pg.evaluate((c) => window.__pavecad.map().jumpTo({ center: [c.lng + 0.0001, c.lat], zoom: 21 }), e0));
-      assert.equal((await estadoMapa()).max, 17, 'a Esri nasce com tile até o 17');
-      assert.ok(Math.max(...zs) <= 17 && zs.includes(17), `depois de recarregar: tiles até o 17 (pediu ${[...new Set(zs)].join(', ')})`);
+      assert.equal((await estadoMapa()).max, 19, 'a Esri nasce com tile até o 19');
+      assert.ok(Math.max(...zs) <= 19 && zs.includes(19), `depois de recarregar: tiles até o 19 (pediu ${[...new Set(zs)].join(', ')})`);
     }],
     ['nitidez do satélite: a chave fica ao lado de Liso, Ruas e Satélite, com alvos de 44 px', ['1568x760', 'tablet-h-1024x768', 'tablet-v-820x1180'], async (pg) => {
       await pg.click('#btnMore'); await pg.waitForSelector('#drawer', { state: 'visible' });
@@ -673,7 +674,7 @@ const TESTES = {
           dentro: n.left >= d.left - 0.5 && n.right <= d.right + 0.5 && n.bottom <= d.bottom + 0.5, abaixoBase: n.top >= base.bottom - 0.5, naGaveta: !!document.querySelector('#drawer #nitidez') };
       });
       assert.equal(m.rot, 'Nitidez do satélite');
-      assert.deepEqual(m.botoes.map((b) => b[0]), ['Máxima', 'Segura']);
+      assert.deepEqual(m.botoes.map((b) => b[0]), ['Segura', 'Máxima']);
       assert.ok(m.botoes.every((b) => b[1] >= 44 && b[2] >= 44), 'alvos de 44 px: ' + JSON.stringify(m.botoes));
       assert.ok(m.dentro && m.abaixoBase && m.naGaveta, 'dentro da gaveta, junto da escolha de base');
     }],
@@ -973,8 +974,8 @@ const TESTES = {
     }],
   ],
   g08: [
-    ['zoom até o limite em Ruas e Satélite (tile 19, o padrão) com sobrezoom até o 21', '1366x768', async (pg, { log }) => {
-      for (const [base, nome, tileMax] of [['osm', 'Ruas', 19], ['esri', 'Satélite', 19]]) {
+    ['zoom até o limite em Ruas (tile 19) e Satélite (tile 17, Segura, o padrão) com sobrezoom até o 21', '1366x768', async (pg, { log }) => {
+      for (const [base, nome, tileMax] of [['osm', 'Ruas', 19], ['esri', 'Satélite', 17]]) {
         await pg.evaluate(() => window.__pavecad.map().jumpTo({ zoom: 15 }));
         log.tiles.length = 0;
         await escolherBase(pg, base);

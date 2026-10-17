@@ -11,9 +11,9 @@ export type Nitidez = 'maxima' | 'segura';
 export const esriMaxZoom = (n: Nitidez) => (n === 'segura' ? ESRI_MAX_ZOOM_SEGURO : ESRI_MAX_ZOOM);
 export const CHAVE_NITIDEZ = 'pavecad-nitidez';
 
-/** Escolha salva da nitidez do satélite; "maxima" quando não há escolha. */
+/** Escolha salva da nitidez do satélite; "segura" quando não há escolha. */
 export function nitidezSalva(): Nitidez {
-  try { return localStorage.getItem(CHAVE_NITIDEZ) === 'segura' ? 'segura' : 'maxima'; } catch { return 'maxima'; }
+  try { return localStorage.getItem(CHAVE_NITIDEZ) === 'maxima' ? 'maxima' : 'segura'; } catch { return 'segura'; }
 }
 
 export const esriSource = (n: Nitidez): RasterSourceSpecification =>
@@ -37,7 +37,7 @@ export const MAPTILER_MAX = { ruas: 21, satelite: 20 };
 
 /** Fontes raster das bases. Sem chave do MapTiler, só OSM (ruas) e Esri (satélite).
  *  A chave vem do ambiente (VITE_MAPTILER_KEY) e nunca do repositório. */
-export function baseSources(key: string, nitidez: Nitidez = 'maxima'): Record<string, RasterSourceSpecification> {
+export function baseSources(key: string, nitidez: Nitidez = 'segura'): Record<string, RasterSourceSpecification> {
   const src: Record<string, RasterSourceSpecification> = {
     osm: { type: 'raster', tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'], tileSize: 256, maxzoom: TILE_MAX_ZOOM, attribution: '© OpenStreetMap' },
     esri: esriSource(nitidez),

@@ -41,7 +41,7 @@ A base usa o MapTiler quando `VITE_MAPTILER_KEY` está definida no ambiente de b
 ### Nitidez do satélite (sem chave)
 
 Na gaveta do mapa (botão ⋯), ao lado de Liso, Ruas e Satélite, a chave **Nitidez do satélite** controla até que nível a Esri é consultada; a escolha fica salva no aparelho e a troca recarrega só a imagem de satélite, sem mexer em zoom nem posição.
-**Máxima** (padrão) pede tiles até o zoom 19, a imagem mais nítida em zoom alto; **Segura** pede até o 17 e amplia o resultado, para as regiões do interior em que a Esri não tem imagem nos zooms 18 e 19 e devolve a mensagem "Map data not yet available". Com `VITE_MAPTILER_KEY` a chave não aparece e o satélite do MapTiler segue como era (tiles até o 20).
+**Segura** (padrão) pede tiles até o zoom 17 e amplia o resultado; use quando a Esri não tem imagem nos zooms 18 e 19 da região e aparece "Map data not yet available". **Máxima** pede até o 19, com imagem mais nítida em zoom alto; use onde a Esri tem cobertura detalhada. Com `VITE_MAPTILER_KEY` a chave não aparece e o satélite do MapTiler segue como era (tiles até o 20).
 
 ## Deploy na Vercel
 

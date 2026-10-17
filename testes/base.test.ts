@@ -2,17 +2,17 @@ import { describe, expect, it } from 'vitest';
 import { baseSources, ESRI_MAX_ZOOM, ESRI_MAX_ZOOM_SEGURO, esriMaxZoom, MAP_MAX_ZOOM, MAPTILER_MAX, TILE_MAX_ZOOM } from '../src/mapa/base';
 
 describe('zoom das bases do mapa', () => {
-  it('OSM e Esri pedem tiles até o 19 por padrão; o mapa permite 21 (sobrezoom)', () => {
+  it('OSM pede tiles até o 19 e a Esri até o 17 por padrão (Segura); o mapa permite 21 (sobrezoom)', () => {
     const s = baseSources('');
     expect(Object.keys(s).sort()).toEqual(['esri', 'osm']);
     expect(s.osm).toMatchObject({ maxzoom: 19 });
-    expect(s.esri).toMatchObject({ maxzoom: 19 });
+    expect(s.esri).toMatchObject({ maxzoom: 17 });
     expect(TILE_MAX_ZOOM).toBe(19);
     expect(ESRI_MAX_ZOOM).toBe(19);
     expect(MAP_MAX_ZOOM).toBe(21);
   });
 
-  it('nitidez do satélite: Máxima pede até o 19 e Segura até o 17, só na Esri', () => {
+  it('nitidez do satélite: Segura (padrão) pede até o 17 e Máxima até o 19, só na Esri', () => {
     expect(ESRI_MAX_ZOOM_SEGURO).toBe(17);
     expect(esriMaxZoom('maxima')).toBe(19);
     expect(esriMaxZoom('segura')).toBe(17);
@@ -27,8 +27,8 @@ describe('zoom das bases do mapa', () => {
     expect(s['mt-sat']).toMatchObject({ maxzoom: 20 });
     expect(MAPTILER_MAX).toEqual({ ruas: 21, satelite: 20 });
     expect(s.osm).toMatchObject({ maxzoom: 19 });
-    expect(s.esri).toMatchObject({ maxzoom: 19 });
-    expect(baseSources('abc123', 'segura')['mt-sat']).toMatchObject({ maxzoom: 20 }); // a chave de nitidez não mexe no MapTiler
+    expect(s.esri).toMatchObject({ maxzoom: 17 });
+    expect(baseSources('abc123', 'maxima')['mt-sat']).toMatchObject({ maxzoom: 20 }); // a chave de nitidez não mexe no MapTiler
     expect(JSON.stringify(s['mt-ruas'].tiles)).toContain('key=abc123');
   });
 
