@@ -73,7 +73,7 @@ const TESTES = {
       assert.ok(m.painelGap >= 8, 'não cobre o painel direito: ' + m.painelGap);
       assert.equal(m.zoomX, m.maisX, 'o ⋯ alinha com o zoom');
       assert.ok(m.borda <= 20, 'barra lateral encostada na borda esquerda: ' + m.borda);
-      assert.equal(m.topo.filter((x) => !['sol', 'iri', 'atr', 'd0', 'rc', 'def', 'btnAjuda', 'btnCfg', 'btnFile', 'btnGps', 'btnField', 'prop', 'pin', 'ocultar-ferramentas'].includes(x)).length, 0, 'topo com botão extra: ' + m.topo);
+      assert.equal(m.topo.filter((x) => !['sol', 'iri', 'atr', 'd0', 'rc', 'def', 'btnAjuda', 'btnCfg', 'btnFile', 'btnGps', 'btnField', 'btnAlinhar', 'prop', 'pin', 'ocultar-ferramentas'].includes(x)).length, 0, 'topo com botão extra: ' + m.topo);
       assert.equal(m.baseNoTopo, false, 'a escolha de base saiu do topo');
     }],
     ['gaveta ⋯ abre alinhar, girar, norte e base; estado salvo; Satélite troca a base', TODOS, async (pg) => {
@@ -111,7 +111,7 @@ const TESTES = {
       for (const [w, h] of [[1568, 760], [1366, 768], [1024, 768], [820, 1180]]) {
         await pg.setViewportSize({ width: w, height: h }); await pg.waitForTimeout(600);
         const r = await pg.evaluate(() => {
-          const sel = ['.leftcol > .title', '.leftcol > .search', '.topbar > .modes', '.topright > .trrow', '#zoomhost .maplibregl-ctrl-group', '#toolbar', '#drawer', '#btnMore', '#legend', '#propbar:not([hidden])', '#inspector', '#unicard'];
+          const sel = ['.titlecard > .title', '.titlecard > .search', '.topbar > .modes', '.topright > .trrow', '#zoomhost .maplibregl-ctrl-group', '#toolbar', '#drawer', '#btnMore', '#legend', '#propbar:not([hidden])', '#inspector', '#unicard'];
           const caixas = sel.map((s) => [s, document.querySelector(s)]).filter(([, e]) => e && e.checkVisibility()).map(([s, e]) => [s, e.getBoundingClientRect()]);
           const ruins = [];
           for (let i = 0; i < caixas.length; i++) for (let j = i + 1; j < caixas.length; j++) {
@@ -123,7 +123,7 @@ const TESTES = {
           return { ruins, fora, n: caixas.length };
         });
         assert.ok(r.n >= 9, `${w}: poucos controles medidos (${r.n})`);
-        assert.deepEqual(r.ruins, [], `${w}: controles sobrepostos`);
+        assert.deepEqual(r.ruins, [], `${w}: controles sobrepostos ${JSON.stringify(r.ruins)}`);
         assert.deepEqual(r.fora, [], `${w}: controles fora da tela`);
       }
     }],
@@ -196,7 +196,7 @@ const TESTES = {
       for (const [w, h] of [[1568, 760], [1366, 768], [1024, 768], [820, 1180]]) {
         await pg.setViewportSize({ width: w, height: h }); await pg.waitForTimeout(600);
         const r = await pg.evaluate(() => {
-          const sel = ['.leftcol > .title', '.leftcol > .search', '.topbar > .modes', '.topright > .trrow', '#zoomhost .maplibregl-ctrl-group', '#toolbar', '#btnMore', '#legend', '#inspector', '#unicard'];
+          const sel = ['.titlecard > .title', '.titlecard > .search', '.topbar > .modes', '.topright > .trrow', '#zoomhost .maplibregl-ctrl-group', '#toolbar', '#btnMore', '#legend', '#inspector', '#unicard'];
           const cx = sel.map((s) => [s, document.querySelector(s)]).filter(([, e]) => e && e.checkVisibility()).map(([s, e]) => [s, e.getBoundingClientRect()]);
           const ruins = [];
           for (let i = 0; i < cx.length; i++) for (let j = i + 1; j < cx.length; j++) { const a = cx[i][1], b = cx[j][1]; if (Math.min(a.right, b.right) - Math.max(a.left, b.left) > 1 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 1) ruins.push(cx[i][0] + ' x ' + cx[j][0]); }
@@ -251,7 +251,7 @@ const TESTES = {
       await toque('touchStart', r.y); for (let i = 1; i <= 6; i++) await toque('touchMove', r.y + i * 12); await toque('touchEnd', r.y + 72); await pg.waitForTimeout(400);
       assert.equal(await estado(pg, 'E => E.uniCollapsed'), true, 'o toque arrastado recolhe');
       const ruins = await pg.evaluate(() => {
-        const sel = ['.leftcol > .title', '.leftcol > .search', '.topbar > .modes', '.topright > .trrow', '#zoomhost .maplibregl-ctrl-group', '#toolbar', '#btnMore', '#legend', '#inspector', '#unicard'];
+        const sel = ['.titlecard > .title', '.titlecard > .search', '.topbar > .modes', '.topright > .trrow', '#zoomhost .maplibregl-ctrl-group', '#toolbar', '#btnMore', '#legend', '#inspector', '#unicard'];
         const cx = sel.map((s) => [s, document.querySelector(s)]).filter(([, e]) => e && e.checkVisibility()).map(([s, e]) => [s, e.getBoundingClientRect()]);
         const out = [];
         for (let i = 0; i < cx.length; i++) for (let j = i + 1; j < cx.length; j++) { const a = cx[i][1], b = cx[j][1]; if (Math.min(a.right, b.right) - Math.max(a.left, b.left) > 1 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 1) out.push(cx[i][0] + ' x ' + cx[j][0]); }
@@ -328,9 +328,9 @@ const TESTES = {
     ['sem chips na coluna esquerda; Visão geral é um botão de 44 px dentro do cartão do título', TODOS, async (pg) => {
       assert.equal(await pg.locator('#views, #viewsIn').count(), 0, 'a linha de chips saiu da coluna esquerda');
       const m = await pg.evaluate(() => {
-        const t = document.querySelector('#titlebox').getBoundingClientRect(), b = document.querySelector('#btnOverview').getBoundingClientRect(), s = document.querySelector('.leftcol .search').getBoundingClientRect();
+        const t = document.querySelector('#titlebox').getBoundingClientRect(), card = document.querySelector('#titlecard').getBoundingClientRect(), b = document.querySelector('#btnOverview').getBoundingClientRect(), s = document.querySelector('.leftcol .search').getBoundingClientRect();
         const txt = document.querySelector('#title'), g = document.querySelector('#titlebox [data-ocultar]').getBoundingClientRect();
-        return { dentro: b.left >= t.left && b.right <= t.right && b.top >= t.top - 0.5 && b.bottom <= t.bottom + 0.5, w: b.width, h: b.height, rot: document.querySelector('#btnOverview').getAttribute('aria-label'),
+        return { dentro: b.left >= card.left && b.right <= card.right && b.top >= card.top - 0.5 && b.bottom <= card.bottom + 0.5, w: b.width, h: b.height, rot: document.querySelector('#btnOverview').getAttribute('aria-label'),
           cortado: txt.scrollWidth > txt.clientWidth + 1, buscaAbaixo: s.top >= t.bottom - 0.5, folga: s.top - t.bottom, buscaH: s.height, semEncontro: b.right <= g.left + 0.5 };
       });
       assert.ok(m.dentro, 'o botão fica dentro do cartão do título');
@@ -743,9 +743,9 @@ const TESTES = {
       const mover = (a, b) => { const dE = (b.c[0] - a.c[0]) * a.mLon, dN = (b.c[1] - a.c[1]) * 111132; return { l: dE * a.tE + dN * a.tN, t: dE * a.tN + dN * -a.tE, d: Math.hypot(dE, dN) }; };
       const perto = (v, esp, msg) => assert.ok(Math.abs(v - esp) < 0.08, `${msg}: ${v.toFixed(3)} x ${esp}`);
       const ajustou = async (l, t) => { await pg.waitForFunction(([pid, l, t]) => { const p = window.__pavecad.E.P.find((q) => q.id === pid); return p.desloc.l === l && p.desloc.t === t; }, [(await medir()).pid, l, t], { timeout: 15000 }); await pg.waitForTimeout(400); };
-      await aba(pg, 'aj');
       const pid = (await medir()).pid;
-      await pg.click('[data-atalho=nenhuma]'); await pg.check(`#a-lista input[data-id="${pid}"]`); await pg.waitForSelector('#d-l');
+      await pg.click('#btnAlinhar'); await pg.waitForSelector('#al-lista');
+      await pg.click('#t-al [data-atalho=nenhuma]'); await pg.check(`#al-lista input[data-id="${pid}"]`); await pg.waitForSelector('#d-l');
       const m0 = await medir();
       assert.deepEqual(m0.desloc, { l: 0, t: 0 });
       // transversal +5 m (direita do sentido de percurso)
@@ -772,13 +772,15 @@ const TESTES = {
       assert.ok(Math.abs(lin.d - 7) < 0.15, 'a linha efetiva (CSV e GPS) andou 7 m: ' + lin.d);
       assert.equal(lin.planilhaIntacta, true, 'a linha original da planilha não foi alterada');
       // persistência
+      await pg.click('#d-aplicar'); await pg.waitForFunction(() => !!document.querySelector('.toast-acao'));
       await pg.waitForTimeout(600);
       const antes = await medir();
       await pg.reload(); await pg.waitForFunction(() => window.__pavecad && window.__pavecad.E.P.length >= 1, null, { timeout: 60000 }); await pg.waitForTimeout(3000);
       const depois = await pg.evaluate(() => { const p = window.__pavecad.E.P.find((q) => q.meta.travel === 1); return { n: window.__pavecad.E.P.length, desloc: { ...p.desloc }, lat: p.rows[10].lat }; });
       assert.deepEqual(depois.desloc, { l: 7, t: -4 }, 'o deslocamento volta após recarregar');
       assert.ok(Math.abs(depois.lat - (await pg.evaluate(() => window.__pavecad.E.P.find((q) => q.meta.travel === 1).rowsPlanilha[10].lat))) > 1e-6, 'e a geometria está deslocada');
-      await aba(pg, 'aj');
+      await pg.click('#btnAlinhar'); await pg.waitForSelector('#al-lista');
+      await pg.click('#t-al [data-atalho=crescentes]');
       assert.equal(await pg.inputValue('#d-l'), '7'); assert.equal(await pg.inputValue('#d-t'), '-4');
       // Zerar
       await pg.click('#d-zero');
@@ -789,58 +791,92 @@ const TESTES = {
       assert.equal(await pg.inputValue('#d-l'), '0');
       void antes;
     }],
-    ['ajustes: marcar planilhas por checkbox aplica o deslocamento só nelas ("Só decrescentes"), cada uma soma ao seu valor, e desfaz', '1366x768', async (pg) => {
-      await aba(pg, 'aj');
-      await pg.waitForSelector('#a-lista');
+    ['Alinhar: marcar planilhas por checkbox, Aplicar às selecionadas grava só nelas ("Só decrescentes"), sair sem aplicar descarta e Desfazer restaura', '1366x768', async (pg) => {
+      await pg.click('#btnAlinhar');
+      await pg.waitForSelector('#al-lista');
       const ver = () => pg.evaluate(() => window.__pavecad.E.P.map((p) => ({ id: p.id, travel: p.meta.travel, d: { ...p.desloc } })));
+      const salvos = () => pg.evaluate(() => JSON.stringify(window.__pavecad.E.deslocSalvos));
       const todas = await ver();
-      assert.equal(await pg.locator('#a-lista input[data-id]').count(), todas.length, 'todas as planilhas aparecem na lista');
-      assert.equal(await pg.locator('#a-lista [data-id]').first().evaluate((e) => e.tagName), 'INPUT');
+      assert.equal(await pg.locator('#al-lista input[data-id]').count(), todas.length, 'todas as planilhas aparecem na lista');
       assert.equal(await pg.locator('select#a-proj').count(), 0, 'a lista suspensa deixou de existir');
-      // atalhos
-      await pg.click('[data-atalho=decrescentes]');
-      const marc = () => pg.evaluate(() => [...document.querySelectorAll('#a-lista input[data-id]')].filter((c) => c.checked).map((c) => c.dataset.id).sort());
-      assert.deepEqual(await marc(), todas.filter((p) => p.travel === -1).map((p) => p.id).sort(), 'Só decrescentes marca apenas as decrescentes');
-      assert.match(await pg.innerText('#a-cont'), new RegExp(`^${todas.filter((p) => p.travel === -1).length} de ${todas.length}`, 'i'));
-      // +5 longitudinal e −1 transversal valem para as marcadas e só para elas
+      const dec = todas.filter((p) => p.travel === -1);
+      await pg.click('#t-al [data-atalho=decrescentes]');
+      const marc = () => pg.evaluate(() => [...document.querySelectorAll('#al-lista input[data-id]')].filter((c) => c.checked).map((c) => c.dataset.id).sort());
+      assert.deepEqual(await marc(), dec.map((p) => p.id).sort(), 'Só decrescentes marca apenas as decrescentes');
+      assert.match(await pg.innerText('#al-cont'), new RegExp(`^${dec.length} de ${todas.length}`, 'i'));
+      assert.equal(await pg.isDisabled('#d-aplicar'), true, 'sem alteração, Aplicar fica desabilitado');
+      // +5 longitudinal e −1 transversal aparecem no mapa na hora, mas ainda não estão gravados
       await pg.click('[data-d=l][data-s="5"]');
       await pg.waitForFunction(() => window.__pavecad.E.P.filter((p) => p.meta.travel === -1).every((p) => p.desloc.l === 5), null, { timeout: 30000 });
       await pg.click('[data-d=t][data-s="-1"]');
       await pg.waitForFunction(() => window.__pavecad.E.P.filter((p) => p.meta.travel === -1).every((p) => p.desloc.t === -1), null, { timeout: 30000 });
       for (const p of await ver()) assert.deepEqual(p.d, p.travel === -1 ? { l: 5, t: -1 } : { l: 0, t: 0 }, `${p.id} (${p.travel})`);
-      // individual: uma só marcada, o passo soma ao valor dela e as outras ficam como estão
-      const uma = todas.find((p) => p.travel === -1).id;
-      await pg.click('[data-atalho=nenhuma]'); await pg.check(`#a-lista input[data-id="${uma}"]`);
+      assert.equal(await salvos(), '{}', 'a prévia não grava');
+      assert.equal(await pg.isDisabled('#d-aplicar'), false);
+      // sair sem aplicar volta ao valor gravado
+      await aba(pg, 'resumo');
+      await pg.waitForFunction(() => window.__pavecad.E.P.every((p) => p.desloc.l === 0 && p.desloc.t === 0), null, { timeout: 30000 });
+      // de novo, agora aplicando
+      await pg.click('#btnAlinhar'); await pg.waitForSelector('#al-lista');
+      await pg.click('#t-al [data-atalho=decrescentes]');
+      await pg.click('[data-d=l][data-s="5"]');
+      await pg.waitForFunction(() => window.__pavecad.E.P.filter((p) => p.meta.travel === -1).every((p) => p.desloc.l === 5), null, { timeout: 30000 });
+      await pg.click('#d-aplicar');
+      await pg.waitForSelector('.toast-acao');
+      assert.match(await pg.innerText('.toast-acao'), new RegExp(`Deslocamento aplicado a ${dec.length} planilha`));
+      const gravados = await pg.evaluate(() => window.__pavecad.E.deslocSalvos);
+      assert.equal(Object.keys(gravados).length, dec.length, 'só as marcadas foram gravadas');
+      for (const p of await ver()) assert.deepEqual(p.d, p.travel === -1 ? { l: 5, t: 0 } : { l: 0, t: 0 }, `${p.id} depois de aplicar`);
+      // individual: uma só marcada
+      const uma = dec[0].id;
+      await pg.click('#t-al [data-atalho=nenhuma]'); await pg.check(`#al-lista input[data-id="${uma}"]`);
       await pg.click('[data-d=l][data-s="1"]');
       await pg.waitForFunction((id) => window.__pavecad.E.P.find((p) => p.id === id).desloc.l === 6, uma, { timeout: 30000 });
-      for (const p of await ver()) assert.deepEqual(p.d, p.id === uma ? { l: 6, t: -1 } : p.travel === -1 ? { l: 5, t: -1 } : { l: 0, t: 0 }, `${p.id} depois do ajuste individual: ${JSON.stringify(p.d)}`);
+      for (const p of await ver()) assert.deepEqual(p.d, p.id === uma ? { l: 6, t: 0 } : p.travel === -1 ? { l: 5, t: 0 } : { l: 0, t: 0 }, `${p.id} depois do ajuste individual`);
       // valores diferentes entre as marcadas aparecem como "vários"
-      await pg.click('[data-atalho=decrescentes]');
-      if (todas.filter((p) => p.travel === -1).length > 1) assert.equal(await pg.inputValue('#d-l'), '', 'valores diferentes: campo vazio');
-      assert.equal(await pg.getAttribute('#d-l', 'placeholder'), todas.filter((p) => p.travel === -1).length > 1 ? 'vários' : null);
-      // nenhuma marcada: nada para ajustar
-      await pg.click('[data-atalho=nenhuma]');
-      assert.equal(await pg.locator('#desloc').count(), 0, 'sem planilha marcada, não há o que ajustar');
-      // desfazer (aviso com botão) de uma aplicação em várias planilhas
-      await pg.click('[data-atalho=decrescentes]');
+      await pg.click('#d-aplicar');
+      await pg.click('#t-al [data-atalho=decrescentes]');
+      if (dec.length > 1) { assert.equal(await pg.inputValue('#d-l'), ''); assert.equal(await pg.getAttribute('#d-l', 'placeholder'), 'vários'); }
+      // nenhuma marcada: nada para alinhar
+      await pg.click('#t-al [data-atalho=nenhuma]');
+      assert.equal(await pg.locator('#desloc').count(), 0, 'sem planilha marcada, não há o que alinhar');
+      // desfazer: restaura o valor gravado antes da aplicação
+      await pg.click('#t-al [data-atalho=decrescentes]');
       await pg.click('#d-zero');
-      await pg.waitForFunction(() => window.__pavecad.E.P.filter((p) => p.meta.travel === -1).every((p) => p.desloc.l === 0 && p.desloc.t === 0), null, { timeout: 30000 });
+      await pg.waitForFunction(() => window.__pavecad.E.P.filter((p) => p.meta.travel === -1).every((p) => p.desloc.l === 0), null, { timeout: 30000 });
+      await pg.click('#d-aplicar');
+      await pg.waitForSelector('.toast-acao');
       await pg.click('.toast-acao button');
       await pg.waitForFunction((id) => window.__pavecad.E.P.find((p) => p.id === id).desloc.l === 6, uma, { timeout: 30000 });
     }, { exemplos: true }],
-    ['deslocamento: o controle fica na aba Ajustes, com ±1 e ±5 m, campo, Zerar e a lista de planilhas com checkbox; alvos de 44 px (falha se sumir)', TODOS, async (pg) => {
+    ['Alinhar: botão na barra de ferramentas e na gaveta, fora de Ajustes; lista fixa no topo, ±1 e ±5 m, campo, Zerar e Aplicar; alvos de 44 px (falha se sumir)', TODOS, async (pg) => {
+      assert.ok(await pg.isVisible('#btnAlinhar'), 'botão na barra de ferramentas');
+      await pg.click('#btnMore'); await pg.waitForSelector('#drawer', { state: 'visible' });
+      assert.ok(await pg.isVisible('#btnAlinharG'), 'botão na gaveta');
+      await pg.click('#btnMore');
       await aba(pg, 'aj');
+      assert.equal(await pg.locator('#t-aj #desloc').count(), 0, 'o deslocamento saiu da aba Ajustes');
+      await pg.click('#btnAlinhar');
       await pg.waitForSelector('#desloc', { state: 'visible' });
       const m = await pg.evaluate(() => {
         const alvo = (s) => { const r = document.querySelector(s)?.getBoundingClientRect(); return r ? [Math.round(r.width), Math.round(r.height)] : null; };
+        const topo = document.querySelector('#t-al .al-topo').getBoundingClientRect(), corpo = document.querySelector('#t-al');
+        corpo.scrollTop = 60;
+        const topo2 = document.querySelector('#t-al .al-topo').getBoundingClientRect();
         return {
           passos: ['l', 't'].map((e) => [-5, -1, 1, 5].map((v) => alvo(`[data-d=${e}][data-s="${v}"]`))),
-          campos: [alvo('#d-l'), alvo('#d-t')], zero: alvo('#d-zero'), outras: alvo('#a-lista .sel-item'),
+          campos: [alvo('#d-l'), alvo('#d-t')], zero: alvo('#d-zero'), aplicar: alvo('#d-aplicar'), item: alvo('#al-lista .sel-item'),
+          atalhos: [...document.querySelectorAll('#t-al [data-atalho]')].map((b) => b.dataset.atalho),
+          fixa: Math.abs(topo2.top - topo.top) < 1,
           dentro: document.querySelector('#desloc').getBoundingClientRect().right <= window.innerWidth + 0.5,
         };
       });
+      assert.deepEqual(m.atalhos, ['todas', 'nenhuma', 'crescentes', 'decrescentes', 'rodovia'], 'atalhos na mesma ordem do seletor das Larguras');
       for (const g of m.passos) for (const a of g) assert.ok(a && a[0] >= 44 && a[1] >= 44, 'botão de passo ≥ 44 px: ' + JSON.stringify(m.passos));
-      for (const a of [...m.campos, m.zero, m.outras]) assert.ok(a && a[1] >= 44, 'alvo ≥ 44 px: ' + JSON.stringify(m));
+      for (const a of [...m.campos, m.zero, m.aplicar]) assert.ok(a && a[1] >= 44, 'alvo ≥ 44 px: ' + JSON.stringify(m));
+      const toque = await pg.evaluate(() => matchMedia('(pointer: coarse)').matches);
+      assert.ok(m.item && m.item[1] >= (toque ? 44 : 36), 'linha da lista: ' + JSON.stringify(m.item));
+      assert.ok(m.fixa, 'o cabeçalho (nome, contagem e Fechar) fica fixo no topo ao rolar');
       assert.ok(m.dentro, 'cabe na largura da tela');
     }],
   ],
@@ -868,7 +904,7 @@ const TESTES = {
       assert.ok(itens.some((t) => /andou [\d.,]+ m em relação à planilha/.test(t) && /km \d+\+\d+/.test(t)), 'cada ponto traz km, tipo e deslocamento: ' + itens.slice(0, 3).join(' | '));
       // o log da aba Ajustes traz o mesmo resumo
       await aba(pg, 'aj');
-      await pg.click('[data-atalho=nenhuma]'); await pg.check(`#a-lista input[data-id="${alvo.id}"]`);
+      await pg.click('#t-aj [data-atalho=nenhuma]'); await pg.check(`#a-lista input[data-id="${alvo.id}"]`);
       assert.match(await pg.innerText('#t-aj'), /coordenadas corrigidas: \d+/);
       assert.equal(log.erros.filter((e) => !/Failed to load resource/i.test(e)).length, 0, log.erros.join(' | '));
     }, { arquivos: ['planservi_amostra_1.xlsx', 'planservi_amostra_2.xlsx'], projetos: 4 }],
@@ -908,6 +944,126 @@ const TESTES = {
       assert.equal(await pg.evaluate(() => window.__pavecad.E.P[0].kmLab[5]), await pg.evaluate(() => { const k = window.__pavecad.E.P[0].kmNum[5]; return `${Math.floor(k)}+${String(Math.round((k % 1) * 1000)).padStart(3, '0')}`; }));
     }, { arquivos: ['planservi_amostra_1.xlsx', 'planservi_amostra_2.xlsx'], projetos: 4 }],
   ],
+  t14: [
+    ['lixeira: remover mostra aviso com Desfazer; desfazer devolve a planilha na mesma posição, com ajustes de largura e propostas', '1366x768', async (pg) => {
+      await criarProposta(pg, 'FSE', 'trecho de teste');
+      const info = await pg.evaluate(() => { const E = window.__pavecad.E; const r = E.props[0]; return { pname: r.pname, n: E.P.length, nomes: E.P.map((p) => p.meta.name), idx: E.P.findIndex((p) => p.meta.name === r.pname), pid: E.P.find((p) => p.meta.name === r.pname).id }; });
+      // ajuste de largura na planilha da proposta, pela tela de Configurações
+      await pg.click('#btnCfg'); await pg.click('#cfgTabs [data-ct=larg]'); await pg.waitForSelector('#lgProj');
+      await pg.selectOption('#lgProj', info.pid);
+      await pg.fill('#lgW', '3.2'); await pg.click('#lgAdd');
+      await pg.waitForFunction((pid) => window.__pavecad.E.P.find((p) => p.id === pid).ajustes.length === 1, info.pid, { timeout: 20000 });
+      await pg.click('#cfgClose');
+      await aba(pg, 'resumo');
+      // remove
+      await pg.click(`[data-del="${info.pid}"]`);
+      await pg.waitForFunction((n) => window.__pavecad.E.P.length === n - 1, info.n);
+      assert.match(await pg.innerText('.toast-acao'), /removida/);
+      assert.equal(await pg.evaluate(() => window.__pavecad.E.props[0].pid), null, 'sem a planilha carregada, a proposta fica guardada sem vínculo');
+      // desfaz
+      await pg.click('.toast-acao button');
+      await pg.waitForFunction((n) => window.__pavecad.E.P.length === n, info.n, { timeout: 30000 });
+      await pg.waitForTimeout(800);
+      const depois = await pg.evaluate((nome) => { const E = window.__pavecad.E; const p = E.P.find((q) => q.meta.name === nome); return { idx: E.P.indexOf(p), nomes: E.P.map((q) => q.meta.name), aj: p.ajustes.map((a) => [a.lane, a.largura]), orfa: E.props[0].orfa === true, pidProp: E.props[0].pid === p.id, visivel: p.visible }; }, info.pname);
+      assert.equal(depois.idx, info.idx, 'mesma posição na lista');
+      assert.deepEqual(depois.nomes, info.nomes);
+      assert.deepEqual(depois.aj, [[1, 3.2]], 'ajuste de largura de volta');
+      assert.equal(depois.orfa, false, 'a proposta volta a apontar para a planilha');
+      assert.equal(depois.pidProp, true);
+      assert.equal(depois.visivel, true);
+      // a planilha restaurada também foi regravada no aparelho: sobrevive ao recarregar
+      await pg.reload(); await pg.waitForFunction((n) => window.__pavecad && window.__pavecad.E.P.length === n, info.n, { timeout: 60000 });
+    }],
+  ],
+  t15: [
+    ['toque: todos os alvos interativos dos painéis, da barra, da gaveta, da legenda e do unifilar têm 44 px (pointer: coarse)', ['tablet-h-1024x768', 'tablet-v-820x1180'], async (pg) => {
+      const medir = (rotulo) => pg.evaluate((rot) => {
+        const sels = 'button, [role=switch], select, summary, label.sel-item, input:not([type=checkbox]):not([type=hidden]):not([type=file])';
+        const raizes = ['#inspector', '#toolbar', '#tools', '#drawer', '#unicard', '#legend', '#modes', '.search', '#titlebox', '.topright'];
+        const ruins = [];
+        for (const r of raizes) for (const el of document.querySelectorAll(sels.split(', ').map((q) => `${r} ${q}`).join(', '))) {
+          if (!el.checkVisibility()) continue;
+          const b = el.getBoundingClientRect();
+          if (b.width === 0 || b.height === 0) continue;
+          if (b.width < 43.5 || b.height < 43.5) ruins.push(`${rot} ${r} ${el.tagName.toLowerCase()}${el.id ? '#' + el.id : ''}${el.className && typeof el.className === 'string' ? '.' + el.className.split(' ')[0] : ''} ${Math.round(b.width)}x${Math.round(b.height)} "${(el.getAttribute('aria-label') || el.textContent || '').trim().slice(0, 24)}"`);
+        }
+        return ruins;
+      }, rotulo);
+      assert.equal(await pg.evaluate(() => matchMedia('(pointer: coarse)').matches), true);
+      let ruins = [];
+      await pg.click('#btnMore'); await pg.waitForSelector('#drawer', { state: 'visible' });
+      ruins.push(...await medir('gaveta'));
+      await pg.click('#btnMore');
+      for (const t of ['resumo', 'ana', 'notas', 'aj']) { await aba(pg, t); ruins.push(...await medir(t)); }
+      await pg.click('#btnAlinhar'); await pg.waitForSelector('#desloc', { state: 'visible' }); ruins.push(...await medir('alinhar'));
+      await aba(pg, 'resumo');
+      await pg.evaluate(() => { const E = window.__pavecad.E; window.__pavecad.select(E.P[0].id, 20, 1, { tab: true }); });
+      await pg.waitForTimeout(500); ruins.push(...await medir('segmento'));
+      const unicos = [...new Set(ruins)];
+      assert.deepEqual(unicos, [], 'alvos abaixo de 44 px:\n  ' + unicos.join('\n  '));
+    }],
+    ['tipografia: nenhum texto visível abaixo de 12 px (13 px nos metadados do modo campo)', ['1366x768', 'tablet-v-820x1180'], async (pg) => {
+      const pequenos = (min, rot) => pg.evaluate(([min, rot]) => {
+        const out = [];
+        const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+        let n;
+        while ((n = w.nextNode())) {
+          const t = n.textContent.trim(); if (!t) continue;
+          const el = n.parentElement; if (!el || !el.checkVisibility() || el.closest('.maplibregl-map, script, style, canvas')) continue;
+          const px = parseFloat(getComputedStyle(el).fontSize);
+          if (px < min - 0.01) out.push(`${rot} ${px}px <${el.tagName.toLowerCase()}${el.className && typeof el.className === 'string' ? ' .' + el.className.split(' ')[0] : ''}> "${t.slice(0, 28)}"`);
+        }
+        return out;
+      }, [min, rot]);
+      await pg.evaluate(() => { const E = window.__pavecad.E; window.__pavecad.select(E.P[0].id, 20, 1, { tab: true }); });
+      let ruins = [];
+      for (const t of ['resumo', 'seg', 'ana', 'notas', 'aj']) { await aba(pg, t); ruins.push(...await pequenos(12, 'claro ' + t)); }
+      await pg.click('#btnAlinhar'); ruins.push(...await pequenos(12, 'claro alinhar'));
+      await pg.evaluate(() => window.__pavecad.setField(true, true)); await pg.waitForTimeout(400);
+      for (const t of ['resumo', 'seg', 'aj']) { await aba(pg, t); ruins.push(...await pequenos(13, 'campo ' + t)); }
+      const unicos = [...new Set(ruins)];
+      assert.deepEqual(unicos, [], 'texto abaixo do mínimo:\n  ' + unicos.join('\n  '));
+    }],
+  ],
+  t16: [
+    ['1366x768: painel direito começa recolhido, a rodovia fica livre de elementos flutuantes e o título e a busca são um cartão só', '1366x768', async (pg) => {
+      const r = await pg.evaluate(() => {
+        const R = (e) => { const b = e.getBoundingClientRect(); return { x: b.left, y: b.top, r: b.right, b: b.bottom, w: b.width, h: b.height }; };
+        const flut = ['#titlecard', '#modes', '.topright', '#tools', '#legend', '#inspector', '#unicard'].map((s) => [s, document.querySelector(s)]).filter(([, e]) => e && e.checkVisibility()).map(([s, e]) => [s, R(e)]);
+        const m = window.__pavecad.map(), E = window.__pavecad.E;
+        const pts = [];
+        for (const p of E.P) for (let i = 0; i < p.rows.length; i += 10) { const q = m.project([p.rows[i].lon, p.rows[i].lat]); pts.push([q.x, q.y, p.meta.name]); }
+        const sob = [];
+        for (const [x, y] of pts) for (const [s, b] of flut) if (x >= b.x - 2 && x <= b.r + 2 && y >= b.y - 2 && y <= b.b + 2) sob.push(`${s} em (${Math.round(x)}, ${Math.round(y)})`);
+        const cruz = [];
+        for (let i = 0; i < flut.length; i++) for (let j = i + 1; j < flut.length; j++) {
+          const a = flut[i][1], b = flut[j][1];
+          if (a.x < b.r && b.x < a.r && a.y < b.b && b.y < a.b) cruz.push(`${flut[i][0]} x ${flut[j][0]}`);
+        }
+        const tc = document.querySelector('#titlecard');
+        return { colapsado: document.querySelector('#inspector').classList.contains('collapsed'), painelH: R(document.querySelector('#inspector')).h, sob: [...new Set(sob)], cruz, tituloNoCartao: !!tc.querySelector('#title') && !!tc.querySelector('#gokm'), cartoes: document.querySelectorAll('.leftcol > .glass').length, n: pts.length, fora: pts.filter(([x, y]) => x < 0 || y < 0 || x > innerWidth || y > innerHeight).length };
+      });
+      assert.equal(r.colapsado, true, 'o painel começa recolhido');
+      assert.ok(r.painelH < 130, 'só a faixa de abas: ' + r.painelH);
+      assert.equal(r.tituloNoCartao, true, 'título e busca no mesmo cartão');
+      assert.equal(r.cartoes, 1, 'um cartão de vidro só na coluna esquerda');
+      assert.deepEqual(r.cruz, [], 'elementos flutuantes se sobrepõem');
+      assert.deepEqual(r.sob, [], 'a rodovia fica sob elementos flutuantes');
+      assert.equal(r.fora, 0, 'a rodovia cabe na tela');
+      // selecionar um segmento abre o painel
+      await pg.evaluate(() => { const E = window.__pavecad.E; window.__pavecad.select(E.P[0].id, 20, 1, { tab: true }); });
+      await pg.waitForTimeout(400);
+      assert.equal(await pg.evaluate(() => document.querySelector('#inspector').classList.contains('collapsed')), false, 'selecionar abre o painel');
+      // tocar na aba abre de novo depois de recolher
+      await pg.click('#collapse'); await pg.waitForTimeout(300);
+      assert.equal(await pg.evaluate(() => document.querySelector('#inspector').classList.contains('collapsed')), true);
+      await pg.click('#tabs [data-t=ana]'); await pg.waitForTimeout(300);
+      assert.equal(await pg.evaluate(() => document.querySelector('#inspector').classList.contains('collapsed')), false, 'tocar na aba abre o painel');
+    }],
+    ['1568x760 e tablet: o painel não começa recolhido (sem mudança fora do desktop até 1400 px)', ['1568x760', 'tablet-h-1024x768', 'tablet-v-820x1180'], async (pg) => {
+      assert.equal(await pg.evaluate(() => document.querySelector('#inspector').classList.contains('collapsed')), false);
+    }],
+  ],
   g03: [
     ['a seção é o seletor de faixa (clique, aria-pressed, teclado)', '1366x768', async (pg) => {
       await irParaKm(pg, '170+500'); await aba(pg, 'seg');
@@ -937,13 +1093,13 @@ const TESTES = {
     }],
   ],
   g04: [
-    ['parâmetros em 3 colunas, rótulo 10 px, valor 18 px', '1366x768', async (pg) => {
+    ['parâmetros em 3 colunas, rótulo 12 px (mínimo de tipografia), valor 18 px', '1366x768', async (pg) => {
       await irParaKm(pg, '170+500'); await aba(pg, 'seg');
       const m = await pg.evaluate(() => {
         const g = document.querySelector('#t-seg .params'), p = document.querySelector('#t-seg .param');
         return { cols: getComputedStyle(g).gridTemplateColumns.split(' ').length, k: getComputedStyle(p.querySelector('.k')).fontSize, v: getComputedStyle(p.querySelector('.v')).fontSize, escala: p.querySelectorAll('.scale i').length };
       });
-      assert.equal(m.cols, 3); assert.equal(m.k, '10px'); assert.equal(m.v, '18px'); assert.equal(m.escala, 5);
+      assert.equal(m.cols, 3); assert.equal(m.k, '12px'); assert.equal(m.v, '18px'); assert.equal(m.escala, 5);
     }],
     ['o painel Segmento cabe sem rolar em 768 px de altura (amostra de trechos)', '1366x768', async (pg) => {
       await irParaKm(pg, '170+500'); await aba(pg, 'seg');

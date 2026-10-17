@@ -17,18 +17,20 @@
 
     <div class="hud">
     <div class="leftcol">
-      <div class="glass title" id="titlebox"><div class="ttx"><b id="title">PaveCAD</b><span id="subtitle"></span></div><button class="iconbtn" id="btnOverview" type="button" aria-label="Visão geral" title="Visão geral: enquadra todas as planilhas"><svg class="i" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button><button class="gocultar" type="button" data-ocultar="titulo" aria-label="Ocultar título e busca" title="Ocultar título e busca"><svg class="i" viewBox="0 0 24 24"><path d="M3 3l18 18"/><path d="M10.6 6.1A10 10 0 0 1 12 6c6.5 0 10 6 10 6a17 17 0 0 1-3.2 3.9M6.2 7C3.7 8.7 2 12 2 12s3.5 6 10 6c1.6 0 3-.4 4.2-.9"/><path d="M9.9 10a3 3 0 0 0 4.1 4.1"/></svg></button></div>
-      <div class="glass search">
+      <div class="glass titlecard" id="titlecard">
+      <div class="title" id="titlebox"><div class="ttx"><b id="title">PaveCAD</b><span id="subtitle"></span></div><button class="iconbtn" id="btnOverview" type="button" aria-label="Visão geral" title="Visão geral: enquadra todas as planilhas"><svg class="i" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button><button class="gocultar" type="button" data-ocultar="titulo" aria-label="Ocultar título e busca" title="Ocultar título e busca"><svg class="i" viewBox="0 0 24 24"><path d="M3 3l18 18"/><path d="M10.6 6.1A10 10 0 0 1 12 6c6.5 0 10 6 10 6a17 17 0 0 1-3.2 3.9M6.2 7C3.7 8.7 2 12 2 12s3.5 6 10 6c1.6 0 3-.4 4.2-.9"/><path d="M9.9 10a3 3 0 0 0 4.1 4.1"/></svg></button></div>
+      <div class="search">
         <svg class="i" viewBox="0 0 24 24" style="color:var(--faint)"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
         <input id="gokm" class="num" placeholder="Ir para km" inputmode="decimal" aria-label="Ir para km">
         <button class="go" id="goBtn" type="button" aria-label="Ir"><svg class="i" viewBox="0 0 24 24" style="width:14px;height:14px"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+      </div>
       </div>
             <div id="zoomhost"></div>
       <div class="glass rotbar" id="rotbar" role="group" aria-label="Girar o mapa">
         <button class="tbtn" id="rotL" aria-label="Girar 15 graus à esquerda" title="Girar à esquerda (Q)"><svg class="i" viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 3-6.2M4 4v4h4"/></svg></button>
         <button class="tbtn" id="rotN" aria-label="Norte para cima" title="Norte para cima"><span id="compass" style="display:grid;transition:transform .15s"><svg class="i" viewBox="0 0 24 24"><path d="M12 3l4.5 9h-9z" fill="#ff3b30" stroke="#ff3b30"/><path d="M12 21l-4.5-9h9z"/></svg></span></button>
         <button class="tbtn" id="rotR" aria-label="Girar 15 graus à direita" title="Girar à direita (E)"><svg class="i" viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-3-6.2M20 4v4h-4"/></svg></button>
-        <button class="chipbtn" id="rotA" title="Pista na vertical, no sentido de tráfego (R)" style="border:0;background:var(--fill)">Alinhar à pista</button>
+        <button class="chipbtn" id="rotA" title="Pista na vertical, no sentido de tráfego (R)" style="border:0;background:var(--fill)">Pista na vertical</button>
       </div>
       <p class="zoomnote" id="zoomnote"></p>
     </div>
@@ -63,14 +65,15 @@
           </div>
           <input id="file" type="file" accept=".xlsx,.xlsm" multiple hidden>
           <button class="iconbtn" id="btnAjuda" type="button" aria-label="Atalhos de teclado" aria-haspopup="dialog" title="Atalhos de teclado (?)" style="background:var(--glass);font-weight:700;font-size:15px">?</button>
-          <button class="iconbtn" id="btnCfg" aria-label="Configurações" title="Configurações (,)" style="position:relative;background:var(--glass)"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span class="dot" id="cfgDot" style="display:none;position:absolute;top:4px;right:4px;width:9px;height:9px;border-radius:50%;background:#ff9500"></span></button>
+          <button class="iconbtn" id="btnCfg" aria-label="Configurações" title="Configurações (,)" style="position:relative;background:var(--glass)"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span class="dot" id="cfgDot" style="display:none;position:absolute;top:4px;right:4px;width:9px;height:9px;border-radius:50%;background:var(--warn-solid)"></span></button>
           <button class="pillbtn" id="btnExample" type="button" hidden title="Só em desenvolvimento: lê referencia/dados">Carregar exemplo</button>
-          <button class="pillbtn primary" id="btnFile" type="button"><svg class="i" viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></svg>Planilhas</button>
+          <button class="pillbtn primary" id="btnFile" type="button"><svg class="i" viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></svg>Abrir planilhas</button>
         </div>
         <div class="glass toolbar" id="toolbar" role="toolbar" aria-label="Ferramentas">
           <button class="tbtn" id="btnGps" aria-pressed="false" title="Minha posição (G)" aria-label="Minha posição"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg><span class="dot"></span></button>
           <button class="tbtn" data-tool="prop" aria-pressed="false" title="Propor nova solução (N)" aria-label="Propor nova solução"><svg class="i" viewBox="0 0 24 24"><path d="M7 7h11l-3-3M17 17H6l3 3"/></svg></button>
           <button class="tbtn" id="btnField" aria-pressed="false" title="Modo campo para uso ao sol (S)" aria-label="Modo campo"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button>
+          <button class="tbtn" id="btnAlinhar" data-alinhar aria-pressed="false" title="Alinhar planilhas: deslocar as coordenadas (A)" aria-label="Alinhar planilhas"><svg class="i" viewBox="0 0 24 24"><path d="M12 3v18M3 12h18M12 3l-2.5 2.5M12 3l2.5 2.5M12 21l-2.5-2.5M12 21l2.5-2.5M3 12l2.5-2.5M3 12l2.5 2.5M21 12l-2.5-2.5M21 12l-2.5 2.5"/></svg></button>
           <button class="tbtn" data-tool="pin" aria-pressed="false" title="Nota em um ponto (P)" aria-label="Nota em um ponto"><svg class="i" viewBox="0 0 24 24"><path d="M12 21s-6-5.2-6-10a6 6 0 1 1 12 0c0 4.8-6 10-6 10z"/><circle cx="12" cy="11" r="2.2"/></svg></button>
           <button class="tbtn" type="button" data-ocultar="ferramentas" aria-label="Ocultar ferramentas" title="Ocultar ferramentas" style="color:var(--muted)"><svg class="i" viewBox="0 0 24 24"><path d="M3 3l18 18"/><path d="M10.6 6.1A10 10 0 0 1 12 6c6.5 0 10 6 10 6a17 17 0 0 1-3.2 3.9M6.2 7C3.7 8.7 2 12 2 12s3.5 6 10 6c1.6 0 3-.4 4.2-.9"/><path d="M9.9 10a3 3 0 0 0 4.1 4.1"/></svg></button>
         </div>
@@ -83,7 +86,7 @@
       <button class="tbtn" id="btnLimpo" type="button" aria-pressed="false" aria-label="Mapa limpo: ocultar os controles (H)" title="Mapa limpo (H)"><svg class="i" viewBox="0 0 24 24"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
       <button class="tbtn" id="btnMore" type="button" aria-expanded="false" aria-controls="drawer" title="Alinhar, girar e base do mapa" aria-label="Mais ferramentas do mapa"><svg class="i" viewBox="0 0 24 24"><circle cx="5.5" cy="12" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/><circle cx="18.5" cy="12" r="1.2" fill="currentColor"/></svg></button>
     </nav>
-    <div class="glass drawer" id="drawer" role="group" aria-label="Mais ferramentas do mapa"><div class="drawer-h"><span>Mapa</span><button class="gocultar" type="button" data-ocultar="girar" aria-label="Ocultar alinhar e girar" title="Ocultar alinhar e girar"><svg class="i" viewBox="0 0 24 24"><path d="M3 3l18 18"/><path d="M10.6 6.1A10 10 0 0 1 12 6c6.5 0 10 6 10 6a17 17 0 0 1-3.2 3.9M6.2 7C3.7 8.7 2 12 2 12s3.5 6 10 6c1.6 0 3-.4 4.2-.9"/><path d="M9.9 10a3 3 0 0 0 4.1 4.1"/></svg></button></div></div>
+    <div class="glass drawer" id="drawer" role="group" aria-label="Mais ferramentas do mapa"><div class="drawer-h"><span>Mapa</span><button class="chipbtn drawer-al" id="btnAlinharG" data-alinhar type="button" aria-pressed="false" title="Deslocar as coordenadas das planilhas (A)">Alinhar planilhas</button><button class="gocultar" type="button" data-ocultar="girar" aria-label="Ocultar girar e pista na vertical" title="Ocultar girar e pista na vertical"><svg class="i" viewBox="0 0 24 24"><path d="M3 3l18 18"/><path d="M10.6 6.1A10 10 0 0 1 12 6c6.5 0 10 6 10 6a17 17 0 0 1-3.2 3.9M6.2 7C3.7 8.7 2 12 2 12s3.5 6 10 6c1.6 0 3-.4 4.2-.9"/><path d="M9.9 10a3 3 0 0 0 4.1 4.1"/></svg></button></div></div>
     <div class="glass gpschip" id="gpschip" hidden></div>
     <div class="glass toast" id="toast" role="status" aria-live="polite"></div>
     <div class="glass tip" id="tip"></div>
@@ -112,6 +115,7 @@
     <div class="tabbody" id="t-ana" hidden></div>
     <div class="tabbody" id="t-notas" hidden></div>
     <div class="tabbody" id="t-aj" hidden></div>
+    <div class="tabbody" id="t-al" hidden></div>
   </aside>
 
   <section class="glass uni" id="unicard" aria-label="Unifilar">
@@ -132,7 +136,8 @@
     <div><dt><kbd>P</kbd></dt><dd>Nota em um ponto</dd></div>
     <div><dt><kbd>N</kbd></dt><dd>Propor solução</dd></div>
     <div><dt><kbd>Q</kbd> <kbd>E</kbd></dt><dd>Girar o mapa 15 graus</dd></div>
-    <div><dt><kbd>R</kbd></dt><dd>Alinhar à pista</dd></div>
+    <div><dt><kbd>R</kbd></dt><dd>Alinhar o mapa à pista</dd></div>
+    <div><dt><kbd>A</kbd></dt><dd>Alinhar planilhas: deslocar as coordenadas</dd></div>
     <div><dt><kbd>G</kbd></dt><dd>Minha posição (GPS)</dd></div>
     <div><dt><kbd>S</kbd></dt><dd>Modo campo (sol)</dd></div>
     <div><dt><kbd>H</kbd></dt><dd>Mapa limpo: esconde os controles, menos o zoom</dd></div>

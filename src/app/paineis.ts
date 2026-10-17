@@ -5,10 +5,9 @@ import { trColor, trLabel, trOrder } from '../dominio/solucoes';
 import { edgesOf } from '../geometry/build';
 import { tituloDe } from '../dominio/titulo';
 import { atualizarRotulosKm, E, getP, kmVis, projName, rodoviaNome, visibleProjects, type AppProj } from './estado';
-import { aplicarDesloc, regeometrar, removerProjeto } from './projetos';
-import { DESLOC_MAX, validarDesloc, type Desloc } from '../geometry/deslocamento';
-import { itemDe } from './seletor';
-import { marcadosPor, ROTULO_ATALHO, type Atalho } from '../dominio/selecao';
+import { abrirLidas, regeometrar, removerProjeto } from './projetos';
+import { abrirAlinhar, aoSairDeAlinhar, renderAlinhar } from './alinhar';
+import { contadorSelecao, htmlSelecao, itemDe, ligarSelecao } from './selecaoPlanilhas';
 import { IC } from './icones';
 import { applyLayers, applyPaint, clearFocus, clearSel, fitAll, fitFocus, fitList, getMap, renderLegend, select, setBase, setFocus, setProjectData, stepSel, updateSelLayer, updateStakes, applyVisibility, temMapTiler } from './mapa';
 import { drawUni, renderGroups } from './unifilar';
@@ -30,9 +29,11 @@ const flyTo = (p: AppProj, i: number, zoom = 17.2) => { const r = p.rows[i]; get
 /* Abas                                                              */
 /* ---------------------------------------------------------------- */
 export function setTab(t: typeof E.tab) {
+  if (E.tab === 'al' && t !== 'al') aoSairDeAlinhar();
   E.tab = t;
   document.querySelectorAll<HTMLElement>('#tabs button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.t === t)));
-  for (const x of ['resumo', 'seg', 'ana', 'notas', 'aj']) $(`#t-${x}`).hidden = x !== t;
+  for (const x of ['resumo', 'seg', 'ana', 'notas', 'aj', 'al']) $(`#t-${x}`).hidden = x !== t;
+  if (t === 'al') renderAlinhar();
   syncSeg($('#tabs'));
   if (t === 'ana') renderAna();
   if (t === 'notas') renderNotes();
@@ -76,6 +77,7 @@ export function renderAll() {
   renderAna();
   renderNotes();
   renderAj();
+  if (E.tab === 'al') renderAlinhar();
   renderGroups();
   syncAllSegs();
   drawUni();
@@ -115,7 +117,7 @@ export function renderResumo() {
   const maxA = Math.max(1, ...rows.map((r) => r[1].area));
   const key: IndKey = E.mode === 'sol' ? 'iri' : E.mode, M = IND[key], cr = criticos(V, key);
   el.innerHTML = `
-    <div><div class="sect">Planilhas <button class="btn" id="addFiles" style="min-height:28px;padding:3px 10px;font-size:12px">+ Adicionar</button></div>
+    <div><div class="sect">Planilhas <button class="btn" id="addFiles" style="min-height:28px;padding:3px 10px;font-size:var(--fs-meta)">+ Adicionar</button></div>
       <div class="list">${E.P.map((p) => `<div class="prow">
         <button class="iconbtn" data-eye="${p.id}" aria-label="${p.visible ? 'Ocultar' : 'Mostrar'} ${esc(projName(p))}" style="width:30px;height:30px">${p.visible ? IC.eye : IC.eyeoff}</button>
         <button class="nm" data-fly="${p.id}"><b>${esc(projName(p))}</b><span class="num">km ${fmt(p.meta.kmi === null ? null : kmVis(p.meta.kmi), 0)} a ${fmt(p.meta.kmf === null ? null : kmVis(p.meta.kmf), 0)} · ${p.rows.length.toLocaleString('pt-BR')} seg · ${p.meta.format === 'planservi' ? 'Planservi' : 'RoadRunner'}</span>${selo(p) ? `<span>${selo(p)}</span>` : ''}</button>
@@ -126,12 +128,12 @@ export function renderResumo() {
     <div><div class="sect">Soluções</div><div class="list">
       ${rows.map(([k, v]) => `<div class="row"><span class="sw" style="background:${tc(k)}"></span>
         <div class="grow"><div>${esc(trLabel(k))}</div><div class="bar"><i style="width:${(v.area / maxA) * 100}%;background:${tc(k)}"></i></div></div>
-        <div style="text-align:right" class="num"><div class="val">${fmt(v.area / 1000, 1)}</div><div class="muted" style="font-size:11px">mil m² · ${fmt(v.len, 1)} km</div></div></div>`).join('')}
+        <div style="text-align:right" class="num"><div class="val">${fmt(v.area / 1000, 1)}</div><div class="muted" style="font-size:var(--fs-meta)">mil m² · ${fmt(v.len, 1)} km</div></div></div>`).join('')}
     </div><p class="note" style="margin-top:7px">Área = largura da faixa × 20 m × percentual de atuação.</p></div>
     <div><div class="sect">${M.low ? 'Menores' : 'Maiores'} ${M.label}</div><div class="list">
       ${cr.map((o) => `<button class="row" data-go="${o.p.id}:${o.i}:${o.lane}"><span class="sw" style="background:${Q()[M.cls(o.v)]}"></span>
         <div class="grow">km ${esc(o.p.kmLab[o.i])} <span class="muted">· Fx ${o.lane}${V.length > 1 ? ' · ' + esc(projName(o.p)) : ''}</span></div>
-        <div class="val num">${fmt(o.v * M.scale, M.dec)} <span class="muted" style="font-weight:400;font-size:11px">${M.unit}</span></div></button>`).join('')}
+        <div class="val num">${fmt(o.v * M.scale, M.dec)} <span class="muted" style="font-weight:400;font-size:var(--fs-meta)">${M.unit}</span></div></button>`).join('')}
     </div></div>`;
   el.querySelectorAll<HTMLElement>('[data-eye]').forEach((b) => (b.onclick = () => {
     const p = getP(b.dataset.eye!)!;
@@ -157,14 +159,31 @@ export function renderResumo() {
 export function removeProject(id: string) {
   const p = getP(id);
   if (!p) return;
+  // o que preciso para trazer a planilha de volta: a planilha como veio, a posição na lista e se estava visível.
+  // Ajustes de largura, deslocamento e propostas continuam guardados pelo nome da planilha e voltam sozinhos.
+  const copia = { parsed: { meta: p.meta, rows: p.rowsPlanilha, log: p.log, codes: p.codes, qualidade: p.qualidade }, zone: p.crs.source === 'fixo' ? p.crs.zone : undefined, rotulo: p.meta.name };
+  const indice = E.P.indexOf(p), visivel = p.visible, nome = projName(p);
   removerProjeto(p, true);
+  E.settingsSel.delete(id);
   if (E.sel?.pid === id) { E.sel = null; updateSelLayer(); }
   if (E.focus) clearFocus();
   resolveProps();
   refreshProp();
   refreshPropLayers();
   renderAll();
-  toast('Planilha removida');
+  toastAcao(`${nome} removida`, 'Desfazer', async () => {
+    const [volta] = await abrirLidas([copia], true, false);
+    if (!volta) return;
+    E.P = E.P.filter((x) => x !== volta);
+    E.P.splice(Math.min(indice, E.P.length), 0, volta);
+    volta.visible = visivel;
+    applyVisibility(volta);
+    resolveProps();
+    refreshProp();
+    refreshPropLayers();
+    renderAll();
+    toast('Planilha restaurada');
+  }, 10000);
 }
 
 /* ---------------------------------------------------------------- */
@@ -269,7 +288,7 @@ export function renderAna() {
     const a = acc[k], tot = a.cnt || 1;
     return `<tr><td class="nm"><span class="sw" style="display:inline-block;margin-right:6px;background:${tc(k)}"></span>${esc(trLabel(k).replace('Fresagem ', 'Fres. '))}</td>
       ${a.cls.map((c, ci) => `<td><button class="cell" data-k="${esc(k)}" data-c="${ci}" title="${c} de ${a.cnt} faixas de 20 m"><i style="background:${Q()[ci]};opacity:${((c / tot) * 0.85).toFixed(2)}"></i><b>${a.cnt ? Math.round((c / tot) * 100) : 0}%</b></button></td>`).join('')}
-      <td class="mean num">${a.cnt ? fmt((a.sum / a.cnt) * M.scale, M.dec) : '–'}<br><span style="font-size:10px">${fmt(a.n * 0.02, 1)} km</span></td></tr>`;
+      <td class="mean num">${a.cnt ? fmt((a.sum / a.cnt) * M.scale, M.dec) : '–'}<br><span style="font-size:var(--fs-meta)">${fmt(a.n * 0.02, 1)} km</span></td></tr>`;
   }).join('');
   const stacks = M.labels.map((lb, ci) => {
     const tot = keys.reduce((s, k) => s + acc[k].cls[ci], 0);
@@ -284,7 +303,7 @@ export function renderAna() {
       <table class="matrix"><thead><tr><th></th>${M.labels.map((l, i) => `<th style="color:${Q()[i]}">${l.replace(' a ', '–')}</th>`).join('')}<th style="text-align:right">Média</th></tr></thead><tbody>${matrix}</tbody></table></div>
     <div><div class="sect">Soluções dentro de cada classe de ${M.label}</div>${stacks}</div>
     <div><div class="sect">Verificações de coerência</div><p class="note" style="margin-bottom:8px">Critérios provisórios, para ajustar ao padrão da concessionária.</p>
-      <div class="list">${rules.map(({ regra, n }, ri) => `<div class="rule ${n ? 'bad' : 'ok'}"><div class="t">${regra.t}<small>${regra.s}</small></div><div class="n num">${fmt(n * 0.02, 1)}<span class="muted" style="font-size:10px;font-weight:500"> km</span></div><button class="btn" data-r="${ri}" ${n ? '' : 'disabled'} style="min-height:30px;padding:3px 10px">Ver</button></div>`).join('')}</div></div>`;
+      <div class="list">${rules.map(({ regra, n }, ri) => `<div class="rule ${n ? 'bad' : 'ok'}"><div class="t">${regra.t}<small>${regra.s}</small></div><div class="n num">${fmt(n * 0.02, 1)}<span class="muted" style="font-size:var(--fs-meta);font-weight:500"> km</span></div><button class="btn" data-r="${ri}" ${n ? '' : 'disabled'} style="min-height:30px;padding:3px 10px">Ver</button></div>`).join('')}</div></div>`;
   el.querySelectorAll<HTMLElement>('#anSeg button').forEach((b) => b.addEventListener('click', () => { E.anInd = b.dataset.i as IndKey; renderAna(); }));
   const focusCell = (k: string, ci: number) => {
     setMode(E.anInd, true);
@@ -299,27 +318,9 @@ export function renderAna() {
 /* ---------------------------------------------------------------- */
 /* Ajustes                                                           */
 /* ---------------------------------------------------------------- */
-/** Deslocamentos em fila: cada clique usa o valor mais recente, mesmo com o worker ainda calculando. */
-const deslocFila = new Map<string, { p: AppProj; d: Desloc }>();
-let deslocOcupado = false;
-let deslocFoco: string | null = null;
-const deslocAtual = (p: AppProj): Desloc => deslocFila.get(p.id)?.d ?? p.desloc;
-async function pedirDesloc(p: AppProj, d: Desloc) {
-  deslocFila.set(p.id, { p, d });
-  if (deslocOcupado) return;
-  deslocOcupado = true;
-  try {
-    while (deslocFila.size) {
-      const [id, n] = deslocFila.entries().next().value as [string, { p: AppProj; d: Desloc }];
-      await aplicarDesloc(n.p, n.d);
-      if (deslocFila.get(id) === n) deslocFila.delete(id);
-    }
-  } finally { deslocOcupado = false; }
-}
-
 /** Planilhas marcadas em Ajustes. Sem marca nenhuma, as mudanças não valem para planilha alguma. */
 export function alvosAjuste(): AppProj[] {
-  E.settingsSel = new Set([...E.settingsSel].filter((id) => getP(id)));
+  for (const id of [...E.settingsSel]) if (!getP(id)) E.settingsSel.delete(id); // no mesmo conjunto: a lista de checkbox guarda a referência
   return E.P.filter((q) => E.settingsSel.has(q.id));
 }
 /** Uma planilha ganhou o foco (clique no mapa ou planilha nova): se não está marcada, passa a ser a única marcada. */
@@ -344,10 +345,9 @@ export function renderAj() {
   const alvos = alvosAjuste(), p = alvos[0];
   const lista = E.P.map(itemDe);
   const sel = E.P.length ? `
-    <div><div class="sect">Planilhas a ajustar <span class="num" id="a-cont">${alvos.length} de ${E.P.length}</span></div>
-      <div class="sel-atalhos" role="group" aria-label="Atalhos de seleção">${(Object.keys(ROTULO_ATALHO) as Atalho[]).map((a) => `<button type="button" class="btn" data-atalho="${a}">${ROTULO_ATALHO[a]}</button>`).join('')}</div>
-      <div class="sel-lista" id="a-lista" role="group" aria-label="Planilhas a ajustar" style="margin-top:8px">${lista.map((i) => `<label class="sel-item"><input type="checkbox" data-id="${esc(i.id)}"${E.settingsSel.has(i.id) ? ' checked' : ''}><span><b>${esc(i.nome)}</b><span class="note">${esc(i.rodovia)} · ${i.sentido === 1 ? 'Crescente' : 'Decrescente'}</span></span></label>`).join('')}</div>
-      <p class="note" style="margin-top:6px">${alvos.length ? 'Os campos abaixo valem para todas as marcadas. Os botões de passo somam ao valor de cada planilha.' : 'Marque ao menos uma planilha para ajustar.'}</p></div>` : '';
+    <div><div class="sect">Planilhas a ajustar <span class="num" id="a-cont">${contadorSelecao(E.settingsSel, E.P.length)}</span></div>
+      ${htmlSelecao({ itens: lista, marcadas: E.settingsSel }, 'a-lista')}
+      <p class="note" style="margin-top:6px">${alvos.length ? 'Os campos abaixo valem para todas as marcadas.' : 'Marque ao menos uma planilha para ajustar.'} Para deslocar as coordenadas, use <button class="linkbtn" type="button" id="irAlinhar">Alinhar</button>.</p></div>` : '';
   const opts = p ? `
     <div><div class="sect">Geometria ${alvos.length > 1 ? `das ${alvos.length} planilhas` : 'da planilha'}</div>
       <div class="list">
@@ -359,17 +359,6 @@ export function renderAj() {
         <div class="field"><label for="a-dr">Lado dos drenos</label><select id="a-dr"><option value="out">Externo</option><option value="in">Interno</option></select></div>
       </div>
       <p class="note" style="margin-top:7px">Sentido e coordenada seguem a regra confirmada: coordenada na borda esquerda da Fx 1, no sentido do tráfego. A Marginal Sul usa as mesmas coordenadas da pista principal, por isso entra com 12 m de deslocamento transversal à direita.</p>
-      <div class="sect" style="margin-top:14px">Deslocamento ${alvos.length > 1 ? 'das planilhas marcadas' : 'da planilha'}</div>
-      <div class="list desl" id="desloc">
-        ${([['l', 'Longitudinal', 'ao longo da via; positivo no sentido de percurso'], ['t', 'Transversal', 'positivo à direita do sentido de percurso, negativo à esquerda']] as const).map(([e, nome, dica]) => `
-        <div class="desl-eixo"><label for="d-${e}">${nome} (m)</label><span class="note">${dica}</span>
-          <div class="desl-passo">${[-5, -1].map((v) => `<button class="btn" type="button" data-d="${e}" data-s="${v}" aria-label="${nome} ${v} m">${v === -1 ? '−1' : '−5'}</button>`).join('')}
-            <input id="d-${e}" class="in num" type="number" step="0.1" min="-${DESLOC_MAX}" max="${DESLOC_MAX}" inputmode="decimal" aria-label="${nome} em metros">
-            ${[1, 5].map((v) => `<button class="btn" type="button" data-d="${e}" data-s="${v}" aria-label="${nome} +${v} m">+${v}</button>`).join('')}</div></div>`).join('')}
-        <p class="cfg-err" id="d-err" role="alert"></p>
-        <div class="btns"><button class="btn" type="button" id="d-zero">Zerar</button></div>
-        <p class="note">Move a planilha inteira no mapa, nos polígonos, no CSV de propostas e na localização por GPS. Fica salvo no aparelho junto com a planilha.</p>
-      </div>
       ${selo(p) ? `<p class="note" style="margin-top:7px">${selo(p)}. Veja o detalhe em Revisão, em Qualidade das coordenadas.</p>` : ''}
       <p class="note num" style="margin-top:7px">Sistema de coordenadas: SIRGAS 2000 UTM ${p.crs.zone}S${p.crs.epsg ? ` (EPSG ${p.crs.epsg})` : ''}, ${p.crs.source === 'fixo' ? 'fixado' : 'pela mediana das longitudes'}.</p>
       ${p.log.length && E.privacidade ? '<p class="note" style="margin-top:8px">Log de importação oculto no modo privacidade: traz km e nomes.</p>' : p.log.length ? `<details style="margin-top:8px"><summary>Log de importação (${p.log.length})</summary><div class="formula">${p.log.map((l) => `${l.level === 'warn' ? '! ' : '· '}${esc(l.msg)}`).join('\n')}</div></details>` : ''}</div>` : '';
@@ -388,15 +377,8 @@ nE = cos θ , nN = −sin θ   (invertido no sentido decrescente)
 e(n) = e0 + dir · Σ largura(1..n)
 P(n) = P + e(n) · (nE , nN)</div>
       <p class="note" style="margin-top:8px">O sentido decrescente usa o mesmo cálculo com a normal invertida, porque as linhas da planilha seguem a quilometragem crescente.</p></details>`;
-  el.querySelectorAll<HTMLInputElement>('#a-lista input[data-id]').forEach((c) => c.addEventListener('change', () => {
-    if (c.checked) E.settingsSel.add(c.dataset.id!); else E.settingsSel.delete(c.dataset.id!);
-    renderAj();
-  }));
-  el.querySelectorAll<HTMLElement>('[data-atalho]').forEach((b) => b.addEventListener('click', () => {
-    const origem = itemDe(p ?? E.P[0]);
-    E.settingsSel = marcadosPor(b.dataset.atalho as Atalho, lista, origem);
-    renderAj();
-  }));
+  ligarSelecao(el, { itens: lista, marcadas: E.settingsSel, origem: p ? itemDe(p) : undefined, aoMudar: () => renderAj() });
+  document.getElementById('irAlinhar')?.addEventListener('click', () => abrirAlinhar());
   if (p) {
     // seletores: mostra o valor comum; se as marcadas diferem, "vários"
     const set = (id: string, vals: string[]) => {
@@ -406,7 +388,6 @@ P(n) = P + e(n) · (nE , nN)</div>
       else { e.value = ''; e.placeholder = 'vários'; }
     };
     set('#a-trav', alvos.map((q) => String(q.opts.travel))); set('#a-dir', alvos.map((q) => String(q.opts.dir))); set('#a-org', alvos.map((q) => q.opts.origin));
-    set('#d-l', alvos.map((q) => String(q.desloc.l))); set('#d-t', alvos.map((q) => String(q.desloc.t)));
     set('#a-win', alvos.map((q) => String(q.opts.win))); set('#a-sh', alvos.map((q) => (q.opts.shoulder ? '1' : '0'))); set('#a-dr', alvos.map((q) => q.opts.drainSide));
     const ch = (id: string, fn: (q: AppProj, v: string) => void) => {
       $(id).onchange = (e) => {
@@ -423,32 +404,6 @@ P(n) = P + e(n) · (nE , nN)</div>
     ch('#a-win', (q, v) => (q.opts.win = +v));
     ch('#a-sh', (q, v) => (q.opts.shoulder = v === '1'));
     ch('#a-dr', (q, v) => (q.opts.drainSide = v as 'out' | 'in'));
-    // deslocamento: passo soma ao valor de cada planilha; valor digitado vale para todas
-    const aplicarDeslocs = (novos: { q: AppProj; d: Desloc }[]) => {
-      const msg = novos.map((x) => validarDesloc(x.d)).find(Boolean) ?? '';
-      $('#d-err').textContent = msg;
-      if (msg) return;
-      const antes = novos.map((x) => ({ q: x.q, d: { ...deslocAtual(x.q) } }));
-      for (const x of novos) void pedirDesloc(x.q, x.d);
-      if (novos.length > 1) toastAcao(`Deslocamento aplicado a ${novos.length} planilhas`, 'Desfazer', () => { for (const a of antes) void pedirDesloc(a.q, a.d); toast('Aplicação desfeita'); });
-    };
-    el.querySelectorAll<HTMLButtonElement>('[data-d]').forEach((b) => (b.onclick = () => {
-      const e = b.dataset.d as 'l' | 't', passo = +b.dataset.s!;
-      deslocFoco = `[data-d="${e}"][data-s="${b.dataset.s}"]`;
-      aplicarDeslocs(alvosAjuste().map((q) => ({ q, d: { ...deslocAtual(q), [e]: Math.round((deslocAtual(q)[e] + passo) * 1000) / 1000 } })));
-    }));
-    for (const e of ['l', 't'] as const) {
-      $<HTMLInputElement>('#d-' + e).onchange = (ev) => {
-        const txt = (ev.target as HTMLInputElement).value.replace(',', '.');
-        if (txt === '') return;
-        const v = parseFloat(txt);
-        deslocFoco = '#d-' + e;
-        if (!Number.isFinite(v)) { $('#d-err').textContent = 'Informe um número em metros.'; return; }
-        aplicarDeslocs(alvosAjuste().map((q) => ({ q, d: { ...deslocAtual(q), [e]: Math.round(v * 1000) / 1000 } })));
-      };
-    }
-    $('#d-zero').onclick = () => { deslocFoco = '#d-zero'; $('#d-err').textContent = ''; aplicarDeslocs(alvosAjuste().map((q) => ({ q, d: { l: 0, t: 0 } }))); };
-    if (deslocFoco) { const f = el.querySelector<HTMLElement>(deslocFoco); deslocFoco = null; f?.focus(); }
   }
   const bs = $<HTMLSelectElement>('#a-base');
   bs.value = E.base;

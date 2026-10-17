@@ -17,7 +17,8 @@ export function toast(msg: string, ms = 3400) {
 /** Pílula deslizante do controle segmentado. */
 export function syncSeg(el: HTMLElement | null) {
   const b = el?.querySelector<HTMLElement>('[aria-pressed="true"],[aria-selected="true"]');
-  if (!el || !b) return;
+  if (!el) return;
+  if (!b) { if (el.id === 'tabs') el.style.setProperty('--w', '0px'); return; } // Alinhar abre o painel sem aba marcada
   el.style.setProperty('--x', b.offsetLeft + 'px');
   el.style.setProperty('--w', b.offsetWidth + 'px');
 }

@@ -84,9 +84,9 @@ export function drawUni() {
   kmi = Math.floor(kmi); kmf = Math.ceil(kmf);
   const sx = (km: number) => x0 + ((km - kmi) / (kmf - kmi)) * (x1 - x0);
   lay = { x0, x1, kmi, kmf, blocks, top };
-  const muted = cssv('--muted'), none = cssv('--none'), fill = cssv('--fill2'), sans = cssv('--sans');
+  const fm = E.field ? 13 : 12, muted = cssv('--muted'), none = cssv('--none'), fill = cssv('--fill2'), sans = cssv('--sans');
   const pxKm = (x1 - x0) / (kmf - kmi), step = [1, 2, 5, 10, 20, 25, 50, 100].find((s) => s * pxKm >= 70) || 100, bottom = y - bgap;
-  g.font = '500 11px ' + sans;
+  g.font = `500 ${fm}px ` + sans;
   g.textBaseline = 'alphabetic';
   for (let k = Math.ceil(kmi / step) * step; k <= kmf; k += step) {
     const x = Math.round(sx(k)), txt = kmVis(k) + ' km', tw = g.measureText(txt).width;
@@ -97,10 +97,10 @@ export function drawUni() {
   const M = E.mode === 'sol' ? null : IND[E.mode];
   for (const b of blocks) {
     g.textBaseline = 'alphabetic';
-    g.font = '600 11px ' + sans;
+    g.font = `600 ${fm}px ` + sans;
     g.fillStyle = muted;
     g.fillText(projName(b.p) + (b.p.meta.travel > 0 ? '  ↑' : '  ↓'), 0, b.titleY + 11);
-    g.font = '500 11px ' + sans;
+    g.font = `500 ${fm}px ` + sans;
     g.textBaseline = 'middle';
     for (const rw of b.rows) {
       g.fillStyle = muted; g.fillText(rw.lane ? 'Fx ' + rw.lane : 'Ac.', 0, rw.y + rw.h / 2);
@@ -147,7 +147,7 @@ export function drawUni() {
       const xa = sx(lo), xb = Math.max(sx(hi + 0.02), xa + 6);
       g.fillStyle = cssv('--accent'); g.globalAlpha = 0.14; rr(g, xa, top - 4, xb - xa, bottom - top + 8, 6); g.fill(); g.globalAlpha = 1;
       g.strokeStyle = cssv('--accent'); g.lineWidth = 1.5; rr(g, xa, top - 4, xb - xa, bottom - top + 8, 6); g.stroke();
-      $('#unisub').textContent = `Vista atual: hod. ${fmt(kmVis(lo), 1)} a ${fmt(kmVis(hi + 0.02), 1)} km`;
+      $('#unisub').textContent = `Vista atual: km ${fmt(kmVis(lo), 1)} a ${fmt(kmVis(hi + 0.02), 1)}`;
     } else $('#unisub').textContent = 'Clique para voar até o trecho';
   }
   const s = E.sel;

@@ -90,7 +90,7 @@ export const E = {
   /** Planilhas marcadas na aba Ajustes: geometria e deslocamento valem para todas. */
   settingsSel: new Set<string>(),
   uniCollapsed: false,
-  tab: 'resumo' as 'resumo' | 'seg' | 'ana' | 'notas' | 'aj',
+  tab: 'resumo' as 'resumo' | 'seg' | 'ana' | 'notas' | 'aj' | 'al',
   /** Ajustes de largura salvos, por nome de planilha. Valem quando a planilha é aberta. */
   ajustesSalvos: {} as Record<string, AjusteLargura[]>,
   /** Deslocamento salvo, por nome de planilha. */

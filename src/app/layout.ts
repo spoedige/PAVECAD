@@ -5,6 +5,9 @@ import { $, gestoVertical, syncAllSegs } from './ui';
 export const MQ_UNICO = '(min-width: 601px)';
 const mq = window.matchMedia(MQ_UNICO);
 export const ehUnico = () => mq.matches;
+/** Desktop com a janela até 1400 px: o painel direito começa recolhido para liberar a rodovia. Tablets (toque) não mudam. */
+export const MQ_COMPACTO = '(max-width: 1400px) and (pointer: fine)';
+export const ehCompacto = () => ehUnico() && window.matchMedia(MQ_COMPACTO).matches;
 
 /** Elementos que mudam de lugar no layout único: a barra lateral recebe o zoom (o ⋯ já está nela); a gaveta recebe girar e base. */
 const MOVEIS = [
@@ -110,7 +113,7 @@ export function setPainel(recolher: boolean, salvar = true) {
 export function initPainel() {
   let salvo = false;
   try { salvo = localStorage.getItem(CHAVE_PAINEL) === '1'; } catch { /* sem storage */ }
-  setPainel(salvo, false);
+  setPainel(ehCompacto() ? true : salvo, false);
   $('#collapse').addEventListener('click', () => setPainel(!painelRecolhido()));
   const cab = $('#ihead');
   gestoVertical(cab, { ativo: ehUnico, aoBaixo: () => setPainel(true), aoCima: () => setPainel(false) });

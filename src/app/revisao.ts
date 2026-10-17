@@ -165,9 +165,9 @@ function propsHtml(): string {
     const p = getP(r.pid!)!, q = runStats(p, r);
     return `<div class="note-card"><button class="note-top" data-pf="${r.id}"><span class="sw" style="background:${tc(r.to)};width:12px;height:12px"></span><span class="t"><b>${esc(trLabel(r.from))} → ${esc(trLabel(r.to))}</b><span>${esc(projName(p))} · ${r.lane ? 'Fx ' + r.lane : 'Acost.'} · ${runLabel(p, r)} · ${fmt(q.len, 0)} m · ${fmt(q.area, 0)} m²${r.note ? ' · ' + esc(r.note) : ''}</span></span></button><div class="btns"><button class="btn d" data-pd="${r.id}" style="min-height:28px;padding:3px 10px">${IC.trash} Remover</button></div></div>`;
   }).join('');
-  const rows = Object.entries(sum).map(([k, v]) => `<div class="row"><span class="sw" style="background:${tc(k)}"></span><div class="grow">${esc(trLabel(k))}</div><div class="val num">${fmt(v.area, 0)} <span class="muted" style="font-weight:400;font-size:11px">m² · ${fmt(v.len / 1000, 2)} km·faixa</span></div></div>`).join('');
+  const rows = Object.entries(sum).map(([k, v]) => `<div class="row"><span class="sw" style="background:${tc(k)}"></span><div class="grow">${esc(trLabel(k))}</div><div class="val num">${fmt(v.area, 0)} <span class="muted" style="font-weight:400;font-size:var(--fs-meta)">m² · ${fmt(v.len / 1000, 2)} km·faixa</span></div></div>`).join('');
   return `${orfasHtml}<div>${head}<div class="list">${cards}</div>
-    <div class="list" style="margin-top:8px">${rows}<div class="row"><div class="grow muted">Total proposto</div><div class="val num">${fmt(tl.area, 0)} <span class="muted" style="font-weight:400;font-size:11px">m²</span></div></div></div>
+    <div class="list" style="margin-top:8px">${rows}<div class="row"><div class="grow muted">Total proposto</div><div class="val num">${fmt(tl.area, 0)} <span class="muted" style="font-weight:400;font-size:var(--fs-meta)">m²</span></div></div></div>
     <div class="btns" style="margin-top:8px"><button class="btn" id="pCsv">Copiar tabela (CSV)</button><button class="btn" id="pCsvDown">Baixar CSV</button><button class="btn d" id="pAll">Limpar todas</button></div>${aviso}</div>`;
 }
 
@@ -280,7 +280,7 @@ function qualidadeHtml(): string {
       sentidos.length ? `${sentidos.length} acima de ${q!.maxSentidos} m entre os sentidos` : '',
       inv.length ? `${inv.length} polígono${inv.length === 1 ? '' : 's'} só em linha` : '',
     ].filter(Boolean).join(' · ') || 'Nenhuma ocorrência';
-    return `<details class="qual" data-qp="${p.id}"><summary><span><b>${esc(projName(p))}</b><span class="muted num" style="display:block;font-size:11px;font-weight:400">${esc(resumo)}</span></span><span class="num ${n ? '' : 'muted'}">${n}</span></summary>
+    return `<details class="qual" data-qp="${p.id}"><summary><span><b>${esc(projName(p))}</b><span class="muted num" style="display:block;font-size:var(--fs-meta);font-weight:400">${esc(resumo)}</span></span><span class="num ${n ? '' : 'muted'}">${n}</span></summary>
       ${n ? `<div class="list" style="margin-top:8px">${itens.slice(0, MAX_OC).join('')}${itens.length > MAX_OC ? `<p class="note" style="padding:8px 10px;margin:0">e mais ${itens.length - MAX_OC} ocorrências, no log da aba Ajustes.</p>` : ''}</div>` : '<p class="vazio" style="margin-top:8px">Nenhuma ocorrência.</p>'}</details>`;
   }).join('');
   return `<div><div class="sect">Qualidade das coordenadas</div>${linhas}<p class="note" style="margin-top:7px">Pontos reconstruídos pelo km quando a coordenada da planilha estava repetida, saltando ou retrocedendo. A planilha original não muda. O mesmo resumo está no log da aba Ajustes.</p></div>`;

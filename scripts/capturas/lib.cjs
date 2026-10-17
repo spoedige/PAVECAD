@@ -46,6 +46,7 @@ async function abrir(browser, vp, opts = {}) {
       const E = window.__pavecad.E;
       for (const p of [...E.P]) if (/Marginal/i.test(p.meta.via) && E.P.length > 4) { const b = document.querySelector(`[data-del="${p.id}"]`); if (b) b.click(); await new Promise((r) => setTimeout(r, 300)); }
     });
+    await pg.evaluate(() => document.querySelector('.toast-acao')?.remove()); // o aviso de planilha removida não deve ficar na frente dos testes
     await pg.waitForTimeout(500);
   } else if (opts.arquivos) {
     // opts.arquivos: nomes em testes/fixtures; opts.projetos: quantos projetos esperar (um arquivo Planservi gera dois)

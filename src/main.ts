@@ -13,7 +13,8 @@ import { abrirArquivos, abrirLidas, carregarConfig, restaurarProjetos } from './
 import { abrirConfig, atualizarAviso, configAberta, initConfig } from './app/config';
 import { focarAjustes, modosVisiveis, renderAll, renderSeg, setField, setMode, setTab, syncBaseSeg } from './app/paineis';
 import { blocosDoUnifilar, drawUni, initUnifilar } from './app/unifilar';
-import { initLayout } from './app/layout';
+import { ehCompacto, initLayout, setPainel } from './app/layout';
+import { alternarAlinhar } from './app/alinhar';
 import { alternarLimpo, initGrupos } from './app/grupos';
 import { clearFocus } from './app/mapa';
 import { $, observarHud, observarRolagem, observarRolagemH, syncAllSegs, syncSeg, toast } from './app/ui';
@@ -48,6 +49,7 @@ document.querySelectorAll<HTMLButtonElement>('#tabs button').forEach((b) => b.ad
 document.querySelectorAll<HTMLButtonElement>('#base button').forEach((b) =>
   b.addEventListener('click', () => { setBase(b.dataset.b as typeof E.base); syncBaseSeg(); renderAll(); }));
 document.querySelectorAll<HTMLButtonElement>('#nitidez button').forEach((b) => b.addEventListener('click', () => setNitidez(b.dataset.n as 'maxima' | 'segura')));
+document.querySelectorAll<HTMLElement>('[data-alinhar]').forEach((b) => b.addEventListener('click', () => alternarAlinhar()));
 $('#rotL').addEventListener('click', () => rotate(-15));
 $('#rotR').addEventListener('click', () => rotate(15));
 $('#rotN').addEventListener('click', north);
@@ -100,6 +102,7 @@ window.addEventListener('keydown', (e) => {
   if (lk === 'q') { rotate(-15); return; }
   if (lk === 'e') { rotate(15); return; }
   if (lk === 'r') { alignToRoad(); return; }
+  if (lk === 'a') { alternarAlinhar(); return; }
   if (lk === 'g') { void gpsToggle(); return; }
   if (lk === 's') { setField(!E.field); return; }
   if (!E.sel) return;
@@ -113,6 +116,7 @@ window.addEventListener('keydown', (e) => {
 /* ---- ganchos entre mapa e painéis ---- */
 H.onSelect = (opt) => {
   if (E.sel) focarAjustes(E.sel.pid);
+  if (E.sel && ehCompacto()) setPainel(false, false); // selecionar um segmento abre o painel recolhido
   renderSeg();
   drawUni();
   if (opt.tab) setTab('seg');

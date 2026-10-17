@@ -456,7 +456,22 @@ function onMapClick(e: MapMouseEvent) {
 /* ---------------------------------------------------------------- */
 /* Enquadramento, estacas e rotação                                  */
 /* ---------------------------------------------------------------- */
-const fitPad = () => (innerWidth > 900 ? { top: 110, left: 240, right: 60, bottom: 120 } : { top: 110, left: 30, right: 30, bottom: 70 });
+/** Folga do enquadramento: a rodovia deve caber na parte livre do mapa, fora dos cartões flutuantes. Mede os elementos de verdade
+ *  (topo, barra lateral e legenda à esquerda, painel à direita, unifilar embaixo); telas estreitas mantêm a folga fixa. */
+const fitPad = () => {
+  if (innerWidth <= 900) return { top: 110, left: 30, right: 30, bottom: 70 };
+  const ret = (s: string) => { const e = document.querySelector<HTMLElement>(s); return e && e.checkVisibility() ? e.getBoundingClientRect() : null; };
+  const m = 12;
+  const topo = Math.max(0, ...['#modes', '.topright', '#titlecard'].map((s) => ret(s)?.bottom ?? 0)) + m;
+  const esq = Math.max(0, ...['#tools', '#legend'].map((s) => ret(s)?.right ?? 0)) + m;
+  const dir = ret('#inspector'), uni = ret('#unicard');
+  const direita = dir ? innerWidth - dir.left + m : 60;
+  const baixo = uni ? innerHeight - uni.top + m : 60;
+  const w = innerWidth, h = innerHeight;
+  // sem folga demais: sobra ao menos metade da tela para a rodovia
+  const f = Math.min(1, (w * 0.5) / Math.max(1, esq + direita), (h * 0.5) / Math.max(1, topo + baixo));
+  return { top: Math.round(topo * f), left: Math.round(esq * f), right: Math.round(direita * f), bottom: Math.round(baixo * f) };
+};
 
 export function fitList(list: AppProj[], instant = false) {
   if (!list.length || !E.mapReady) return;
