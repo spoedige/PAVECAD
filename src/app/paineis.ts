@@ -1,5 +1,6 @@
-import { criticos, INDS_ANALISE, matriz, resumo, violacoes, REGRAS } from '../dominio/analise';
-import { IND, MODE_KEYS, Q5, Q5F, type IndKey, type ModeKey } from '../dominio/indicadores';
+import { criticos, matriz, resumo, violacoes, REGRAS } from '../dominio/analise';
+import { IND, indicadoresComDados, MODE_KEYS, Q5, Q5F, type IndKey, type ModeKey } from '../dominio/indicadores';
+import { descreverCamada } from '../formats/planservi';
 import { trColor, trLabel, trOrder } from '../dominio/solucoes';
 import { edgesOf } from '../geometry/build';
 import { tituloDe } from '../dominio/titulo';
@@ -30,6 +31,25 @@ export function setTab(t: typeof E.tab) {
   syncAllSegs();
 }
 
+/** Modos de cor com dado nas planilhas visíveis. Sem planilhas, os seis do RoadRunner. D0, Rc e Defeitos somem no Planservi; IGG e FC somem no RoadRunner. */
+export function modosVisiveis(): ModeKey[] {
+  const V = visibleProjects();
+  if (!V.length) return ['sol', 'iri', 'atr', 'd0', 'rc', 'def'];
+  const com = new Set<string>(indicadoresComDados(V));
+  return MODE_KEYS.filter((k) => k === 'sol' || com.has(k));
+}
+
+export function renderModes() {
+  const vis = modosVisiveis();
+  document.querySelectorAll<HTMLButtonElement>('#modes button').forEach((b) => {
+    const k = b.dataset.m as ModeKey, i = vis.indexOf(k);
+    b.hidden = i < 0;
+    if (i >= 0) b.title = `Atalho: ${i + 1}`;
+  });
+  if (!vis.includes(E.mode)) setMode('sol', true);
+  syncSeg($('#modes'));
+}
+
 export function renderViews() {
   const v = visibleProjects();
   const t = tituloDe(v.length ? v : E.P), n = E.P.length;
@@ -40,6 +60,7 @@ export function renderViews() {
 
 export function renderAll() {
   updateStakes();
+  renderModes();
   renderViews();
   renderLegend();
   renderResumo();
@@ -89,7 +110,7 @@ export function renderResumo() {
     <div><div class="sect">Planilhas <button class="btn" id="addFiles" style="min-height:28px;padding:3px 10px;font-size:12px">+ Adicionar</button></div>
       <div class="list">${E.P.map((p) => `<div class="prow">
         <button class="iconbtn" data-eye="${p.id}" aria-label="${p.visible ? 'Ocultar' : 'Mostrar'} ${esc(projName(p))}" style="width:30px;height:30px">${p.visible ? IC.eye : IC.eyeoff}</button>
-        <button class="nm" data-fly="${p.id}"><b>${esc(projName(p))}</b><span class="num">km ${fmt(p.meta.kmi, 0)} a ${fmt(p.meta.kmf, 0)} · ${p.rows.length.toLocaleString('pt-BR')} seg · RoadRunner</span></button>
+        <button class="nm" data-fly="${p.id}"><b>${esc(projName(p))}</b><span class="num">km ${fmt(p.meta.kmi, 0)} a ${fmt(p.meta.kmf, 0)} · ${p.rows.length.toLocaleString('pt-BR')} seg · ${p.meta.format === 'planservi' ? 'Planservi' : 'RoadRunner'}</span></button>
         ${dirBadge(p)}
         <button class="iconbtn" data-del="${p.id}" aria-label="Remover ${esc(projName(p))}" style="width:30px;height:30px">${IC.trash}</button></div>`).join('')}</div></div>
     <div><h2 class="h1 num">${fmt(R.ext, 1)} km</h2><p class="lead num">${V.length} planilha${V.length !== 1 ? 's' : ''} ${V.length !== 1 ? 'visíveis' : 'visível'} · ${R.nR.toLocaleString('pt-BR')} segmentos de 20 m${R.drKm ? ` · ${fmt(R.drKm, 1)} km de dreno` : ''}</p>
@@ -143,6 +164,8 @@ export function removeProject(id: string) {
 /* ---------------------------------------------------------------- */
 /** Detalhes e tratamentos começam recolhidos para o painel caber sem rolar; a escolha do usuário é lembrada. */
 let segDetAberto = false;
+/** O Planservi abre os detalhes de saída (as camadas são o que importa); depois vale a escolha do usuário. */
+let segDetEscolhido = false;
 
 export function renderSeg() {
   const el = $('#t-seg'), s = E.sel;
@@ -171,11 +194,14 @@ export function renderSeg() {
     xs += `<button type="button" data-l="${isS ? 0 : k + 1}" aria-pressed="${on}" aria-label="${esc(rot)}" title="${esc(rot)}" class="${on ? 'sel' : ''} ${nd ? 'nodata' : ''}" style="width:${(w / total) * 100}%;background:${tc(t.main)}">${isS ? 'Ac' : 'Fx ' + (k + 1)}</button>`;
   });
   const xt = ticks.map((e, i) => `<span style="left:${(e / total) * 100}%;transform:translateX(${i === 0 ? '0' : i === ticks.length - 1 ? '-100%' : '-50%'})">${fmt(e, 1)} m</span>`).join('');
+  const plan = p.meta.format === 'planservi';
   const treat = isSh || !L ? [] : L.treat.map((v, i) => [TREAT_LABELS[i], v] as const).filter(([, v]) => v !== 0 && v !== null);
   const dr = r.drain, drainTxt = dr && (dr[0] || dr[1]) ? `tipo ${dr[0] || dr[1]}, lado ${p.opts.drainSide === 'in' ? 'interno' : 'externo'}` : null;
   const extra: [string, string][] = [];
+  if (L?.camadas) for (const c of L.camadas) extra.push([c.nome, c.texto]);
+  if (plan && isSh) extra.push(['Revestimento do acostamento', descreverCamada(r.shoulderRaw ?? null, 'rev')]);
   if (L?.fsTipo) extra.push(['Fresagem', L.fsTipo === 'C' ? 'Contínua' : 'Descontínua']);
-  if (L?.fsEsp) extra.push(['Espessura de fresagem', `${L.fsEsp} cm${L.fsPct ? ' · ' + Math.round(L.fsPct * 100) + '% da área' : ''}`]);
+  if (L?.fsEsp && !L.camadas) extra.push(['Espessura de fresagem', `${L.fsEsp} cm${L.fsPct ? ' · ' + Math.round(L.fsPct * 100) + '% da área' : ''}`]);
   if (L?.gapCm) extra.push(['Gap graded', `${L.gapCm} cm`]);
   if (r.he[0]) extra.push(['Revestimento existente (He)', `${r.he[0]} cm`]);
   if (L?.opdr) extra.push(['Ocorrência O/P/R/D', 'marcada']);
@@ -187,7 +213,7 @@ export function renderSeg() {
     ...extra,
   ];
   const detalhes = itens.length
-    ? `<details id="segDet" ${segDetAberto ? 'open' : ''}><summary>Detalhes e tratamentos <span class="muted num">${itens.length}</span></summary>
+    ? `<details id="segDet" ${segDetAberto || (plan && !segDetEscolhido) ? 'open' : ''}><summary>Detalhes e tratamentos <span class="muted num">${itens.length}</span></summary>
         <div class="kv">${itens.map(([k, v]) => `<div><span>${esc(k)}</span><b class="num">${esc(v)}</b></div>`).join('')}</div></details>`
     : '';
   el.innerHTML = `
@@ -196,7 +222,9 @@ export function renderSeg() {
       <div class="sbtns"><button class="iconbtn" id="sPrev" aria-label="Segmento anterior" title="Anterior (←)">${IC.prev}</button><button class="iconbtn" id="sNext" aria-label="Próximo segmento" title="Próximo (→)">${IC.next}</button><button class="iconbtn" id="sCopy" aria-label="Copiar localização" title="Copiar localização">${IC.copy}</button><button class="iconbtn" id="sNote" aria-label="Nota neste segmento" title="Nota neste segmento">${IC.pin}</button></div></div>
     <div class="chips" aria-label="Solução">${chips.join('')}</div>
     <div><div class="xs" role="group" aria-label="Seção a partir da coordenada: escolha a faixa" title="Seção a partir da coordenada. Setas para cima e para baixo trocam de faixa">${xs}</div><div class="xsticks num">${xt}</div></div>
-    ${isSh || !L ? '' : `<div class="params">${param('iri')}${param('def', 'Defeitos')}${param('atr')}${param('d0')}${param('rc')}
+    ${isSh || !L ? '' : plan
+      ? `<div class="params">${param('iri')}${param('atr', 'Flecha')}${param('igg')}${param('fc2')}${param('fc3')}</div>`
+      : `<div class="params">${param('iri')}${param('def', 'Defeitos')}${param('atr')}${param('d0')}${param('rc')}
       <div class="param"><div class="k">D120</div><div class="v num">${fmt(L.d120, 2)}<small>0,01 mm</small></div></div></div>`}
     ${detalhes}`;
   $('#sPrev').onclick = () => stepSel(-1, 0);
@@ -212,7 +240,7 @@ export function renderSeg() {
     startNote('pin', [[(c[0][0] + c[2][0]) / 2, (c[0][1] + c[2][1]) / 2]]);
   };
   el.querySelectorAll<HTMLElement>('.xs button').forEach((b) => b.addEventListener('click', () => select(s.pid, s.row, +b.dataset.l!)));
-  el.querySelector('#segDet')?.addEventListener('toggle', (ev) => { segDetAberto = (ev.target as HTMLDetailsElement).open; });
+  el.querySelector('#segDet')?.addEventListener('toggle', (ev) => { segDetAberto = (ev.target as HTMLDetailsElement).open; segDetEscolhido = true; });
   // a seleção refaz o painel: devolve o foco do teclado à faixa escolhida
   if (tinhaFoco) el.querySelector<HTMLElement>('.xs [aria-pressed="true"]')?.focus();
 }
@@ -225,7 +253,8 @@ export function renderAna() {
   if (!el) return;
   const V = visibleProjects();
   if (!V.length) { el.innerHTML = '<div class="empty"><b>Sem dados visíveis</b>Mostre ao menos uma planilha.</div>'; return; }
-  const key = E.anInd, M = IND[key], acc = matriz(V, key);
+  const inds = indicadoresComDados(V);
+  const key: IndKey = inds.includes(E.anInd) ? E.anInd : inds[0] ?? 'iri', M = IND[key], acc = matriz(V, key);
   const ordem = trOrder();
   const keys = [...ordem.filter((k) => acc[k]), ...Object.keys(acc).filter((k) => !ordem.includes(k) && k !== '-'), ...(acc['-'] ? ['-'] : [])];
   const matrix = keys.map((k) => {
@@ -242,7 +271,7 @@ export function renderAna() {
   const rules = violacoes(V);
   el.innerHTML = `
     <div><h2 class="h2">Solução × patologias</h2><p class="lead">Distribuição de cada indicador dentro de cada solução, nas planilhas visíveis. Toque em uma célula para ver os trechos no mapa.</p></div>
-    <div class="seg" id="anSeg" role="group" aria-label="Indicador" style="align-self:flex-start">${INDS_ANALISE.map((k) => `<button data-i="${k}" aria-pressed="${k === key}">${IND[k].label.replace(' máx', '')}</button>`).join('')}</div>
+    <div class="seg" id="anSeg" role="group" aria-label="Indicador" style="align-self:flex-start">${inds.map((k) => `<button data-i="${k}" aria-pressed="${k === key}">${IND[k].label.replace(' máx', '')}</button>`).join('')}</div>
     <div><div class="sect">${M.label} por solução <span style="text-transform:none;font-weight:500">${M.unit}</span></div>
       <table class="matrix"><thead><tr><th></th>${M.labels.map((l, i) => `<th style="color:${Q()[i]}">${l.replace(' a ', '–')}</th>`).join('')}<th style="text-align:right">Média</th></tr></thead><tbody>${matrix}</tbody></table></div>
     <div><div class="sect">Soluções dentro de cada classe de ${M.label}</div>${stacks}</div>

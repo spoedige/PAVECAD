@@ -516,6 +516,107 @@ const TESTES = {
       assert.ok(m.buscaB <= m.fimConteudo + 1, 'rolada até o fim, a busca aparece inteira');
     }],
   ],
+  t09: [
+    ['Planservi: dois arquivos viram quatro projetos no unifilar, agrupados por rodovia', ['1366x768', 'tablet-h-1024x768'], async (pg) => {
+      const nomes = await pg.evaluate(() => window.__pavecad.E.P.map((p) => p.meta.name).sort());
+      assert.deepEqual(nomes, ['SP-333 · TH50 · Crescente', 'SP-333 · TH50 · Decrescente', 'SP-333 · TH51 · Crescente', 'SP-333 · TH51 · Decrescente']);
+      assert.equal(await pg.evaluate(() => window.__pavecad.E.activeGroup), 'SP-333');
+      await pg.waitForTimeout(600);
+      const blocos = await pg.evaluate(() => window.__pavecad.blocosDoUnifilar());
+      assert.equal(blocos.length, 4, 'quatro projetos desenhados no unifilar: ' + blocos.join(' | '));
+      assert.deepEqual([...blocos].sort(), nomes);
+      assert.ok(blocos.indexOf('SP-333 · TH50 · Crescente') < blocos.indexOf('SP-333 · TH50 · Decrescente'), 'crescente antes do decrescente');
+      // filtro: um grupo só (mesma rodovia), então o filtro não aparece; o título do unifilar traz a rodovia
+      assert.equal(await pg.evaluate(() => document.querySelectorAll('#unigroups button').length), 0);
+      assert.match(await pg.textContent('#title'), /^SP-333$/);
+      // sem erro de interface: unifilar legível (altura do cartão cabe na tela)
+      const h = await pg.evaluate(() => ({ uni: document.querySelector('#unicard').getBoundingClientRect().height, vh: innerHeight }));
+      assert.ok(h.uni < h.vh * 0.6, 'o unifilar com 4 projetos não toma mais de 60% da tela: ' + h.uni);
+    }, { arquivos: ['planservi_TH50.xlsx', 'planservi_TH51.xlsx'], projetos: 4 }],
+    ['Planservi: só IGG, FC-2 e FC-3 além de IRI e ATR; D0, Rc e Defeitos escondidos; limiares do IGG 20, 40, 80 e 160', ['1366x768'], async (pg) => {
+      const modos = await pg.evaluate(() => [...document.querySelectorAll('#modes button')].filter((b) => !b.hidden).map((b) => b.textContent));
+      assert.deepEqual(modos, ['Solução', 'IRI', 'ATR', 'IGG', 'FC-2', 'FC-3']);
+      assert.equal(await pg.evaluate(() => [...document.querySelectorAll('#modes button')].filter((b) => b.hidden).map((b) => b.dataset.m).join(',')), 'd0,rc,def');
+      // atalho pela ordem dos botões visíveis: 4 = IGG
+      await pg.evaluate(() => document.activeElement && document.activeElement.blur());
+      await pg.keyboard.press('4');
+      assert.equal(await estado(pg, 'E => E.mode'), 'igg');
+      await pg.click('#legTog'); await pg.waitForTimeout(300);
+      const leg = await pg.evaluate(() => [...document.querySelectorAll('#legend li button')].map((b) => b.textContent.trim()));
+      assert.deepEqual(leg, ['≤ 20', '20 a 40', '40 a 80', '80 a 160', '> 160']);
+      await pg.keyboard.press('5');
+      assert.equal(await estado(pg, 'E => E.mode'), 'fc2');
+      const leg2 = await pg.evaluate(() => [...document.querySelectorAll('#legend li button')].map((b) => b.textContent.trim()));
+      assert.equal(leg2[0], '0%', 'FC-2 em porcentagem: ' + leg2.join(' | '));
+      assert.ok(leg2.every((t) => /%/.test(t)), 'todos os rótulos com %: ' + leg2.join(' | '));
+      // Configurações > Limiares traz IGG, FC-2 e FC-3 editáveis
+      await pg.click('#btnCfg'); await pg.waitForTimeout(300); await pg.click('#cfgTabs [data-ct=lim]'); await pg.waitForTimeout(300);
+      const cards = await pg.evaluate(() => [...document.querySelectorAll('.cfg-grid [data-k]')].map((c) => c.dataset.k));
+      for (const k of ['igg', 'fc2', 'fc3']) assert.ok(cards.includes(k), 'limiar de ' + k);
+      const igg = await pg.evaluate(() => [...document.querySelectorAll('.cfg-grid [data-k="igg"] input')].map((i) => +i.value));
+      assert.deepEqual(igg, [20, 40, 80, 160]);
+    }, { arquivos: ['planservi_TH50.xlsx', 'planservi_TH51.xlsx'], projetos: 4 }],
+    ['Planservi: o detalhe do segmento lista as camadas; sem D0, Rc e D120; cor pela camada mais forte', ['1366x768'], async (pg) => {
+      // procura um segmento do crescente com intervenção funcional, para ver camadas e cor
+      const alvo = await pg.evaluate(() => {
+        const p = window.__pavecad.E.P.find((q) => q.meta.name === 'SP-333 · TH50 · Crescente');
+        const i = p.rows.findIndex((r) => r.lanes[0] && r.lanes[0].code === 'F4R4');
+        return { id: p.id, i };
+      });
+      assert.ok(alvo.i >= 0, 'um segmento F4R4 na amostra');
+      await pg.evaluate((a) => window.__pavecad.select(a.id, a.i, 1, { tab: true }), alvo);
+      await pg.waitForTimeout(600);
+      const m = await pg.evaluate(() => ({
+        params: [...document.querySelectorAll('#t-seg .param .k')].map((k) => k.textContent.trim()),
+        aberto: document.querySelector('#segDet').open,
+        itens: [...document.querySelectorAll('#segDet .kv > div')].map((d) => [d.querySelector('span').textContent, d.querySelector('b').textContent]),
+        chip: document.querySelector('#t-seg .chips .chip').textContent.trim(),
+      }));
+      assert.deepEqual(m.params, ['IRI', 'Flecha', 'IGG', 'FC-2', 'FC-3'], 'cartões: ' + m.params.join(', '));
+      assert.equal(m.aberto, true, 'no Planservi o detalhe abre de saída');
+      const nomes = m.itens.map((x) => x[0]);
+      for (const n of ['Estrutural', 'Fresagem / Recomposição estrutural', 'Funcional', 'Revestimento']) assert.ok(nomes.includes(n), 'camada ' + n + ' em ' + nomes.join(' | '));
+      const fun = m.itens.find((x) => x[0] === 'Funcional')[1];
+      assert.match(fun, /^F4R4 · fresagem de 4 cm e recomposição de 4 cm$/);
+      assert.match(m.chip, /Fresagem de 4 cm e recomposição de 4 cm/);
+      // a cor vem do catálogo: F4R4 usa a de Fres. funcional (a de FS4), e o código original continua o da planilha
+      const cor = await pg.evaluate((a) => { const p = window.__pavecad.E.P.find((q) => q.id === a.id); return { code: p.rows[a.i].lanes[0].code, main: p.model[a.i].tr[0].main }; }, alvo);
+      assert.deepEqual(cor, { code: 'F4R4', main: 'F4R4' });
+    }, { arquivos: ['planservi_TH50.xlsx', 'planservi_TH51.xlsx'], projetos: 4 }],
+    ['Planservi: a aba Revisão mostra a qualidade da importação, com o km de cada ocorrência, e o log traz o mesmo', ['1366x768'], async (pg) => {
+      await aba(pg, 'notas');
+      const sec = await pg.evaluate(() => ({ titulo: [...document.querySelectorAll('#t-notas .sect')].map((e) => e.textContent.trim()), itens: [...document.querySelectorAll('#t-notas details.qual')].map((d) => d.querySelector('summary b').textContent) }));
+      assert.ok(sec.titulo.some((t) => /Qualidade da importação/.test(t)));
+      assert.equal(sec.itens.length, 4, 'um item por projeto: ' + sec.itens.join(' | '));
+      // o resumo bate com o que o leitor calculou, e cada ocorrência traz o km
+      const q = await pg.evaluate(() => window.__pavecad.E.P.map((p) => ({ nome: p.meta.name, saltos: p.qualidade.saltos.length, sent: p.qualidade.sentidos.length, kms: [...p.qualidade.saltos.map((s) => s.km), ...p.qualidade.sentidos.map((s) => s.km)] })));
+      const crescA = q.find((x) => x.nome === 'SP-333 · TH50 · Crescente');
+      assert.ok(crescA.saltos >= 2 && crescA.sent >= 1, 'a amostra tem salto e distância entre sentidos');
+      await pg.click('#t-notas details.qual[data-qp] summary'); await pg.waitForTimeout(300);
+      const lista = await pg.evaluate(() => [...document.querySelectorAll('#t-notas details.qual[open] [data-q]')].map((b) => b.textContent.trim()));
+      assert.ok(lista.length > 0 && lista.every((t) => /^km \d+\+\d+/.test(t)), 'cada ocorrência começa pelo km: ' + lista.slice(0, 3).join(' | '));
+      // clicar numa ocorrência seleciona a linha
+      const alvo = await pg.evaluate(() => document.querySelector('#t-notas details.qual[open] [data-q]').dataset.q);
+      await pg.click('#t-notas details.qual[open] [data-q]'); await pg.waitForTimeout(800);
+      assert.equal(await pg.evaluate(() => { const s = window.__pavecad.E.sel; return s ? s.pid + ':' + s.row : null; }), alvo);
+      // o log do projeto (aba Ajustes) traz o mesmo resumo
+      await aba(pg, 'aj');
+      const log = await pg.evaluate(() => { const E = window.__pavecad.E; return E.P.find((p) => p.meta.name === 'SP-333 · TH50 · Crescente').log.filter((l) => /^planservi/.test(l.code)).map((l) => l.code + ': ' + l.msg); });
+      assert.ok(log.some((l) => /salto/.test(l) && /Nada foi corrigido/.test(l)), 'log com os saltos');
+      assert.ok(log.some((l) => /entre os sentidos/.test(l)), 'log com a distância entre os sentidos');
+      assert.ok(log.some((l) => /Aba IRI ignorada/.test(l)), 'log da aba IRI ignorada');
+      assert.ok(log.some((l) => /Larguras assumidas/.test(l)), 'log das larguras assumidas');
+    }, { arquivos: ['planservi_TH50.xlsx', 'planservi_TH51.xlsx'], projetos: 4 }],
+    ['Planservi: os quatro projetos sobrevivem ao recarregar, com a qualidade da importação', ['1366x768'], async (pg) => {
+      await pg.reload(); await pg.waitForTimeout(2500);
+      assert.equal(await pg.evaluate(() => window.__pavecad.E.P.length), 4, 'projetos restaurados do aparelho');
+      assert.ok(await pg.evaluate(() => window.__pavecad.E.P.every((p) => p.qualidade && p.meta.format === 'planservi')));
+    }, { arquivos: ['planservi_TH50.xlsx', 'planservi_TH51.xlsx'], projetos: 4 }],
+    ['RoadRunner: continua com os seis modos e sem IGG e FC', ['1366x768'], async (pg) => {
+      const modos = await pg.evaluate(() => [...document.querySelectorAll('#modes button')].filter((b) => !b.hidden).map((b) => b.textContent));
+      assert.deepEqual(modos, ['Solução', 'IRI', 'ATR', 'D0', 'Rc', 'Defeitos']);
+    }],
+  ],
   g03: [
     ['a seção é o seletor de faixa (clique, aria-pressed, teclado)', '1366x768', async (pg) => {
       await irParaKm(pg, '170+500'); await aba(pg, 'seg');
@@ -800,7 +901,7 @@ const TESTES = {
         const problemas = r.filter((x) => !x.startsWith('@'));
         assert.equal(problemas.length, 0, `${w}px: ` + problemas.slice(0, 5).join(' | '));
         const info = r.filter((x) => x.startsWith('@'));
-        assert.equal(info.length, 5, 'cinco indicadores');
+        assert.equal(info.length, 8, 'oito indicadores: IRI, ATR, D0, Rc, Defeitos, IGG, FC-2 e FC-3');
         for (const x of info) {
           assert.match(x, /campos=5/, `${w}px: 5 campos por cartão (${x})`);
           if (w < 520) assert.match(x, /linhas=2/, `${w}px: quebra em 2 linhas (${x})`);

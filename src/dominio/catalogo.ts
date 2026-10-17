@@ -28,6 +28,18 @@ export const CATALOGO_PADRAO: ItemCatalogo[] = [
   item('REC', 'Reconstrução', 'Reconstrução', '#a2231d', '#6b0f0a', 'Restauração'),
   item('Micro', 'Microrrevestimento', 'Micro', '#ffcc00', '#e6a800', 'Revestimento fino'),
   item('GAP', 'Gap graded', 'Gap graded', '#ff9500', '#ff6a00', 'Reforço'),
+  // Planservi. Onde há equivalente no RoadRunner, a cor é a mesma: RE como Reconstrução, RP já existe, MF como Microfresagem,
+  // FXRX funcional (F4R4, F8R8) como Fres. funcional 4 e FXRX estrutural (F4R8, F4R10) como Fres. estrutural.
+  item('RE', 'Reconstrução', 'Reconstrução', '#a2231d', '#6b0f0a', 'Restauração'),
+  item('F4R8', 'Fresagem de 4 cm e recomposição de 8 cm', 'Fres. e recomp. estrutural', '#af52de', '#7b2fbe', 'Restauração'),
+  item('F4R10', 'Fresagem de 4 cm e recomposição de 10 cm', 'Fres. e recomp. estrutural', '#af52de', '#7b2fbe', 'Restauração'),
+  item('F4R4', 'Fresagem de 4 cm e recomposição de 4 cm', 'Fres. funcional', '#0a84ff', '#0033b3', 'Fresagem'),
+  item('F8R8', 'Fresagem de 8 cm e recomposição de 8 cm', 'Fres. funcional', '#0a84ff', '#0033b3', 'Fresagem'),
+  item('MF', 'Microfresagem', 'Microfresagem', '#30b0c7', '#00788f', 'Fresagem'),
+  // Entradas novas, com cores que não existiam no catálogo.
+  item('ST', 'Selagem de trincas', 'Selagem de trincas', '#a2845e', '#6f5a40', 'Reparo'),
+  item('REF', 'Reforço (R e PMQ)', 'Reforço', '#8bc34a', '#4e7a1d', 'Reforço'),
+  item('VP', 'Ver projeto à parte', 'Ver projeto à parte', '#7d7aff', '#3b38c9', 'Outro'),
 ];
 
 const copia = (l: ItemCatalogo[]) => l.map((x) => ({ ...x }));

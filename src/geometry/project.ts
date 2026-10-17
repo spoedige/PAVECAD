@@ -1,4 +1,4 @@
-import type { LogEntry, ParsedProject, ProjectMeta, Row } from '../formats/types';
+import type { LogEntry, ParsedProject, ProjectMeta, Qualidade, Row } from '../formats/types';
 import { kmLabel, parseMarco } from '../formats/km';
 import { segmentsOf, type Seg } from '../formats/segments';
 import { type Crs, crsForZone, toUtm, zoneOf } from './utm';
@@ -9,6 +9,8 @@ export interface Project {
   rows: Row[];
   log: LogEntry[];
   codes: Record<string, number>;
+  /** Verificação das coordenadas feita na importação (Planservi). */
+  qualidade?: Qualidade;
   segs: Seg[];
   /** Trecho de cada linha. */
   segOf: Int32Array;

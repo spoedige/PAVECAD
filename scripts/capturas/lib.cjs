@@ -47,6 +47,10 @@ async function abrir(browser, vp, opts = {}) {
       for (const p of [...E.P]) if (/Marginal/i.test(p.meta.via) && E.P.length > 4) { const b = document.querySelector(`[data-del="${p.id}"]`); if (b) b.click(); await new Promise((r) => setTimeout(r, 300)); }
     });
     await pg.waitForTimeout(500);
+  } else if (opts.arquivos) {
+    // opts.arquivos: nomes em testes/fixtures; opts.projetos: quantos projetos esperar (um arquivo Planservi gera dois)
+    await pg.setInputFiles('#file', opts.arquivos.map((f) => path.join(RAIZ, 'testes/fixtures', f)));
+    await pg.waitForFunction((n) => window.__pavecad && window.__pavecad.E.P.length === n, opts.projetos, { timeout: 90000 });
   } else {
     await pg.setInputFiles('#file', FIXTURES);
     await pg.waitForFunction(() => window.__pavecad && window.__pavecad.E.P.length === 2, null, { timeout: 90000 });

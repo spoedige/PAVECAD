@@ -12,8 +12,8 @@ import { lerPlanilha } from './helpers';
 afterEach(() => { cat.restaurarPadrao(false); restaurarLimites(); });
 
 describe('catálogo de soluções', () => {
-  it('traz o padrão RoadRunner', () => {
-    expect(trOrder()).toEqual(['FS3', 'FS4', 'FSE', 'MFS', 'RP', 'REC', 'Micro', 'GAP']);
+  it('traz o padrão RoadRunner e os códigos do Planservi', () => {
+    expect(trOrder()).toEqual(['FS3', 'FS4', 'FSE', 'MFS', 'RP', 'REC', 'Micro', 'GAP', 'RE', 'F4R8', 'F4R10', 'F4R4', 'F8R8', 'MF', 'ST', 'REF', 'VP']);
     expect(trLabel('GAP')).toBe('Gap graded');
     expect(trLabel('-')).toBe('Sem intervenção');
     expect(trColor('Micro', false, '#ccc')).toBe('#ffcc00');
@@ -63,7 +63,7 @@ describe('catálogo de soluções', () => {
     expect(j.itens.some((i: { codigo: string }) => i.codigo === 'XYZ')).toBe(false);
     cat.restaurarPadrao(false);
     expect(trLabel('GAP')).toBe('Gap graded');
-    expect(cat.importar(j)).toBe(9);
+    expect(cat.importar(j)).toBe(18);
     expect(trLabel('GAP')).toBe('Reforço');
     expect(cat.get('NOVO').categoria).toBe('Reparo');
   });
