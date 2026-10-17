@@ -5,12 +5,14 @@ import { trColor, trLabel, trOrder } from '../dominio/solucoes';
 import { edgesOf } from '../geometry/build';
 import { tituloDe } from '../dominio/titulo';
 import { E, getP, projName, visibleProjects, type AppProj } from './estado';
-import { regeometrar, removerProjeto } from './projetos';
+import { aplicarDesloc, regeometrar, removerProjeto } from './projetos';
+import { DESLOC_MAX, validarDesloc, type Desloc } from '../geometry/deslocamento';
+import { selecionarPlanilhas } from './seletor';
 import { IC } from './icones';
 import { applyLayers, applyPaint, clearFocus, clearSel, fitAll, fitFocus, fitList, getMap, renderLegend, select, setBase, setFocus, setProjectData, stepSel, updateSelLayer, updateStakes, applyVisibility, temMapTiler } from './mapa';
 import { drawUni, renderGroups } from './unifilar';
 import { refreshProp, refreshPropLayers, renderNotes, resolveProps, startNote } from './revisao';
-import { $, cssv, esc, fmt, syncAllSegs, syncSeg, toast } from './ui';
+import { $, cssv, esc, fmt, syncAllSegs, syncSeg, toast, toastAcao } from './ui';
 
 const Q = () => (E.field ? Q5F : Q5);
 const tc = (k: string) => trColor(k, E.field, cssv('--none'));
@@ -291,6 +293,40 @@ export function renderAna() {
 /* ---------------------------------------------------------------- */
 /* Ajustes                                                           */
 /* ---------------------------------------------------------------- */
+/** Deslocamentos em fila: cada clique usa o valor mais recente, mesmo com o worker ainda calculando. */
+let deslocOcupado = false;
+let deslocPend: { p: AppProj; d: Desloc } | null = null;
+let deslocFoco: string | null = null;
+const deslocAtual = (p: AppProj): Desloc => (deslocPend?.p === p ? deslocPend.d : p.desloc);
+async function pedirDesloc(p: AppProj, d: Desloc) {
+  deslocPend = { p, d };
+  if (deslocOcupado) return;
+  deslocOcupado = true;
+  try {
+    while (deslocPend) {
+      const n: { p: AppProj; d: Desloc } = deslocPend;
+      await aplicarDesloc(n.p, n.d);
+      if (deslocPend === n) deslocPend = null;
+    }
+  } finally { deslocOcupado = false; }
+}
+
+/** Copia o deslocamento da planilha atual, como valor absoluto, para as planilhas marcadas. */
+async function deslocarOutras(origem: AppProj) {
+  const d = { ...origem.desloc };
+  const destinos = await selecionarPlanilhas(origem, {
+    titulo: 'Aplicar deslocamento a outras planilhas',
+    descricao: `Copia o deslocamento de ${projName(origem)} (longitudinal ${fmt(d.l, 1)} m, transversal ${fmt(d.t, 1)} m) como valor absoluto. O que as marcadas já têm é substituído.`,
+  });
+  if (!destinos?.length) return;
+  const antes = destinos.map((q) => ({ q, d: { ...q.desloc } }));
+  for (const q of destinos) await aplicarDesloc(q, d);
+  toastAcao(`Deslocamento aplicado a ${destinos.length} planilha(s)`, 'Desfazer', async () => {
+    for (const a of antes) await aplicarDesloc(a.q, a.d);
+    toast('Aplicação desfeita');
+  });
+}
+
 export function renderAj() {
   const el = $('#t-aj'), p = getP(E.settingsPid ?? '') ?? E.P[0];
   const opts = p ? `
@@ -300,13 +336,22 @@ export function renderAj() {
         <div class="field"><label for="a-trav">Sentido de tráfego</label><select id="a-trav"><option value="1">Crescente</option><option value="-1">Decrescente</option></select></div>
         <div class="field"><label for="a-dir">Faixas crescem para a</label><select id="a-dir"><option value="1">Direita</option><option value="-1">Esquerda</option></select></div>
         <div class="field"><label for="a-org">Coordenada está na</label><select id="a-org"><option value="edge">Borda da Fx 1 (0 m)</option><option value="axis">Eixo da Fx 1</option></select></div>
-        <div class="field"><label for="a-ext">Deslocamento adicional (m)</label><input id="a-ext" type="number" step="0.5" min="0" max="100"></div>
-        <div class="field"><label for="a-exs">Lado do deslocamento</label><select id="a-exs"><option value="1">Direita</option><option value="-1">Esquerda</option></select></div>
         <div class="field"><label for="a-win">Suavização do azimute</label><select id="a-win"><option value="1">±1 ponto (20 m)</option><option value="2">±2 pontos (40 m)</option><option value="4">±4 pontos (80 m)</option></select></div>
         <div class="field"><label for="a-sh">Acostamento externo</label><select id="a-sh"><option value="1">Mostrar</option><option value="0">Ocultar</option></select></div>
         <div class="field"><label for="a-dr">Lado dos drenos</label><select id="a-dr"><option value="out">Externo</option><option value="in">Interno</option></select></div>
       </div>
-      <p class="note" style="margin-top:7px">Sentido e coordenada seguem a regra confirmada: coordenada na borda esquerda da Fx 1, no sentido do tráfego. A Marginal Sul usa as mesmas coordenadas da pista principal, por isso entra com 12 m de deslocamento adicional.</p>
+      <p class="note" style="margin-top:7px">Sentido e coordenada seguem a regra confirmada: coordenada na borda esquerda da Fx 1, no sentido do tráfego. A Marginal Sul usa as mesmas coordenadas da pista principal, por isso entra com 12 m de deslocamento transversal à direita.</p>
+      <div class="sect" style="margin-top:14px">Deslocamento da planilha</div>
+      <div class="list desl" id="desloc">
+        ${([['l', 'Longitudinal', 'ao longo da via; positivo no sentido de percurso'], ['t', 'Transversal', 'positivo à direita do sentido de percurso, negativo à esquerda']] as const).map(([e, nome, dica]) => `
+        <div class="desl-eixo"><label for="d-${e}">${nome} (m)</label><span class="note">${dica}</span>
+          <div class="desl-passo">${[-5, -1].map((v) => `<button class="btn" type="button" data-d="${e}" data-s="${v}" aria-label="${nome} ${v} m">${v === -1 ? '−1' : '−5'}</button>`).join('')}
+            <input id="d-${e}" class="in num" type="number" step="0.1" min="-${DESLOC_MAX}" max="${DESLOC_MAX}" inputmode="decimal" aria-label="${nome} em metros">
+            ${[1, 5].map((v) => `<button class="btn" type="button" data-d="${e}" data-s="${v}" aria-label="${nome} +${v} m">+${v}</button>`).join('')}</div></div>`).join('')}
+        <p class="cfg-err" id="d-err" role="alert"></p>
+        <div class="btns"><button class="btn" type="button" id="d-zero">Zerar</button><button class="btn" type="button" id="d-outras">Aplicar a outras planilhas…</button></div>
+        <p class="note">Move a planilha inteira no mapa, nos polígonos, no CSV de propostas e na localização por GPS. Fica salvo no aparelho junto com a planilha.</p>
+      </div>
       <p class="note num" style="margin-top:7px">Sistema de coordenadas: SIRGAS 2000 UTM ${p.crs.zone}S${p.crs.epsg ? ` (EPSG ${p.crs.epsg})` : ''}, ${p.crs.source === 'fixo' ? 'fixado' : 'pela mediana das longitudes'}.</p>
       ${p.log.length ? `<details style="margin-top:8px"><summary>Log de importação (${p.log.length})</summary><div class="formula">${p.log.map((l) => `${l.level === 'warn' ? '! ' : '· '}${esc(l.msg)}`).join('\n')}</div></details>` : ''}</div>` : '';
   el.innerHTML = `
@@ -325,14 +370,30 @@ P(n) = P + e(n) · (nE , nN)</div>
   if (p) {
     const set = (id: string, v: string) => { $<HTMLInputElement | HTMLSelectElement>(id).value = v; };
     set('#a-proj', p.id); set('#a-trav', String(p.opts.travel)); set('#a-dir', String(p.opts.dir)); set('#a-org', p.opts.origin);
-    set('#a-ext', String(p.opts.extra)); set('#a-exs', String(p.opts.extraSide)); set('#a-win', String(p.opts.win)); set('#a-sh', p.opts.shoulder ? '1' : '0'); set('#a-dr', p.opts.drainSide);
+    set('#d-l', String(p.desloc.l)); set('#d-t', String(p.desloc.t)); set('#a-win', String(p.opts.win)); set('#a-sh', p.opts.shoulder ? '1' : '0'); set('#a-dr', p.opts.drainSide);
     $('#a-proj').onchange = (e) => { E.settingsPid = (e.target as HTMLSelectElement).value; renderAj(); };
     const ch = (id: string, fn: (v: string) => void) => { $(id).onchange = (e) => { fn((e.target as HTMLInputElement).value); void regeometrar(p); }; };
     ch('#a-trav', (v) => (p.opts.travel = +v as 1 | -1));
     ch('#a-dir', (v) => (p.opts.dir = +v as 1 | -1));
     ch('#a-org', (v) => (p.opts.origin = v as 'edge' | 'axis'));
-    ch('#a-ext', (v) => (p.opts.extra = Math.max(0, +v || 0)));
-    ch('#a-exs', (v) => (p.opts.extraSide = +v as 1 | -1));
+    const mudar = (eixo: 'l' | 't', v: number) => {
+      const d = { ...deslocAtual(p), [eixo]: Math.round(v * 1000) / 1000 };
+      const msg = validarDesloc(d);
+      $('#d-err').textContent = msg ?? '';
+      if (msg) return;
+      void pedirDesloc(p, d);
+    };
+    el.querySelectorAll<HTMLButtonElement>('[data-d]').forEach((b) => (b.onclick = () => {
+      const e = b.dataset.d as 'l' | 't';
+      deslocFoco = `[data-d="${e}"][data-s="${b.dataset.s}"]`;
+      mudar(e, deslocAtual(p)[e] + +b.dataset.s!);
+    }));
+    for (const e of ['l', 't'] as const) {
+      $<HTMLInputElement>('#d-' + e).onchange = (ev) => { const v = parseFloat((ev.target as HTMLInputElement).value.replace(',', '.')); deslocFoco = '#d-' + e; if (Number.isFinite(v)) mudar(e, v); else $('#d-err').textContent = 'Informe um número em metros.'; };
+    }
+    $('#d-zero').onclick = () => { deslocFoco = '#d-zero'; $('#d-err').textContent = ''; void pedirDesloc(p, { l: 0, t: 0 }); };
+    $('#d-outras').onclick = () => void deslocarOutras(p);
+    if (deslocFoco) { const f = el.querySelector<HTMLElement>(deslocFoco); deslocFoco = null; f?.focus(); }
     ch('#a-win', (v) => (p.opts.win = +v));
     ch('#a-sh', (v) => (p.opts.shoulder = v === '1'));
     ch('#a-dr', (v) => (p.opts.drainSide = v as 'out' | 'in'));

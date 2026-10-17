@@ -679,6 +679,152 @@ const TESTES = {
       assert.ok(m.dentro && m.abaixoBase && m.naGaveta, 'dentro da gaveta, junto da escolha de base');
     }],
   ],
+  t11: [
+    ['larguras: "Aplicar a outras planilhas…" lista as outras com nome, rodovia e sentido, atalhos marcam o conjunto certo e só as marcadas mudam', '1366x768', async (pg) => {
+      await pg.click('#btnCfg'); await pg.click('#cfgTabs [data-ct=larg]'); await pg.waitForSelector('#lgProj');
+      const info = await pg.evaluate(() => { const E = window.__pavecad.E, pid = document.querySelector('#lgProj').value; return { pid, todas: E.P.map((p) => ({ id: p.id, travel: p.meta.travel, uf: p.meta.uf })) }; });
+      assert.ok(info.todas.length >= 4, 'esperava 4 planilhas, vieram ' + info.todas.length);
+      assert.equal(await pg.isDisabled('#lgOutras'), true, 'sem ajustes, não há o que copiar');
+      await pg.fill('#lgW', '3.2'); await pg.click('#lgAdd'); await pg.waitForFunction((pid) => window.__pavecad.E.P.find((p) => p.id === pid).ajustes.length === 1, info.pid);
+      await pg.click('#lgOutras'); await pg.waitForSelector('#seletor');
+      const outras = info.todas.filter((p) => p.id !== info.pid);
+      assert.equal(await pg.locator('#seletor input[data-id]').count(), outras.length, 'a origem não aparece');
+      assert.equal(await pg.locator(`#seletor input[data-id="${info.pid}"]`).count(), 0);
+      const linhas = await pg.locator('.sel-item').allInnerTexts();
+      assert.ok(linhas.every((t) => /Crescente|Decrescente/.test(t) && /\S+/.test(t.split('\n')[1] || '')), 'cada linha traz nome, rodovia e sentido: ' + linhas.join(' | '));
+      assert.equal(await pg.isDisabled('#selOk'), true, 'nada marcado: Aplicar desabilitado');
+      assert.match(await pg.innerText('#selCont'), new RegExp(`^0 de ${outras.length} selecionadas`));
+      const marcados = () => pg.evaluate(() => [...document.querySelectorAll('#seletor input[data-id]')].filter((c) => c.checked).map((c) => c.dataset.id).sort());
+      const ids = (f) => outras.filter(f).map((p) => p.id).sort();
+      await pg.click('[data-atalho=todas]'); assert.deepEqual(await marcados(), ids(() => true));
+      await pg.click('[data-atalho=nenhuma]'); assert.deepEqual(await marcados(), []);
+      await pg.click('[data-atalho=crescentes]'); assert.deepEqual(await marcados(), ids((p) => p.travel === 1));
+      await pg.click('[data-atalho=rodovia]'); const orig = info.todas.find((p) => p.id === info.pid); assert.deepEqual(await marcados(), ids((p) => p.uf === orig.uf));
+      await pg.click('[data-atalho=decrescentes]');
+      assert.deepEqual(await marcados(), ids((p) => p.travel === -1), 'Só decrescentes marca apenas as decrescentes');
+      assert.equal(await pg.isDisabled('#selOk'), false);
+      const nDec = ids((p) => p.travel === -1).length;
+      assert.match(await pg.innerText('#selCont'), new RegExp(`^${nDec} de ${outras.length} selecionadas`));
+      await pg.click('#selOk');
+      await pg.waitForFunction((n) => window.__pavecad.E.P.filter((p) => p.ajustes.length === 1).length === n, nDec + 1, { timeout: 20000 });
+      const depois = await pg.evaluate(() => window.__pavecad.E.P.map((p) => ({ id: p.id, travel: p.meta.travel, aj: p.ajustes.map((a) => [a.lane, a.largura, a.pname]) })));
+      for (const p of depois) {
+        const esperado = p.id === info.pid || (p.travel === -1);
+        assert.equal(p.aj.length, esperado ? 1 : 0, `${p.id}: ajustes ${JSON.stringify(p.aj)}`);
+      }
+      assert.ok(depois.filter((p) => p.travel === -1).every((p) => p.aj[0][1] === 3.2));
+      // desfazer pelo aviso
+      await pg.click('.toast-acao button');
+      await pg.waitForFunction((pid) => window.__pavecad.E.P.every((p) => p.id === pid || p.ajustes.length === 0), info.pid, { timeout: 20000 });
+      assert.equal(await pg.evaluate((pid) => window.__pavecad.E.P.find((p) => p.id === pid).ajustes.length, info.pid), 1, 'a origem continua com o ajuste');
+    }, { exemplos: true }],
+    ['larguras: faixas que o destino não tem são ignoradas e o aviso diz quais', '1366x768', async (pg) => {
+      await pg.click('#btnCfg'); await pg.click('#cfgTabs [data-ct=larg]'); await pg.waitForSelector('#lgProj');
+      const pid = await pg.inputValue('#lgProj');
+      // acrescenta um ajuste na Fx 6, que nenhuma planilha de exemplo possui
+      await pg.evaluate(async (pid) => { const E = window.__pavecad.E, p = E.P.find((q) => q.id === pid); p.ajustes = [{ id: 'z1', pname: p.meta.name, lane: 1, km0: null, km1: null, largura: 3.3 }, { id: 'z2', pname: p.meta.name, lane: 6, km0: null, km1: null, largura: 3.1 }]; }, pid);
+      await pg.click('#cfgTabs [data-ct=dados]'); await pg.click('#cfgTabs [data-ct=larg]'); await pg.waitForSelector('#lgOutras:not([disabled])');
+      await pg.click('#lgOutras'); await pg.waitForSelector('#seletor');
+      const alvo = (await pg.locator('#seletor input[data-id]').first().getAttribute('data-id'));
+      await pg.check(`#seletor input[data-id="${alvo}"]`);
+      assert.match(await pg.innerText('#selAviso'), /Faixas inexistentes.*Fx 6/s, 'o rodapé avisa antes de aplicar');
+      await pg.click('#selOk');
+      await pg.waitForSelector('.toast-acao');
+      assert.match(await pg.innerText('.toast-acao'), /ignoradas.*Fx 6/s);
+      const aj = await pg.evaluate((id) => window.__pavecad.E.P.find((p) => p.id === id).ajustes.map((a) => a.lane), alvo);
+      assert.deepEqual(aj, [1], 'só a Fx 1 foi copiada');
+    }, { exemplos: true }],
+    ['deslocamento: ±1 m e ±5 m, campo numérico e Zerar movem a pista no valor esperado; fica salvo e volta após recarregar', '1366x768', async (pg) => {
+      const medir = () => pg.evaluate(() => {
+        const E = window.__pavecad.E, p = E.P.find((q) => q.meta.travel === 1), f = p.camadas.polys.features.find((q) => q.properties.row > 5 && q.properties.lane === 1);
+        const o = p.rowsPlanilha, r0 = f.properties.row, c = f.geometry.coordinates[0][0], mLon = 111320 * Math.cos((o[r0].lat * Math.PI) / 180);
+        const tE = (o[r0 + 1].lon - o[r0].lon) * mLon, tN = (o[r0 + 1].lat - o[r0].lat) * 111132, d = Math.hypot(tE, tN);
+        return { pid: p.id, c, mLon, tE: tE / d, tN: tN / d, desloc: { ...p.desloc }, lat: p.rows[r0].lat, lon: p.rows[r0].lon };
+      });
+      const mover = (a, b) => { const dE = (b.c[0] - a.c[0]) * a.mLon, dN = (b.c[1] - a.c[1]) * 111132; return { l: dE * a.tE + dN * a.tN, t: dE * a.tN + dN * -a.tE, d: Math.hypot(dE, dN) }; };
+      const perto = (v, esp, msg) => assert.ok(Math.abs(v - esp) < 0.08, `${msg}: ${v.toFixed(3)} x ${esp}`);
+      const ajustou = async (l, t) => { await pg.waitForFunction(([pid, l, t]) => { const p = window.__pavecad.E.P.find((q) => q.id === pid); return p.desloc.l === l && p.desloc.t === t; }, [(await medir()).pid, l, t], { timeout: 15000 }); await pg.waitForTimeout(400); };
+      await aba(pg, 'aj');
+      const pid = (await medir()).pid;
+      await pg.selectOption('#a-proj', pid); await pg.waitForSelector('#d-l');
+      const m0 = await medir();
+      assert.deepEqual(m0.desloc, { l: 0, t: 0 });
+      // transversal +5 m (direita do sentido de percurso)
+      await pg.click('[data-d=t][data-s="5"]'); await ajustou(0, 5);
+      let m1 = await medir(), d = mover(m0, m1);
+      perto(d.t, 5, 'transversal +5'); perto(d.l, 0, 'sem longitudinal');
+      assert.equal(await pg.inputValue('#d-t'), '5');
+      // +1 e −1 voltam 1 m a cada clique
+      await pg.click('[data-d=t][data-s="1"]'); await ajustou(0, 6);
+      await pg.click('[data-d=t][data-s="-5"]'); await ajustou(0, 1);
+      m1 = await medir(); perto(mover(m0, m1).t, 1, 'transversal +1 depois de +5 +1 −5');
+      // longitudinal pelo campo numérico: 7 m no sentido de percurso
+      await pg.fill('#d-l', '7'); await pg.press('#d-l', 'Tab'); await ajustou(7, 1);
+      const m2 = await medir(); d = mover(m0, m2);
+      perto(d.l, 7, 'longitudinal 7'); perto(d.t, 1, 'transversal 1 mantido');
+      // transversal negativo vai para a esquerda
+      await pg.fill('#d-t', '-4'); await pg.press('#d-t', 'Tab'); await ajustou(7, -4);
+      perto(mover(m0, await medir()).t, -4, 'transversal −4 (esquerda)');
+      // as linhas efetivas (coordenadas exportadas/GPS) acompanham o longitudinal; a planilha original não muda
+      const lin = await pg.evaluate((pid) => {
+        const p = window.__pavecad.E.P.find((q) => q.id === pid), a = p.rowsPlanilha[10], b = p.rows[10];
+        return { d: Math.hypot((b.lon - a.lon) * 111320 * Math.cos((a.lat * Math.PI) / 180), (b.lat - a.lat) * 111132), planilhaIntacta: p.rowsPlanilha[10] !== p.rows[10] };
+      }, pid);
+      assert.ok(Math.abs(lin.d - 7) < 0.15, 'a linha efetiva (CSV e GPS) andou 7 m: ' + lin.d);
+      assert.equal(lin.planilhaIntacta, true, 'a linha original da planilha não foi alterada');
+      // persistência
+      await pg.waitForTimeout(600);
+      const antes = await medir();
+      await pg.reload(); await pg.waitForFunction(() => window.__pavecad && window.__pavecad.E.P.length >= 1, null, { timeout: 60000 }); await pg.waitForTimeout(3000);
+      const depois = await pg.evaluate(() => { const p = window.__pavecad.E.P.find((q) => q.meta.travel === 1); return { n: window.__pavecad.E.P.length, desloc: { ...p.desloc }, lat: p.rows[10].lat }; });
+      assert.deepEqual(depois.desloc, { l: 7, t: -4 }, 'o deslocamento volta após recarregar');
+      assert.ok(Math.abs(depois.lat - (await pg.evaluate(() => window.__pavecad.E.P.find((q) => q.meta.travel === 1).rowsPlanilha[10].lat))) > 1e-6, 'e a geometria está deslocada');
+      await aba(pg, 'aj');
+      assert.equal(await pg.inputValue('#d-l'), '7'); assert.equal(await pg.inputValue('#d-t'), '-4');
+      // Zerar
+      await pg.click('#d-zero');
+      await pg.waitForFunction(() => window.__pavecad.E.P.every((p) => p.desloc.l === 0 && p.desloc.t === 0), null, { timeout: 15000 });
+      await pg.waitForTimeout(500);
+      const m3 = await medir(); const dz = mover(m0, m3);
+      perto(dz.d, 0, 'Zerar volta ao ponto original');
+      assert.equal(await pg.inputValue('#d-l'), '0');
+      void antes;
+    }],
+    ['deslocamento: "Aplicar a outras planilhas…" copia o valor absoluto só para as marcadas (Só decrescentes) e desfaz', '1366x768', async (pg) => {
+      await aba(pg, 'aj');
+      const origem = await pg.inputValue('#a-proj');
+      await pg.click('[data-d=l][data-s="5"]'); await pg.waitForFunction((pid) => window.__pavecad.E.P.find((p) => p.id === pid).desloc.l === 5, origem);
+      await pg.click('[data-d=t][data-s="-1"]'); await pg.waitForFunction((pid) => window.__pavecad.E.P.find((p) => p.id === pid).desloc.t === -1, origem);
+      await pg.click('#d-outras'); await pg.waitForSelector('#seletor');
+      assert.equal(await pg.locator(`#seletor input[data-id="${origem}"]`).count(), 0, 'a origem não aparece');
+      await pg.click('[data-atalho=decrescentes]');
+      await pg.click('#selOk');
+      const ver = () => pg.evaluate((o) => window.__pavecad.E.P.map((p) => ({ id: p.id, travel: p.meta.travel, d: { ...p.desloc } })), origem);
+      await pg.waitForFunction((o) => window.__pavecad.E.P.filter((p) => p.id !== o && p.meta.travel === -1).every((p) => p.desloc.l === 5 && p.desloc.t === -1), origem, { timeout: 30000 });
+      for (const p of await ver()) {
+        const esp = p.id === origem || p.travel === -1 ? { l: 5, t: -1 } : { l: 0, t: 0 };
+        assert.deepEqual(p.d, esp, `${p.id} (${p.travel})`);
+      }
+      await pg.click('.toast-acao button');
+      await pg.waitForFunction((o) => window.__pavecad.E.P.every((p) => p.id === o || (p.desloc.l === 0 && p.desloc.t === 0)), origem, { timeout: 30000 });
+      assert.deepEqual((await ver()).find((p) => p.id === origem).d, { l: 5, t: -1 }, 'a origem continua deslocada');
+    }, { exemplos: true }],
+    ['deslocamento: o controle fica na aba Ajustes, com ±1 e ±5 m, campo, Zerar e Aplicar a outras; alvos de 44 px (falha se sumir)', TODOS, async (pg) => {
+      await aba(pg, 'aj');
+      await pg.waitForSelector('#desloc', { state: 'visible' });
+      const m = await pg.evaluate(() => {
+        const alvo = (s) => { const r = document.querySelector(s)?.getBoundingClientRect(); return r ? [Math.round(r.width), Math.round(r.height)] : null; };
+        return {
+          passos: ['l', 't'].map((e) => [-5, -1, 1, 5].map((v) => alvo(`[data-d=${e}][data-s="${v}"]`))),
+          campos: [alvo('#d-l'), alvo('#d-t')], zero: alvo('#d-zero'), outras: alvo('#d-outras'),
+          dentro: document.querySelector('#desloc').getBoundingClientRect().right <= window.innerWidth + 0.5,
+        };
+      });
+      for (const g of m.passos) for (const a of g) assert.ok(a && a[0] >= 44 && a[1] >= 44, 'botão de passo ≥ 44 px: ' + JSON.stringify(m.passos));
+      for (const a of [...m.campos, m.zero, m.outras]) assert.ok(a && a[1] >= 44, 'alvo ≥ 44 px: ' + JSON.stringify(m));
+      assert.ok(m.dentro, 'cabe na largura da tela');
+    }],
+  ],
   g03: [
     ['a seção é o seletor de faixa (clique, aria-pressed, teclado)', '1366x768', async (pg) => {
       await irParaKm(pg, '170+500'); await aba(pg, 'seg');

@@ -8,6 +8,7 @@ import type { RowModel } from '../dominio/modelo';
 import type { IndKey, ModeKey } from '../dominio/indicadores';
 import type { Alvo, Proposta } from '../dominio/propostas';
 import type { AjusteLargura } from '../dominio/larguras';
+import type { Desloc } from '../geometry/deslocamento';
 import type { Lane, Row } from '../formats/types';
 import type { SolutionCode } from '../formats/km';
 import type { MapMouseEvent } from 'maplibre-gl';
@@ -27,6 +28,10 @@ export interface AppProj extends Project {
   /** Linhas como vieram da planilha. `rows` já traz os ajustes de largura aplicados. */
   rowsPlanilha: Row[];
   ajustes: AjusteLargura[];
+  /** Eixo como veio da planilha, em metros projetados. `x` e `y` já trazem o deslocamento longitudinal. */
+  x0: Float64Array;
+  y0: Float64Array;
+  desloc: Desloc;
 }
 
 export interface Sel { pid: string; row: number; lane: number }
@@ -82,6 +87,8 @@ export const E = {
   tab: 'resumo' as 'resumo' | 'seg' | 'ana' | 'notas' | 'aj',
   /** Ajustes de largura salvos, por nome de planilha. Valem quando a planilha é aberta. */
   ajustesSalvos: {} as Record<string, AjusteLargura[]>,
+  /** Deslocamento salvo, por nome de planilha. */
+  deslocSalvos: {} as Record<string, Desloc>,
 };
 
 /** Ganchos para os módulos de interface, sem import circular com o mapa. */
@@ -116,6 +123,7 @@ export function criarProjeto(
   return {
     ...base, ...extra, id, label: base.meta.name, visible: true, model: modelOf(base.rows),
     polyByFid, bounds: [[x0, y0], [x1, y1]], markers: [], rowsPlanilha: base.rows, ajustes: [],
+    x0: Float64Array.from(base.x), y0: Float64Array.from(base.y), desloc: { l: 0, t: 0 },
   };
 }
 
