@@ -1,10 +1,12 @@
 import * as catalogo from '../dominio/catalogo';
 import { getLimites, setLimites, type Limites } from '../dominio/indicadores';
 import { aplicarLarguras, type AjusteLargura } from '../dominio/larguras';
+import { deslocarLongitudinal, deslocZerado, type Desloc } from '../geometry/deslocamento';
+import { fromUtm } from '../geometry/utm';
 import type { ParsedProject } from '../formats/types';
 import { carregarLido, lerPlanilha, recalcular } from '../mapa/cliente';
 import { aplicarGeometria, baseOf, criarProjeto, E, H, novoId, type AppProj } from './estado';
-import { addProjectToMap, applyPaint, clearFocus, fitList, removeProjectFromMap, setProjectData, updateSelLayer } from './mapa';
+import { addProjectToMap, applyPaint, clearFocus, fitList, removeProjectFromMap, setProjectData, updateSelLayer, updateStakes } from './mapa';
 import * as db from './persist';
 import { renderAll } from './paineis';
 import { refreshProp, refreshPropLayers, resolveProps } from './revisao';
@@ -24,6 +26,7 @@ export async function carregarConfig() {
       if (it.id === 'catalogo') catalogo.importar(it.json);
       else if (it.id === 'limiares') setLimites(it.limites as Limites);
       else if (it.id.startsWith('larguras:')) E.ajustesSalvos[it.pname as string] = it.ajustes as AjusteLargura[];
+      else if (it.id.startsWith('desloc:')) E.deslocSalvos[it.pname as string] = { l: +(it.l as number) || 0, t: +(it.t as number) || 0 };
     } catch { /* registro inválido: ignora */ }
   }
 }
@@ -33,6 +36,12 @@ export const salvarLimiares = () => db.gravar('config', { id: 'limiares', limite
 export function salvarAjustes(pname: string, ajustes: AjusteLargura[]) {
   E.ajustesSalvos[pname] = ajustes;
   db.gravar('config', { id: 'larguras:' + pname, pname, ajustes });
+}
+
+export function salvarDesloc(p: AppProj) {
+  const { l, t } = p.desloc;
+  E.deslocSalvos[p.meta.name] = { l, t };
+  db.gravar('config', { id: 'desloc:' + p.meta.name, pname: p.meta.name, l, t });
 }
 
 /* ---------------------------------------------------------------- */
@@ -66,12 +75,39 @@ export async function regeometrar(p: AppProj, aviso = true) {
   } catch (e) { toast('Falha ao recalcular: ' + (e as Error).message, 5000); }
 }
 
+/** Linhas efetivas: larguras ajustadas e deslocamento longitudinal. A planilha original não é tocada:
+ *  as linhas deslocadas são cópias, e `x0`/`y0` guardam o eixo de partida. */
+export function atualizarLinhas(p: AppProj) {
+  const base = aplicarLarguras(p.rowsPlanilha, p.kmNum, p.ajustes);
+  const { l, t } = p.desloc;
+  p.opts.extra = Math.abs(t);
+  p.opts.extraSide = t < 0 ? -1 : 1;
+  const { x, y } = deslocarLongitudinal(p.x0, p.y0, p.segs, p.opts.win, p.meta.travel, l);
+  p.x = x; p.y = y;
+  p.rows = l === 0 ? base : base.map((r, i) => {
+    if (x[i] === p.x0[i] && y[i] === p.y0[i]) return r;
+    const [lat, lon] = fromUtm(p.crs, x[i], y[i]);
+    return { ...r, lat: +lat.toFixed(7), lon: +lon.toFixed(7) };
+  });
+}
+
 /** Aplica ajustes de largura: recalcula rows, geometria e áreas. As quantidades da planilha original não mudam. */
 export async function aplicarAjustes(p: AppProj, ajustes: AjusteLargura[]) {
   p.ajustes = ajustes;
   salvarAjustes(p.meta.name, ajustes);
-  p.rows = aplicarLarguras(p.rowsPlanilha, p.kmNum, ajustes);
+  atualizarLinhas(p);
   await regeometrar(p);
+}
+
+/** Desloca a planilha inteira (metros) e refaz a geometria na hora. Vale também para o CSV de propostas e
+ *  para o georreferenciamento por GPS, que leem a mesma geometria. */
+export async function aplicarDesloc(p: AppProj, d: Desloc, salvar = true) {
+  p.desloc = { l: d.l, t: d.t };
+  atualizarLinhas(p);
+  await regeometrar(p, false);
+  updateStakes();
+  if (salvar) salvarDesloc(p);
+  renderAll();
 }
 
 /** Reclassifica as feições de todas as planilhas (limiares novos). */
@@ -90,10 +126,11 @@ async function finalizar(p: AppProj): Promise<void> {
     toast(`${novos.length} código${novos.length > 1 ? 's' : ''} de solução sem cadastro: ${novos.join(', ')}. Veja em Configurações`, 6000);
     H.onCatalogo();
   }
-  const aj = E.ajustesSalvos[p.meta.name];
-  if (aj?.length) {
-    p.ajustes = aj;
-    p.rows = aplicarLarguras(p.rowsPlanilha, p.kmNum, aj);
+  const aj = E.ajustesSalvos[p.meta.name], ds = E.deslocSalvos[p.meta.name];
+  if (ds && !deslocZerado(ds)) p.desloc = { ...ds };
+  if (aj?.length || !deslocZerado(p.desloc)) {
+    p.ajustes = aj ?? [];
+    atualizarLinhas(p);
     const r = await recalcular(p.id, baseOf(p), p.opts);
     aplicarGeometria(p, r);
   }
