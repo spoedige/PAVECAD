@@ -53,6 +53,7 @@ $('#rotN').addEventListener('click', north);
 $('#rotA').addEventListener('click', alignToRoad);
 $('#btnGps').addEventListener('click', () => void gpsToggle());
 $('#btnField').addEventListener('click', () => setField(!E.field));
+$('#btnOverview').addEventListener('click', () => fitAll());
 $('#goBtn').addEventListener('click', () => { const v = $<HTMLInputElement>('#gokm').value; if (v.trim()) goLabel(v); });
 $('#gokm').addEventListener('keydown', (e) => { if (e.key === 'Enter') { $('#goBtn').click(); (e.target as HTMLElement).blur(); } });
 
@@ -138,7 +139,7 @@ async function boot() {
   initGrupos(() => { drawUni(); agendarReaplicar(); });
   observarHud(agendarReaplicar);
   document.querySelectorAll<HTMLElement>('.tabbody').forEach(observarRolagem);
-  observarRolagemH($('#viewsIn'));
+  observarRolagemH($('#unigroups'));
   renderAll();
   initMap(() => {
     resolveProps();

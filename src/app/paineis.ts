@@ -36,13 +36,6 @@ export function renderViews() {
   $('#title').textContent = t;
   $('#titlebox').title = t;
   $('#subtitle').textContent = !n ? 'Nenhuma planilha' : `${n} planilha${n > 1 ? 's' : ''}${v.length < n ? ` · ${v.length} ${v.length > 1 ? 'visíveis' : 'visível'}` : ''}`;
-  const vb = $('#viewsIn'), groups = [...new Set(v.map((p) => p.meta.uf))];
-  vb.innerHTML = '<button class="chipbtn" data-g="*">Visão geral</button>' + groups.map((g) => `<button class="chipbtn" data-g="${esc(g)}">${esc(g.replace('BR-', ''))}</button>`).join('');
-  vb.querySelectorAll<HTMLButtonElement>('button').forEach((b) => b.addEventListener('click', () => {
-    const g = b.dataset.g!;
-    if (g === '*') fitAll();
-    else { E.activeGroup = g; fitList(visibleProjects().filter((p) => p.meta.uf === g)); renderGroups(); drawUni(); }
-  }));
 }
 
 export function renderAll() {
