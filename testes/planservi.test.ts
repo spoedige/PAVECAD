@@ -8,8 +8,8 @@ import { distM } from '../src/dominio/medidas';
 import { fixture } from './helpers';
 
 const bytes = (n: string) => new Uint8Array(readFileSync(fixture(n)));
-const A = 'planservi_TH50.xlsx';
-const B = 'planservi_TH51.xlsx';
+const A = 'planservi_amostra_1.xlsx';
+const B = 'planservi_amostra_2.xlsx';
 
 /** Coluna "AB" vira o índice base 0 (27). Só os testes usam letras; o leitor lê pelos cabeçalhos. */
 const col = (l: string) => [...l].reduce((n, ch) => n * 26 + ch.charCodeAt(0) - 64, 0) - 1;
@@ -26,7 +26,7 @@ describe('detecção', () => {
   });
 });
 
-describe.each([[A, 'SP-333', 'TH50'], [B, 'SP-333', 'TH51']])('%s', (arq, rod, th) => {
+describe.each([[A, 'RD-001', 'TH01'], [B, 'RD-001', 'TH02']])('%s', (arq, rod, th) => {
   const S = readWorkbook(bytes(arq)).sheet('SOLUÇÃO_FINAL');
   const [cres, decr] = parseSpreadsheetAll(bytes(arq));
   const dados = S.map((r, i) => ({ r, linha: i + 1 })).filter((x) => x.linha >= 8 && typeof x.r[0] === 'number');
@@ -132,7 +132,7 @@ describe.each([[A, 'SP-333', 'TH50'], [B, 'SP-333', 'TH51']])('%s', (arq, rod, t
   });
 });
 
-describe('amostra TH50: dreno nos dois sentidos e salto de coordenada', () => {
+describe('amostra TH01: dreno nos dois sentidos e salto de coordenada', () => {
   const [cres, decr] = parseSpreadsheetAll(bytes(A));
   const S = readWorkbook(bytes(A)).sheet('SOLUÇÃO_FINAL');
 
@@ -176,7 +176,7 @@ describe('amostra TH50: dreno nos dois sentidos e salto de coordenada', () => {
   });
 });
 
-describe('amostra TH51: salto no decrescente, EX e RE', () => {
+describe('amostra TH02: salto no decrescente, EX e RE', () => {
   const [cres, decr] = parseSpreadsheetAll(bytes(B));
   it('o salto do decrescente aparece só nele', () => {
     expect(decr.qualidade!.corrigidos!.some((c) => c.deslocamento > 90)).toBe(true);

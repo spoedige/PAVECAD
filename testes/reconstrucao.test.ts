@@ -27,9 +27,9 @@ function projeto(p: PontoBruto[], quebras: number[] = []) {
   return prepareProject(parsed);
 }
 
-describe('reconstrução das pontas (arquivos reais)', () => {
-  it('TH39 crescente: início com ponto repetido vira ponto novo 20 m antes, pelo rumo dos primeiros passos', () => {
-    const p = pontos(F['th39-crescente'].inicio);
+describe('reconstrução das pontas (extratos anonimizados de arquivos reais)', () => {
+  it('Caso A crescente: início com ponto repetido vira ponto novo 20 m antes, pelo rumo dos primeiros passos', () => {
+    const p = pontos(F['caso-a-crescente'].inicio);
     expect(metros(p[0], p[1])).toBeLessThan(0.1); // linhas 1 e 2 idênticas, segmento de 0 m
     const r = reconstruir(p, false);
     expect(r.corrigidos).toHaveLength(1);
@@ -41,8 +41,8 @@ describe('reconstrução das pontas (arquivos reais)', () => {
     expect(r.cortes).toEqual([]);
   });
 
-  it('TH39 crescente: o ponto final ignora a coordenada da planilha e sai pelo km (10 m)', () => {
-    const p = pontos(F['th39-crescente'].fim);
+  it('Caso A crescente: o ponto final ignora a coordenada da planilha e sai pelo km (10 m)', () => {
+    const p = pontos(F['caso-a-crescente'].fim);
     const antes = metros(p[p.length - 2], p[p.length - 1]);
     expect(antes).toBeGreaterThan(29); // coordenada final distante do que o km diz
     const r = reconstruir(p, true);
@@ -59,8 +59,8 @@ describe('reconstrução das pontas (arquivos reais)', () => {
     expect(Math.abs(h - g)).toBeLessThan(0.2);
   });
 
-  it('TH40 crescente: salto de 70 m no primeiro passo vira ponto inicial a 20 m', () => {
-    const p = pontos(F['th40-crescente'].inicio);
+  it('Caso B crescente: salto de 70 m no primeiro passo vira ponto inicial a 20 m', () => {
+    const p = pontos(F['caso-b-crescente'].inicio);
     expect(metros(p[0], p[1])).toBeGreaterThan(65);
     const r = reconstruir(p, false);
     expect(r.corrigidos).toHaveLength(1);
@@ -71,8 +71,8 @@ describe('reconstrução das pontas (arquivos reais)', () => {
     expect(metros(n[0], n[1])).toBeLessThan(20.5);
   });
 
-  it('TH48 crescente: salto de 206 m no primeiro passo vira ponto inicial a 20 m', () => {
-    const p = pontos(F['th48-crescente'].inicio);
+  it('Caso C crescente: salto de 206 m no primeiro passo vira ponto inicial a 20 m', () => {
+    const p = pontos(F['caso-c-crescente'].inicio);
     expect(metros(p[0], p[1])).toBeGreaterThan(200);
     const r = reconstruir(p, false);
     expect(r.corrigidos).toHaveLength(1);
@@ -81,9 +81,9 @@ describe('reconstrução das pontas (arquivos reais)', () => {
     expect(r.cortes).toEqual([]);
   });
 
-  it('TH39 decrescente já está correto: nenhum ponto numerado muda e o final fica a menos de 3 m', () => {
+  it('Caso A decrescente já está correto: nenhum ponto numerado muda e o final fica a menos de 3 m', () => {
     for (const parte of ['inicio', 'fim'] as const) {
-      const p = pontos(F['th39-decrescente'][parte]);
+      const p = pontos(F['caso-a-decrescente'][parte]);
       const r = reconstruir(p, parte === 'fim');
       const ate = parte === 'fim' ? p.length - 1 : p.length;
       for (let i = 0; i < ate; i++) expect([r.lat[i], r.lon[i]]).toEqual([p[i].lat, p[i].lon]);
@@ -93,7 +93,7 @@ describe('reconstrução das pontas (arquivos reais)', () => {
   });
 
   it('depois de reconstruir, todos os polígonos são simples e o comprimento bate com os marcos; antes havia polígono degenerado', () => {
-    for (const [chave, parte, terminal] of [['th39-crescente', 'inicio', false], ['th39-crescente', 'fim', true], ['th40-crescente', 'inicio', false], ['th48-crescente', 'inicio', false]] as const) {
+    for (const [chave, parte, terminal] of [['caso-a-crescente', 'inicio', false], ['caso-a-crescente', 'fim', true], ['caso-b-crescente', 'inicio', false], ['caso-c-crescente', 'inicio', false]] as const) {
       const p = pontos(F[chave][parte]);
       const bruto = buildGeometry(projeto(p));
       const r = reconstruir(p, terminal);
@@ -107,7 +107,7 @@ describe('reconstrução das pontas (arquivos reais)', () => {
         const km = n[i + 1].km - n[i].km, d = metros(n[i], n[i + 1]);
         expect(Math.abs(d - km), `${chave} ${parte} passo ${i}`).toBeLessThan(0.5 * km + 0.5);
       }
-      if (chave === 'th39-crescente' && parte === 'inicio') expect(bruto.polys.some((q) => q.invalido === 'curto')).toBe(true);
+      if (chave === 'caso-a-crescente' && parte === 'inicio') expect(bruto.polys.some((q) => q.invalido === 'curto')).toBe(true);
     }
   });
 });
