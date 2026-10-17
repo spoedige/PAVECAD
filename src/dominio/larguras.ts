@@ -51,7 +51,8 @@ export function aplicarLarguras(rows: Row[], kmNum: ArrayLike<number>, ajustes: 
 }
 
 /** Quantas linhas diferem da planilha. */
-export const contarAlteradas = (plan: Row[], atual: Row[]) => atual.reduce((n, r, i) => n + (r !== plan[i] ? 1 : 0), 0);
+export const contarAlteradas = (plan: Row[], atual: Row[]) =>
+  atual.reduce((n, r, i) => n + (r !== plan[i] && (r.shoulder !== plan[i].shoulder || r.widths.some((w, k) => w !== plan[i].widths[k])) ? 1 : 0), 0);
 
 /** Largura mais frequente de cada faixa (e do acostamento) na planilha. */
 export function larguraPadrao(rows: Row[]): { lane: number; largura: number }[] {
@@ -64,4 +65,27 @@ export function larguraPadrao(rows: Row[]): { lane: number; largura: number }[] 
   const out = Array.from({ length: maxL }, (_, k) => ({ lane: k + 1, largura: moda(rows.map((r) => r.widths[k]).filter((v) => v !== undefined)) }));
   out.push({ lane: 0, largura: moda(rows.map((r) => r.shoulder)) });
   return out;
+}
+
+export interface DestinoLargura { pname: string; nome: string; maxFaixas: number }
+export interface PlanoCopia {
+  pname: string;
+  nome: string;
+  /** Ajustes novos desta planilha: os que cabem no número de faixas dela. */
+  ajustes: AjusteLargura[];
+  /** Ajustes que não se aplicam porque a planilha tem menos faixas. */
+  ignorados: AjusteLargura[];
+}
+
+/** Copia os ajustes de uma planilha para as demais. O acostamento (faixa 0) sempre cabe. Cada cópia
+ *  ganha id novo e o nome da planilha de destino; os ajustes que já existiam no destino são substituídos. */
+export function planejarCopia(ajustes: AjusteLargura[], destinos: DestinoLargura[], novoId: () => string): PlanoCopia[] {
+  return destinos.map((d) => {
+    const ok = ajustes.filter((a) => a.lane === 0 || a.lane <= d.maxFaixas);
+    return {
+      pname: d.pname, nome: d.nome,
+      ajustes: ok.map((a) => ({ ...a, id: novoId(), pname: d.pname })),
+      ignorados: ajustes.filter((a) => !ok.includes(a)),
+    };
+  });
 }
