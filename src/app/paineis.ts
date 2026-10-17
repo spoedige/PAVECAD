@@ -4,10 +4,11 @@ import { descreverCamada } from '../formats/planservi';
 import { trColor, trLabel, trOrder } from '../dominio/solucoes';
 import { edgesOf } from '../geometry/build';
 import { tituloDe } from '../dominio/titulo';
-import { E, getP, projName, visibleProjects, type AppProj } from './estado';
+import { atualizarRotulosKm, E, getP, kmVis, projName, rodoviaNome, visibleProjects, type AppProj } from './estado';
 import { aplicarDesloc, regeometrar, removerProjeto } from './projetos';
 import { DESLOC_MAX, validarDesloc, type Desloc } from '../geometry/deslocamento';
-import { selecionarPlanilhas } from './seletor';
+import { itemDe } from './seletor';
+import { marcadosPor, ROTULO_ATALHO, type Atalho } from '../dominio/selecao';
 import { IC } from './icones';
 import { applyLayers, applyPaint, clearFocus, clearSel, fitAll, fitFocus, fitList, getMap, renderLegend, select, setBase, setFocus, setProjectData, stepSel, updateSelLayer, updateStakes, applyVisibility, temMapTiler } from './mapa';
 import { drawUni, renderGroups } from './unifilar';
@@ -59,7 +60,7 @@ export function renderModes() {
 
 export function renderViews() {
   const v = visibleProjects();
-  const t = tituloDe(v.length ? v : E.P), n = E.P.length;
+  const t = tituloDe((v.length ? v : E.P).map((q) => ({ meta: { uf: rodoviaNome(q.meta.uf) } }))), n = E.P.length;
   $('#title').textContent = t;
   $('#titlebox').title = t;
   $('#subtitle').textContent = !n ? 'Nenhuma planilha' : `${n} planilha${n > 1 ? 's' : ''}${v.length < n ? ` · ${v.length} ${v.length > 1 ? 'visíveis' : 'visível'}` : ''}`;
@@ -117,7 +118,7 @@ export function renderResumo() {
     <div><div class="sect">Planilhas <button class="btn" id="addFiles" style="min-height:28px;padding:3px 10px;font-size:12px">+ Adicionar</button></div>
       <div class="list">${E.P.map((p) => `<div class="prow">
         <button class="iconbtn" data-eye="${p.id}" aria-label="${p.visible ? 'Ocultar' : 'Mostrar'} ${esc(projName(p))}" style="width:30px;height:30px">${p.visible ? IC.eye : IC.eyeoff}</button>
-        <button class="nm" data-fly="${p.id}"><b>${esc(projName(p))}</b><span class="num">km ${fmt(p.meta.kmi, 0)} a ${fmt(p.meta.kmf, 0)} · ${p.rows.length.toLocaleString('pt-BR')} seg · ${p.meta.format === 'planservi' ? 'Planservi' : 'RoadRunner'}</span>${selo(p) ? `<span>${selo(p)}</span>` : ''}</button>
+        <button class="nm" data-fly="${p.id}"><b>${esc(projName(p))}</b><span class="num">km ${fmt(p.meta.kmi === null ? null : kmVis(p.meta.kmi), 0)} a ${fmt(p.meta.kmf === null ? null : kmVis(p.meta.kmf), 0)} · ${p.rows.length.toLocaleString('pt-BR')} seg · ${p.meta.format === 'planservi' ? 'Planservi' : 'RoadRunner'}</span>${selo(p) ? `<span>${selo(p)}</span>` : ''}</button>
         ${dirBadge(p)}
         <button class="iconbtn" data-del="${p.id}" aria-label="Remover ${esc(projName(p))}" style="width:30px;height:30px">${IC.trash}</button></div>`).join('')}</div></div>
     <div><h2 class="h1 num">${fmt(R.ext, 1)} km</h2><p class="lead num">${V.length} planilha${V.length !== 1 ? 's' : ''} ${V.length !== 1 ? 'visíveis' : 'visível'} · ${R.nR.toLocaleString('pt-BR')} segmentos de 20 m${R.drKm ? ` · ${fmt(R.drKm, 1)} km de dreno` : ''}</p>
@@ -225,7 +226,7 @@ export function renderSeg() {
     : '';
   el.innerHTML = `
     <div class="shead"><div><h2 class="h1 num">km ${esc(p.kmLab[s.row])}</h2>
-        <p class="lead num"><span>${esc(projName(p))}</span><span>hod. ${fmt(r.hod, 3)} km${r.obs || r.platform ? ' · ' + [r.obs, r.platform].filter(Boolean).map(esc).join(' · ') : ''}</span></p></div>
+        <p class="lead num"><span>${esc(projName(p))}</span><span>hod. ${fmt(kmVis(r.hod), 3)} km${r.obs || r.platform ? ' · ' + [r.obs, r.platform].filter(Boolean).map(esc).join(' · ') : ''}</span></p></div>
       <div class="sbtns"><button class="iconbtn" id="sPrev" aria-label="Segmento anterior" title="Anterior (←)">${IC.prev}</button><button class="iconbtn" id="sNext" aria-label="Próximo segmento" title="Próximo (→)">${IC.next}</button><button class="iconbtn" id="sCopy" aria-label="Copiar localização" title="Copiar localização">${IC.copy}</button><button class="iconbtn" id="sNote" aria-label="Nota neste segmento" title="Nota neste segmento">${IC.pin}</button></div></div>
     <div class="chips" aria-label="Solução">${chips.join('')}</div>
     <div><div class="xs" role="group" aria-label="Seção a partir da coordenada: escolha a faixa" title="Seção a partir da coordenada. Setas para cima e para baixo trocam de faixa">${xs}</div><div class="xsticks num">${xt}</div></div>
@@ -299,45 +300,57 @@ export function renderAna() {
 /* Ajustes                                                           */
 /* ---------------------------------------------------------------- */
 /** Deslocamentos em fila: cada clique usa o valor mais recente, mesmo com o worker ainda calculando. */
+const deslocFila = new Map<string, { p: AppProj; d: Desloc }>();
 let deslocOcupado = false;
-let deslocPend: { p: AppProj; d: Desloc } | null = null;
 let deslocFoco: string | null = null;
-const deslocAtual = (p: AppProj): Desloc => (deslocPend?.p === p ? deslocPend.d : p.desloc);
+const deslocAtual = (p: AppProj): Desloc => deslocFila.get(p.id)?.d ?? p.desloc;
 async function pedirDesloc(p: AppProj, d: Desloc) {
-  deslocPend = { p, d };
+  deslocFila.set(p.id, { p, d });
   if (deslocOcupado) return;
   deslocOcupado = true;
   try {
-    while (deslocPend) {
-      const n: { p: AppProj; d: Desloc } = deslocPend;
+    while (deslocFila.size) {
+      const [id, n] = deslocFila.entries().next().value as [string, { p: AppProj; d: Desloc }];
       await aplicarDesloc(n.p, n.d);
-      if (deslocPend === n) deslocPend = null;
+      if (deslocFila.get(id) === n) deslocFila.delete(id);
     }
   } finally { deslocOcupado = false; }
 }
 
-/** Copia o deslocamento da planilha atual, como valor absoluto, para as planilhas marcadas. */
-async function deslocarOutras(origem: AppProj) {
-  const d = { ...origem.desloc };
-  const destinos = await selecionarPlanilhas(origem, {
-    titulo: 'Aplicar deslocamento a outras planilhas',
-    descricao: `Copia o deslocamento de ${projName(origem)} (longitudinal ${fmt(d.l, 1)} m, transversal ${fmt(d.t, 1)} m) como valor absoluto. O que as marcadas já têm é substituído.`,
-  });
-  if (!destinos?.length) return;
-  const antes = destinos.map((q) => ({ q, d: { ...q.desloc } }));
-  for (const q of destinos) await aplicarDesloc(q, d);
-  toastAcao(`Deslocamento aplicado a ${destinos.length} planilha(s)`, 'Desfazer', async () => {
-    for (const a of antes) await aplicarDesloc(a.q, a.d);
-    toast('Aplicação desfeita');
-  });
+/** Planilhas marcadas em Ajustes. Sem marca nenhuma, as mudanças não valem para planilha alguma. */
+export function alvosAjuste(): AppProj[] {
+  E.settingsSel = new Set([...E.settingsSel].filter((id) => getP(id)));
+  return E.P.filter((q) => E.settingsSel.has(q.id));
+}
+/** Uma planilha ganhou o foco (clique no mapa ou planilha nova): se não está marcada, passa a ser a única marcada. */
+export function focarAjustes(pid: string) {
+  E.settingsPid = pid;
+  if (!E.settingsSel.has(pid)) E.settingsSel = new Set([pid]);
+}
+const iguais = <T,>(v: T[]) => v.every((x) => x === v[0]);
+
+/** Liga ou desliga o modo privacidade: refaz rótulos de km, marcadores e painéis. A escolha fica no aparelho. */
+export function setPrivacidade(on: boolean) {
+  E.privacidade = on;
+  try { localStorage.setItem('pavecad-privacidade', on ? '1' : '0'); } catch { /* sem storage */ }
+  atualizarRotulosKm();
+  if (E.mapReady) for (const q of E.P) setProjectData(q);
+  renderAll();
+  toast(on ? 'Modo privacidade ligado' : 'Modo privacidade desligado');
 }
 
 export function renderAj() {
-  const el = $('#t-aj'), p = getP(E.settingsPid ?? '') ?? E.P[0];
+  const el = $('#t-aj');
+  const alvos = alvosAjuste(), p = alvos[0];
+  const lista = E.P.map(itemDe);
+  const sel = E.P.length ? `
+    <div><div class="sect">Planilhas a ajustar <span class="num" id="a-cont">${alvos.length} de ${E.P.length}</span></div>
+      <div class="sel-atalhos" role="group" aria-label="Atalhos de seleção">${(Object.keys(ROTULO_ATALHO) as Atalho[]).map((a) => `<button type="button" class="btn" data-atalho="${a}">${ROTULO_ATALHO[a]}</button>`).join('')}</div>
+      <div class="sel-lista" id="a-lista" role="group" aria-label="Planilhas a ajustar" style="margin-top:8px">${lista.map((i) => `<label class="sel-item"><input type="checkbox" data-id="${esc(i.id)}"${E.settingsSel.has(i.id) ? ' checked' : ''}><span><b>${esc(i.nome)}</b><span class="note">${esc(i.rodovia)} · ${i.sentido === 1 ? 'Crescente' : 'Decrescente'}</span></span></label>`).join('')}</div>
+      <p class="note" style="margin-top:6px">${alvos.length ? 'Os campos abaixo valem para todas as marcadas. Os botões de passo somam ao valor de cada planilha.' : 'Marque ao menos uma planilha para ajustar.'}</p></div>` : '';
   const opts = p ? `
-    <div><div class="sect">Geometria da planilha</div>
+    <div><div class="sect">Geometria ${alvos.length > 1 ? `das ${alvos.length} planilhas` : 'da planilha'}</div>
       <div class="list">
-        <div class="field"><label for="a-proj">Planilha</label><select id="a-proj">${E.P.map((q) => `<option value="${q.id}">${esc(projName(q))}</option>`).join('')}</select></div>
         <div class="field"><label for="a-trav">Sentido de tráfego</label><select id="a-trav"><option value="1">Crescente</option><option value="-1">Decrescente</option></select></div>
         <div class="field"><label for="a-dir">Faixas crescem para a</label><select id="a-dir"><option value="1">Direita</option><option value="-1">Esquerda</option></select></div>
         <div class="field"><label for="a-org">Coordenada está na</label><select id="a-org"><option value="edge">Borda da Fx 1 (0 m)</option><option value="axis">Eixo da Fx 1</option></select></div>
@@ -346,7 +359,7 @@ export function renderAj() {
         <div class="field"><label for="a-dr">Lado dos drenos</label><select id="a-dr"><option value="out">Externo</option><option value="in">Interno</option></select></div>
       </div>
       <p class="note" style="margin-top:7px">Sentido e coordenada seguem a regra confirmada: coordenada na borda esquerda da Fx 1, no sentido do tráfego. A Marginal Sul usa as mesmas coordenadas da pista principal, por isso entra com 12 m de deslocamento transversal à direita.</p>
-      <div class="sect" style="margin-top:14px">Deslocamento da planilha</div>
+      <div class="sect" style="margin-top:14px">Deslocamento ${alvos.length > 1 ? 'das planilhas marcadas' : 'da planilha'}</div>
       <div class="list desl" id="desloc">
         ${([['l', 'Longitudinal', 'ao longo da via; positivo no sentido de percurso'], ['t', 'Transversal', 'positivo à direita do sentido de percurso, negativo à esquerda']] as const).map(([e, nome, dica]) => `
         <div class="desl-eixo"><label for="d-${e}">${nome} (m)</label><span class="note">${dica}</span>
@@ -354,17 +367,19 @@ export function renderAj() {
             <input id="d-${e}" class="in num" type="number" step="0.1" min="-${DESLOC_MAX}" max="${DESLOC_MAX}" inputmode="decimal" aria-label="${nome} em metros">
             ${[1, 5].map((v) => `<button class="btn" type="button" data-d="${e}" data-s="${v}" aria-label="${nome} +${v} m">+${v}</button>`).join('')}</div></div>`).join('')}
         <p class="cfg-err" id="d-err" role="alert"></p>
-        <div class="btns"><button class="btn" type="button" id="d-zero">Zerar</button><button class="btn" type="button" id="d-outras">Aplicar a outras planilhas…</button></div>
+        <div class="btns"><button class="btn" type="button" id="d-zero">Zerar</button></div>
         <p class="note">Move a planilha inteira no mapa, nos polígonos, no CSV de propostas e na localização por GPS. Fica salvo no aparelho junto com a planilha.</p>
       </div>
       ${selo(p) ? `<p class="note" style="margin-top:7px">${selo(p)}. Veja o detalhe em Revisão, em Qualidade das coordenadas.</p>` : ''}
       <p class="note num" style="margin-top:7px">Sistema de coordenadas: SIRGAS 2000 UTM ${p.crs.zone}S${p.crs.epsg ? ` (EPSG ${p.crs.epsg})` : ''}, ${p.crs.source === 'fixo' ? 'fixado' : 'pela mediana das longitudes'}.</p>
-      ${p.log.length ? `<details style="margin-top:8px"><summary>Log de importação (${p.log.length})</summary><div class="formula">${p.log.map((l) => `${l.level === 'warn' ? '! ' : '· '}${esc(l.msg)}`).join('\n')}</div></details>` : ''}</div>` : '';
+      ${p.log.length && E.privacidade ? '<p class="note" style="margin-top:8px">Log de importação oculto no modo privacidade: traz km e nomes.</p>' : p.log.length ? `<details style="margin-top:8px"><summary>Log de importação (${p.log.length})</summary><div class="formula">${p.log.map((l) => `${l.level === 'warn' ? '! ' : '· '}${esc(l.msg)}`).join('\n')}</div></details>` : ''}</div>` : '';
   el.innerHTML = `
     <div><div class="sect">Aparência</div><div class="list">
+      <div class="field"><div><div>Modo privacidade</div><div class="note">Oculta nomes de planilha, rodovia e km na tela e nas exportações. Os dados no aparelho não mudam</div></div><button class="sw2" id="s-priv" role="switch" aria-checked="${E.privacidade}" aria-label="Modo privacidade"></button></div>
       <div class="field"><div><div>Modo campo (sol)</div><div class="note">Contraste máximo, cores fortes, alvos de toque maiores</div></div><button class="sw2" id="s-field" role="switch" aria-checked="${E.field}" aria-label="Modo campo"></button></div></div></div>
     <div><div class="sect">Camadas</div><div class="list">
       ${([['drain', 'Drenos', 'Lado externo. Linha cheia tipo R, tracejada tipo P. Passe o mouse para ver detalhes'], ['poi', 'OAE e pedágio', 'Marcadores nos trechos observados'], ['km', 'Marcos e estacas', 'Estaca a cada 20 m com zoom máximo, 100 m e 500 m ao afastar'], ['notes', 'Anotações', '']] as const).map(([k, t, s]) => `<div class="field"><div><div>${t}</div>${s ? `<div class="note">${s}</div>` : ''}</div><button class="sw2" data-layer="${k}" role="switch" aria-checked="${E.layers[k]}" aria-label="${t}"></button></div>`).join('')}</div></div>
+    ${sel}
     ${opts}
     <div><div class="sect">Mapa</div><div class="list"><div class="field"><label for="a-base">Base</label><select id="a-base"><option value="none">Sem base</option><option value="osm">Ruas</option><option value="esri">Satélite</option></select></div></div>
       <p class="note" style="margin-top:7px">${temMapTiler() ? 'Base MapTiler ativa.' : 'Base reserva (OpenStreetMap e Esri). Para o MapTiler, defina VITE_MAPTILER_KEY no ambiente de build.'}</p></div>
@@ -373,41 +388,73 @@ nE = cos θ , nN = −sin θ   (invertido no sentido decrescente)
 e(n) = e0 + dir · Σ largura(1..n)
 P(n) = P + e(n) · (nE , nN)</div>
       <p class="note" style="margin-top:8px">O sentido decrescente usa o mesmo cálculo com a normal invertida, porque as linhas da planilha seguem a quilometragem crescente.</p></details>`;
+  el.querySelectorAll<HTMLInputElement>('#a-lista input[data-id]').forEach((c) => c.addEventListener('change', () => {
+    if (c.checked) E.settingsSel.add(c.dataset.id!); else E.settingsSel.delete(c.dataset.id!);
+    renderAj();
+  }));
+  el.querySelectorAll<HTMLElement>('[data-atalho]').forEach((b) => b.addEventListener('click', () => {
+    const origem = itemDe(p ?? E.P[0]);
+    E.settingsSel = marcadosPor(b.dataset.atalho as Atalho, lista, origem);
+    renderAj();
+  }));
   if (p) {
-    const set = (id: string, v: string) => { $<HTMLInputElement | HTMLSelectElement>(id).value = v; };
-    set('#a-proj', p.id); set('#a-trav', String(p.opts.travel)); set('#a-dir', String(p.opts.dir)); set('#a-org', p.opts.origin);
-    set('#d-l', String(p.desloc.l)); set('#d-t', String(p.desloc.t)); set('#a-win', String(p.opts.win)); set('#a-sh', p.opts.shoulder ? '1' : '0'); set('#a-dr', p.opts.drainSide);
-    $('#a-proj').onchange = (e) => { E.settingsPid = (e.target as HTMLSelectElement).value; renderAj(); };
-    const ch = (id: string, fn: (v: string) => void) => { $(id).onchange = (e) => { fn((e.target as HTMLInputElement).value); void regeometrar(p); }; };
-    ch('#a-trav', (v) => (p.opts.travel = +v as 1 | -1));
-    ch('#a-dir', (v) => (p.opts.dir = +v as 1 | -1));
-    ch('#a-org', (v) => (p.opts.origin = v as 'edge' | 'axis'));
-    const mudar = (eixo: 'l' | 't', v: number) => {
-      const d = { ...deslocAtual(p), [eixo]: Math.round(v * 1000) / 1000 };
-      const msg = validarDesloc(d);
-      $('#d-err').textContent = msg ?? '';
+    // seletores: mostra o valor comum; se as marcadas diferem, "vários"
+    const set = (id: string, vals: string[]) => {
+      const e = $<HTMLInputElement | HTMLSelectElement>(id);
+      if (iguais(vals)) { e.value = vals[0]; return; }
+      if (e instanceof HTMLSelectElement) { const o = document.createElement('option'); o.value = ''; o.textContent = 'vários'; o.hidden = true; e.prepend(o); e.value = ''; }
+      else { e.value = ''; e.placeholder = 'vários'; }
+    };
+    set('#a-trav', alvos.map((q) => String(q.opts.travel))); set('#a-dir', alvos.map((q) => String(q.opts.dir))); set('#a-org', alvos.map((q) => q.opts.origin));
+    set('#d-l', alvos.map((q) => String(q.desloc.l))); set('#d-t', alvos.map((q) => String(q.desloc.t)));
+    set('#a-win', alvos.map((q) => String(q.opts.win))); set('#a-sh', alvos.map((q) => (q.opts.shoulder ? '1' : '0'))); set('#a-dr', alvos.map((q) => q.opts.drainSide));
+    const ch = (id: string, fn: (q: AppProj, v: string) => void) => {
+      $(id).onchange = (e) => {
+        const v = (e.target as HTMLInputElement).value;
+        if (v === '') return;
+        const todos = alvosAjuste();
+        for (const q of todos) fn(q, v);
+        void Promise.all(todos.map((q) => regeometrar(q, todos.length === 1))).then(() => { if (todos.length > 1) { renderAll(); toast(`Aplicado a ${todos.length} planilhas`); } });
+      };
+    };
+    ch('#a-trav', (q, v) => (q.opts.travel = +v as 1 | -1));
+    ch('#a-dir', (q, v) => (q.opts.dir = +v as 1 | -1));
+    ch('#a-org', (q, v) => (q.opts.origin = v as 'edge' | 'axis'));
+    ch('#a-win', (q, v) => (q.opts.win = +v));
+    ch('#a-sh', (q, v) => (q.opts.shoulder = v === '1'));
+    ch('#a-dr', (q, v) => (q.opts.drainSide = v as 'out' | 'in'));
+    // deslocamento: passo soma ao valor de cada planilha; valor digitado vale para todas
+    const aplicarDeslocs = (novos: { q: AppProj; d: Desloc }[]) => {
+      const msg = novos.map((x) => validarDesloc(x.d)).find(Boolean) ?? '';
+      $('#d-err').textContent = msg;
       if (msg) return;
-      void pedirDesloc(p, d);
+      const antes = novos.map((x) => ({ q: x.q, d: { ...deslocAtual(x.q) } }));
+      for (const x of novos) void pedirDesloc(x.q, x.d);
+      if (novos.length > 1) toastAcao(`Deslocamento aplicado a ${novos.length} planilhas`, 'Desfazer', () => { for (const a of antes) void pedirDesloc(a.q, a.d); toast('Aplicação desfeita'); });
     };
     el.querySelectorAll<HTMLButtonElement>('[data-d]').forEach((b) => (b.onclick = () => {
-      const e = b.dataset.d as 'l' | 't';
+      const e = b.dataset.d as 'l' | 't', passo = +b.dataset.s!;
       deslocFoco = `[data-d="${e}"][data-s="${b.dataset.s}"]`;
-      mudar(e, deslocAtual(p)[e] + +b.dataset.s!);
+      aplicarDeslocs(alvosAjuste().map((q) => ({ q, d: { ...deslocAtual(q), [e]: Math.round((deslocAtual(q)[e] + passo) * 1000) / 1000 } })));
     }));
     for (const e of ['l', 't'] as const) {
-      $<HTMLInputElement>('#d-' + e).onchange = (ev) => { const v = parseFloat((ev.target as HTMLInputElement).value.replace(',', '.')); deslocFoco = '#d-' + e; if (Number.isFinite(v)) mudar(e, v); else $('#d-err').textContent = 'Informe um número em metros.'; };
+      $<HTMLInputElement>('#d-' + e).onchange = (ev) => {
+        const txt = (ev.target as HTMLInputElement).value.replace(',', '.');
+        if (txt === '') return;
+        const v = parseFloat(txt);
+        deslocFoco = '#d-' + e;
+        if (!Number.isFinite(v)) { $('#d-err').textContent = 'Informe um número em metros.'; return; }
+        aplicarDeslocs(alvosAjuste().map((q) => ({ q, d: { ...deslocAtual(q), [e]: Math.round(v * 1000) / 1000 } })));
+      };
     }
-    $('#d-zero').onclick = () => { deslocFoco = '#d-zero'; $('#d-err').textContent = ''; void pedirDesloc(p, { l: 0, t: 0 }); };
-    $('#d-outras').onclick = () => void deslocarOutras(p);
+    $('#d-zero').onclick = () => { deslocFoco = '#d-zero'; $('#d-err').textContent = ''; aplicarDeslocs(alvosAjuste().map((q) => ({ q, d: { l: 0, t: 0 } }))); };
     if (deslocFoco) { const f = el.querySelector<HTMLElement>(deslocFoco); deslocFoco = null; f?.focus(); }
-    ch('#a-win', (v) => (p.opts.win = +v));
-    ch('#a-sh', (v) => (p.opts.shoulder = v === '1'));
-    ch('#a-dr', (v) => (p.opts.drainSide = v as 'out' | 'in'));
   }
   const bs = $<HTMLSelectElement>('#a-base');
   bs.value = E.base;
   bs.onchange = () => { setBase(bs.value as typeof E.base); syncBaseSeg(); };
   $('#s-field').onclick = () => setField(!E.field);
+  $('#s-priv').onclick = () => setPrivacidade(!E.privacidade);
   el.querySelectorAll<HTMLElement>('[data-layer]').forEach((b) => (b.onclick = () => {
     const k = b.dataset.layer as keyof typeof E.layers;
     E.layers[k] = !E.layers[k];

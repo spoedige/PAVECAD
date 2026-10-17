@@ -1,6 +1,6 @@
 import { IND, Q5, Q5F } from '../dominio/indicadores';
 import { trColor, trOrder } from '../dominio/solucoes';
-import { E, H, projName, type AppProj } from './estado';
+import { E, H, kmVis, projName, rodoviaNome, type AppProj } from './estado';
 import { IC } from './icones';
 import { getMap, grupoAtivo, select } from './mapa';
 import { $, cssv, esc, fmt, gestoVertical, toast } from './ui';
@@ -32,8 +32,8 @@ export function renderGroups() {
     for (const v of vias) {
       const doVia = gs.filter((g) => via(g) === v);
       const comUf = doVia.some((g) => g.includes('/'));
-      if (vias.length > 1 && comUf) h += `<span class="hwy">${esc(v.replace('BR-', ''))}</span>`;
-      h += doVia.map((g) => chip(g, !g.includes('/') ? g : vias.length > 1 ? g.split('/')[1] : g.replace('BR-', ''))).join('');
+      if (vias.length > 1 && comUf && !E.privacidade) h += `<span class="hwy">${esc(v.replace('BR-', ''))}</span>`;
+      h += doVia.map((g) => chip(g, E.privacidade ? rodoviaNome(g) : !g.includes('/') ? g : vias.length > 1 ? g.split('/')[1] : g.replace('BR-', ''))).join('');
     }
   }
   el.innerHTML = h;
@@ -89,7 +89,7 @@ export function drawUni() {
   g.font = '500 11px ' + sans;
   g.textBaseline = 'alphabetic';
   for (let k = Math.ceil(kmi / step) * step; k <= kmf; k += step) {
-    const x = Math.round(sx(k)), txt = k + ' km', tw = g.measureText(txt).width;
+    const x = Math.round(sx(k)), txt = kmVis(k) + ' km', tw = g.measureText(txt).width;
     g.fillStyle = muted; g.fillText(txt, Math.min(x - 8, W - tw - 1), top - 5);
     g.fillStyle = cssv('--hair'); g.fillRect(x, top - 2, 1, bottom - top + 4);
   }
@@ -147,7 +147,7 @@ export function drawUni() {
       const xa = sx(lo), xb = Math.max(sx(hi + 0.02), xa + 6);
       g.fillStyle = cssv('--accent'); g.globalAlpha = 0.14; rr(g, xa, top - 4, xb - xa, bottom - top + 8, 6); g.fill(); g.globalAlpha = 1;
       g.strokeStyle = cssv('--accent'); g.lineWidth = 1.5; rr(g, xa, top - 4, xb - xa, bottom - top + 8, 6); g.stroke();
-      $('#unisub').textContent = `Vista atual: hod. ${fmt(lo, 1)} a ${fmt(hi + 0.02, 1)} km`;
+      $('#unisub').textContent = `Vista atual: hod. ${fmt(kmVis(lo), 1)} a ${fmt(kmVis(hi + 0.02), 1)} km`;
     } else $('#unisub').textContent = 'Clique para voar até o trecho';
   }
   const s = E.sel;

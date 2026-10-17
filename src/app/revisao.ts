@@ -4,8 +4,8 @@ import { addProposta, nomeArquivoCsv, propostasCsv, reposicionar, runAt, runLabe
 import { localizar, type LocP } from '../dominio/localizar';
 import { eixoDaFaixa } from '../geometry/eixo';
 import { trColor, trLabel, trOrder } from '../dominio/solucoes';
-import { kmLabel } from '../formats/km';
-import { E, H, NOTE_CATS, getP, projName, type AppProj, type Nota, type NoteCat } from './estado';
+import { parseKmTexto } from '../formats/km';
+import { E, H, NOTE_CATS, getP, kmFmt, kmReal, projName, type AppProj, type Nota, type NoteCat } from './estado';
 import { IC } from './icones';
 import { getMap, hitAt, renderLegend, select, setData } from './mapa';
 import * as db from './persist';
@@ -155,7 +155,7 @@ function propsHtml(): string {
   const semPlanilha = E.props.filter((r) => !r.orfa && !r.pid).length;
   const orfasHtml = orfas.length ? `<div><div class="sect">Propostas órfãs <span style="text-transform:none;font-weight:500">${orfas.length}</span></div>
     <p class="note" style="margin-bottom:8px">O km (ou a faixa) dessas propostas não existe mais na planilha carregada. Elas ficam guardadas e fora do mapa e dos totais até você removê-las.</p>
-    <div class="list">${orfas.map((r) => `<div class="note-card"><div class="note-top" style="cursor:default"><span class="sw" style="background:${tc(r.to)};width:12px;height:12px"></span><span class="t"><b>${esc(trLabel(r.from))} → ${esc(trLabel(r.to))}</b><span>Órfã · ${esc(r.pname)} · ${r.lane ? 'Fx ' + r.lane : 'Acost.'} · km ${kmLabel(r.km0)} a ${kmLabel(r.km1 + 0.02)}${r.note ? ' · ' + esc(r.note) : ''}</span></span></div><div class="btns"><button class="btn d" data-pd="${r.id}" style="min-height:28px;padding:3px 10px">${IC.trash} Remover</button></div></div>`).join('')}</div></div>` : '';
+    <div class="list">${orfas.map((r) => `<div class="note-card"><div class="note-top" style="cursor:default"><span class="sw" style="background:${tc(r.to)};width:12px;height:12px"></span><span class="t"><b>${esc(trLabel(r.from))} → ${esc(trLabel(r.to))}</b><span>Órfã · ${E.privacidade ? 'planilha não carregada' : esc(r.pname)} · ${r.lane ? 'Fx ' + r.lane : 'Acost.'} · km ${kmFmt(r.km0)} a ${kmFmt(r.km1 + 0.02)}${r.note ? ' · ' + esc(r.note) : ''}</span></span></div><div class="btns"><button class="btn d" data-pd="${r.id}" style="min-height:28px;padding:3px 10px">${IC.trash} Remover</button></div></div>`).join('')}</div></div>` : '';
   const aviso = semPlanilha ? `<p class="note" style="margin-top:8px">${semPlanilha} proposta${semPlanilha > 1 ? 's' : ''} de planilhas ainda não carregadas. ${semPlanilha > 1 ? 'Voltam' : 'Volta'} ao abrir o arquivo.</p>` : '';
   const head = `<div class="sect">Propostas de solução <span style="text-transform:none;font-weight:500">${vp.length}</span></div>`;
   if (!vp.length) {
@@ -242,6 +242,12 @@ export function refreshNotesLayer() {
   setData('notes', { type: 'FeatureCollection', features: lista.map((n) => ({ type: 'Feature', properties: { id: n.id, cat: n.cat }, geometry: noteGeom(n) })) });
 }
 
+/** Planilha e km de uma nota. No modo privacidade, refeitos com o nome e o km ocultos (a nota guarda os reais). */
+const locDe = (loc: NonNullable<Nota['loc']>) => {
+  if (!E.privacidade) return loc;
+  const p = getP(loc.pid), k = parseKmTexto(loc.km);
+  return { ...loc, name: p ? projName(p) : 'Planilha', km: k === null ? '' : kmFmt(k) };
+};
 const noteSummary = (n: Nota) => (n.type === 'pin' ? 'Ponto' : n.type === 'line' ? `Linha · ${fmtLen(lenM(n.coords))}` : `Área · ${fmt(areaM2(n.coords), 0)} m²`);
 
 /** Verificação de qualidade das coordenadas (Planservi): pontos reconstruídos, cortes, saltos que restaram, distância entre sentidos e
@@ -259,11 +265,12 @@ function qualidadeHtml(): string {
     const n = corr.length + cortes.length + saltos.length + sentidos.length + inv.length;
     const oc = (i: number, km: string, rot: string) => `<button class="row" data-q="${p.id}:${i}" aria-label="Ir ao km ${esc(km)}"><div class="grow"><b class="num">km ${esc(km)}</b> <span class="muted">${esc(rot)}</span></div>${IC.next}</button>`;
     const nbr = (v: number) => v.toLocaleString('pt-BR');
+    const K = (i: number, real: string) => (E.privacidade ? p.kmLab[Math.max(0, Math.min(i, p.kmLab.length - 1))] : real);
     const itens = [
-      ...corr.map((x) => oc(x.i, x.km, `${ROT_TIPO[x.tipo] ?? x.tipo}${x.causa && x.causa !== 'terminal' ? ' (' + (ROT_TIPO[x.causa] ?? x.causa) + ')' : ''}, andou ${nbr(x.deslocamento)} m em relação à planilha`)),
-      ...cortes.map((x) => oc(x.i, x.kmFim, `corte: passo de ${nbr(x.dist)} m entre o km ${x.km} e o ${x.kmFim} (esperado ${nbr(x.esperado)} m)`)),
-      ...saltos.map((x) => oc(x.i, x.kmFim, `salto de ${nbr(x.dist)} m até o km ${x.kmFim}`)),
-      ...sentidos.map((x) => oc(x.i, x.km, `${x.dist} m entre os sentidos`)),
+      ...corr.map((x) => oc(x.i, K(x.i, x.km), `${ROT_TIPO[x.tipo] ?? x.tipo}${x.causa && x.causa !== 'terminal' ? ' (' + (ROT_TIPO[x.causa] ?? x.causa) + ')' : ''}, andou ${nbr(x.deslocamento)} m em relação à planilha`)),
+      ...cortes.map((x) => oc(x.i, K(x.i, x.kmFim), `corte: passo de ${nbr(x.dist)} m entre o km ${K(x.i - 1, x.km)} e o ${K(x.i, x.kmFim)} (esperado ${nbr(x.esperado)} m)`)),
+      ...saltos.map((x) => oc(x.i, K(x.i, x.kmFim), `salto de ${nbr(x.dist)} m até o km ${K(x.i, x.kmFim)}`)),
+      ...sentidos.map((x) => oc(x.i, K(x.i, x.km), `${x.dist} m entre os sentidos`)),
       ...inv.map((x) => oc(x.row, p.kmLab[x.row], `${ROT_INV[x.motivo] ?? x.motivo}${x.lane ? ' na Fx ' + x.lane : ' no acostamento'}: só a linha central`)),
     ];
     const resumo = [
@@ -285,7 +292,7 @@ export function renderNotes() {
   const ed = E.editing;
   const form = ed ? `<div class="list"><div class="note-card">
       <div class="sect" style="margin:0">${ed.isNew ? 'Nova nota' : 'Editar nota'} · ${noteSummary(ed)}</div>
-      ${ed.loc ? `<div class="chips"><span class="chip">${esc(ed.loc.name)} · km ${esc(ed.loc.km)} · ${ed.loc.lane ? 'Fx ' + ed.loc.lane : 'Acost.'}</span></div>` : '<p class="note">Fora dos trechos carregados.</p>'}
+      ${ed.loc ? `<div class="chips"><span class="chip">${esc(locDe(ed.loc).name)} · km ${esc(locDe(ed.loc).km)} · ${ed.loc.lane ? 'Fx ' + ed.loc.lane : 'Acost.'}</span></div>` : '<p class="note">Fora dos trechos carregados.</p>'}
       <div class="seg" id="catSeg" role="group" aria-label="Categoria" style="align-self:flex-start">${Object.entries(NOTE_CATS).map(([k, v]) => `<button data-c="${k}" aria-pressed="${ed.cat === k}">${v.l}</button>`).join('')}</div>
       <textarea id="noteText" placeholder="Descreva a ocorrência, a dúvida ou a decisão" aria-label="Texto da nota">${esc(ed.text)}</textarea>
       <div class="photos">${ed.photos.map((src, i) => `<div><img src="${src}" alt="Foto ${i + 1}"><button data-ph="${i}" aria-label="Remover foto">${IC.x}</button></div>`).join('')}</div>
@@ -294,7 +301,7 @@ export function renderNotes() {
   el.innerHTML = `${form}${propsHtml()}${qualidadeHtml()}
     <div><div class="sect">Anotações <span style="text-transform:none;font-weight:500">${E.notes.length}</span></div>
       ${list.length ? `<div class="list">${list.map((n) => `<div class="note-card"><button class="note-top" data-n="${n.id}"><span class="sw" style="background:${NOTE_CATS[n.cat].c};width:12px;height:12px"></span>
-        <span class="t"><b>${esc(n.text || 'Sem texto')}</b><span>${NOTE_CATS[n.cat].l} · ${noteSummary(n)}${n.loc ? ' · ' + esc(n.loc.name) + ' km ' + esc(n.loc.km) : ''} · ${new Date(n.t).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}${n.photos?.length ? ' · ' + n.photos.length + ' foto(s)' : ''}</span></span></button></div>`).join('')}</div>`
+        <span class="t"><b>${esc(n.text || 'Sem texto')}</b><span>${NOTE_CATS[n.cat].l} · ${noteSummary(n)}${n.loc ? ' · ' + esc(locDe(n.loc).name) + ' km ' + esc(locDe(n.loc).km) : ''} · ${new Date(n.t).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}${n.photos?.length ? ' · ' + n.photos.length + ' foto(s)' : ''}</span></span></button></div>`).join('')}</div>`
         : (ed ? '' : '<p class="vazio">Nenhuma anotação. Use o ponto no mapa (P).</p>')}</div>
     <div><div class="sect">Exportar e importar</div><div class="btns"><button class="btn" id="exCopy" ${E.notes.length ? '' : 'disabled'}>Copiar GeoJSON</button><button class="btn" id="exDown" ${E.notes.length ? '' : 'disabled'}>Baixar GeoJSON</button><button class="btn" id="exImp">Importar</button></div>
       <p class="note" style="margin-top:7px">As anotações ficam no armazenamento deste navegador. Exporte para levar a outro aparelho ou compartilhar.</p></div>`;
@@ -352,7 +359,7 @@ export function notesGeoJSON(withPhotos: boolean) {
     type: 'FeatureCollection',
     features: E.notes.map((n) => ({
       type: 'Feature',
-      properties: { id: n.id, categoria: NOTE_CATS[n.cat].l, texto: n.text, criado: n.t, planilha: n.loc?.name ?? null, km: n.loc?.km ?? null, faixa: n.loc?.lane ?? null, ...(withPhotos ? { fotos: n.photos } : { fotos_qtd: (n.photos || []).length }) },
+      properties: { id: n.id, categoria: NOTE_CATS[n.cat].l, texto: n.text, criado: n.t, planilha: n.loc ? locDe(n.loc).name : null, km: n.loc ? locDe(n.loc).km : null, faixa: n.loc?.lane ?? null, ...(withPhotos ? { fotos: n.photos } : { fotos_qtd: (n.photos || []).length }) },
       geometry: noteGeom(n),
     })),
   };

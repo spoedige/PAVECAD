@@ -13,6 +13,8 @@ import type { Lane, Row } from '../formats/types';
 import type { SolutionCode } from '../formats/km';
 import type { MapMouseEvent } from 'maplibre-gl';
 import { modelOf } from '../dominio/modelo';
+import { kmLabel } from '../formats/km';
+import { definirFormatoKm } from '../dominio/propostas';
 
 export interface AppProj extends Project {
   id: string;
@@ -82,7 +84,11 @@ export const E = {
   propNote: '',
   focus: null as { label: string; n: number; pred: FocoPred } | null,
   anInd: 'iri' as IndKey,
+  /** Modo privacidade: nomes, rodovias e km saem da tela e das exportações. Os dados guardados não mudam. */
+  privacidade: false,
   settingsPid: null as string | null,
+  /** Planilhas marcadas na aba Ajustes: geometria e deslocamento valem para todas. */
+  settingsSel: new Set<string>(),
   uniCollapsed: false,
   tab: 'resumo' as 'resumo' | 'seg' | 'ana' | 'notas' | 'aj',
   /** Ajustes de largura salvos, por nome de planilha. Valem quando a planilha é aberta. */
@@ -106,7 +112,33 @@ export const visibleProjects = () => E.P.filter((p) => p.visible);
 export const getP = (id: string) => E.P.find((p) => p.id === id);
 const short = (p: Pick<AppProj, 'meta'>) => (/Marginal/i.test(p.meta.via) ? p.meta.via.replace(/\s*-\s*Crescente|\s*-\s*Decrescente/, '') : p.meta.via);
 /** O Planservi já traz o nome pronto ("SP-333 · TH36 · Crescente"). */
-export const projName = (p: Pick<AppProj, 'meta'>) => (p.meta.format === 'planservi' ? p.meta.name : `${p.meta.uf.split('/')[1] || p.meta.uf} ${short(p)}`);
+export const projName = (p: Pick<AppProj, 'meta'>) => {
+  if (E.privacidade) {
+    const i = E.P.indexOf(p as AppProj);
+    return `Planilha${i >= 0 ? ' ' + (i + 1) : ''} · ${p.meta.travel > 0 ? 'Crescente' : 'Decrescente'}`;
+  }
+  return p.meta.format === 'planservi' ? p.meta.name : `${p.meta.uf.split('/')[1] || p.meta.uf} ${short(p)}`;
+};
+
+/** Nome da rodovia (ou do grupo) para exibir: "Rodovia A", "Rodovia B"... na ordem em que aparecem, no modo privacidade. */
+export function rodoviaNome(uf: string): string {
+  if (!E.privacidade) return uf;
+  const todas = [...new Set(E.P.map((p) => p.meta.uf))];
+  const i = todas.indexOf(uf);
+  return `Rodovia ${i >= 0 ? String.fromCharCode(65 + (i % 26)) : ''}`.trim();
+}
+
+/** Km exibido. No modo privacidade o km é contado a partir do início da primeira planilha (inteiro), para não revelar o trecho. */
+export const kmBase = () => (E.privacidade && E.P.length ? Math.floor(Math.min(...E.P.map((p) => p.kmNum[0]))) : 0);
+export const kmVis = (k: number) => k - kmBase();
+export const kmReal = (k: number) => k + kmBase();
+export const kmFmt = (k: number) => kmLabel(kmVis(k));
+/** Refaz os rótulos de km de todas as planilhas e o formato usado nas propostas. Chamar ao ligar o modo, abrir ou fechar planilha. */
+export function atualizarRotulosKm() {
+  definirFormatoKm(kmFmt);
+  for (const p of E.P) p.kmLab = p.kmNum.map(kmFmt);
+}
+
 
 export const novoId = () => 'p' + ++E.seq;
 

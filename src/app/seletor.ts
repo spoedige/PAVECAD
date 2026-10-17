@@ -1,5 +1,5 @@
 import { marcadosPor, ROTULO_ATALHO, type Atalho, type ItemSelecao } from '../dominio/selecao';
-import { E, projName, type AppProj } from './estado';
+import { E, projName, rodoviaNome, type AppProj } from './estado';
 import { esc } from './ui';
 
 export interface OpcoesSeletor {
@@ -12,7 +12,7 @@ export interface OpcoesSeletor {
   aviso?: (marcadas: AppProj[]) => string;
 }
 
-export const itemDe = (p: AppProj): ItemSelecao => ({ id: p.id, nome: projName(p), rodovia: p.meta.uf, sentido: p.meta.travel });
+export const itemDe = (p: AppProj): ItemSelecao => ({ id: p.id, nome: projName(p), rodovia: rodoviaNome(p.meta.uf), sentido: p.meta.travel });
 
 /** Seletor de planilhas com checkbox e atalhos. A origem não aparece. Resolve com as planilhas marcadas,
  *  ou null ao cancelar (Esc, fundo ou Cancelar). */

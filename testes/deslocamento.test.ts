@@ -88,12 +88,12 @@ describe('o deslocamento chega às coordenadas exportadas e ao GPS', () => {
 
 describe('seletor de planilhas', () => {
   const lista: ItemSelecao[] = [
-    { id: 'a', nome: 'A', rodovia: 'SP-333', sentido: 1 },
-    { id: 'b', nome: 'B', rodovia: 'SP-333', sentido: -1 },
+    { id: 'a', nome: 'A', rodovia: 'RD-001', sentido: 1 },
+    { id: 'b', nome: 'B', rodovia: 'RD-001', sentido: -1 },
     { id: 'c', nome: 'C', rodovia: 'BR-116', sentido: 1 },
     { id: 'd', nome: 'D', rodovia: 'BR-116', sentido: -1 },
   ];
-  const origem = { rodovia: 'SP-333' };
+  const origem = { rodovia: 'RD-001' };
 
   it('atalhos marcam o conjunto esperado', () => {
     expect([...marcadosPor('todas', lista, origem)]).toEqual(['a', 'b', 'c', 'd']);

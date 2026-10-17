@@ -49,7 +49,10 @@ export function runStats(p: PV, s: Pick<Alvo, 'lane' | 'r0' | 'r1'>) {
   return { len: (s.r1 - s.r0 + 1) * 20, area };
 }
 
-export const runLabel = (p: PV, s: Pick<Alvo, 'r0' | 'r1'>) => `km ${p.kmLab[s.r0]} a ${kmLabel(p.kmNum[s.r1] + 0.02)}`;
+/** Formato do km nas legendas e no CSV. O app troca por um que oculta o km no modo privacidade. */
+let formatarKm: (km: number) => string = kmLabel;
+export const definirFormatoKm = (f: (km: number) => string) => { formatarKm = f; };
+export const runLabel = (p: PV, s: Pick<Alvo, 'r0' | 'r1'>) => `km ${p.kmLab[s.r0]} a ${formatarKm(p.kmNum[s.r1] + 0.02)}`;
 
 /** Uma proposta nova sobre área já proposta substitui só a parte sobreposta.
  *  `kmNum` é o km de cada linha da planilha da proposta, para ancorar os pedaços restantes. */
@@ -117,7 +120,7 @@ export function propostasCsv(list: Proposta[], proj: (id: string | null) => PV |
     if (!p) continue;
     const s = runStats(p, r), e = eixo?.(p, r);
     const coords = e ? [num(e.ini.lat, 7), num(e.ini.lon, 7), num(e.fim.lat, 7), num(e.fim.lon, 7), num(e.ini.e), num(e.ini.n), num(e.fim.e), num(e.fim.n)] : Array(8).fill('');
-    rows.push([q(nome(p)), r.lane || 'Acost', p.kmLab[r.r0], kmLabel(p.kmNum[r.r1] + 0.02), s.len, n(s.area / s.len), n(s.area), q(r.from), q(rotulo(r.from)), q(r.to), q(rotulo(r.to)), q(r.note), ...coords].join(';'));
+    rows.push([q(nome(p)), r.lane || 'Acost', p.kmLab[r.r0], formatarKm(p.kmNum[r.r1] + 0.02), s.len, n(s.area / s.len), n(s.area), q(r.from), q(rotulo(r.from)), q(r.to), q(rotulo(r.to)), q(r.note), ...coords].join(';'));
   }
   return rows.join(eol);
 }

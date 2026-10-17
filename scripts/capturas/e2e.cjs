@@ -519,20 +519,20 @@ const TESTES = {
   t09: [
     ['Planservi: dois arquivos viram quatro projetos no unifilar, agrupados por rodovia', ['1366x768', 'tablet-h-1024x768'], async (pg) => {
       const nomes = await pg.evaluate(() => window.__pavecad.E.P.map((p) => p.meta.name).sort());
-      assert.deepEqual(nomes, ['SP-333 · TH50 · Crescente', 'SP-333 · TH50 · Decrescente', 'SP-333 · TH51 · Crescente', 'SP-333 · TH51 · Decrescente']);
-      assert.equal(await pg.evaluate(() => window.__pavecad.E.activeGroup), 'SP-333');
+      assert.deepEqual(nomes, ['RD-001 · TH01 · Crescente', 'RD-001 · TH01 · Decrescente', 'RD-001 · TH02 · Crescente', 'RD-001 · TH02 · Decrescente']);
+      assert.equal(await pg.evaluate(() => window.__pavecad.E.activeGroup), 'RD-001');
       await pg.waitForTimeout(600);
       const blocos = await pg.evaluate(() => window.__pavecad.blocosDoUnifilar());
       assert.equal(blocos.length, 4, 'quatro projetos desenhados no unifilar: ' + blocos.join(' | '));
       assert.deepEqual([...blocos].sort(), nomes);
-      assert.ok(blocos.indexOf('SP-333 · TH50 · Crescente') < blocos.indexOf('SP-333 · TH50 · Decrescente'), 'crescente antes do decrescente');
+      assert.ok(blocos.indexOf('RD-001 · TH01 · Crescente') < blocos.indexOf('RD-001 · TH01 · Decrescente'), 'crescente antes do decrescente');
       // filtro: um grupo só (mesma rodovia), então o filtro não aparece; o título do unifilar traz a rodovia
       assert.equal(await pg.evaluate(() => document.querySelectorAll('#unigroups button').length), 0);
-      assert.match(await pg.textContent('#title'), /^SP-333$/);
+      assert.match(await pg.textContent('#title'), /^RD-001$/);
       // sem erro de interface: unifilar legível (altura do cartão cabe na tela)
       const h = await pg.evaluate(() => ({ uni: document.querySelector('#unicard').getBoundingClientRect().height, vh: innerHeight }));
       assert.ok(h.uni < h.vh * 0.6, 'o unifilar com 4 projetos não toma mais de 60% da tela: ' + h.uni);
-    }, { arquivos: ['planservi_TH50.xlsx', 'planservi_TH51.xlsx'], projetos: 4 }],
+    }, { arquivos: ['planservi_amostra_1.xlsx', 'planservi_amostra_2.xlsx'], projetos: 4 }],
     ['Planservi: só IGG, FC-2 e FC-3 além de IRI e ATR; D0, Rc e Defeitos escondidos; limiares do IGG 20, 40, 80 e 160', ['1366x768'], async (pg) => {
       const modos = await pg.evaluate(() => [...document.querySelectorAll('#modes button')].filter((b) => !b.hidden).map((b) => b.textContent));
       assert.deepEqual(modos, ['Solução', 'IRI', 'ATR', 'IGG', 'FC-2', 'FC-3']);
@@ -555,11 +555,11 @@ const TESTES = {
       for (const k of ['igg', 'fc2', 'fc3']) assert.ok(cards.includes(k), 'limiar de ' + k);
       const igg = await pg.evaluate(() => [...document.querySelectorAll('.cfg-grid [data-k="igg"] input')].map((i) => +i.value));
       assert.deepEqual(igg, [20, 40, 80, 160]);
-    }, { arquivos: ['planservi_TH50.xlsx', 'planservi_TH51.xlsx'], projetos: 4 }],
+    }, { arquivos: ['planservi_amostra_1.xlsx', 'planservi_amostra_2.xlsx'], projetos: 4 }],
     ['Planservi: o detalhe do segmento lista as camadas; sem D0, Rc e D120; cor pela camada mais forte', ['1366x768'], async (pg) => {
       // procura um segmento do crescente com intervenção funcional, para ver camadas e cor
       const alvo = await pg.evaluate(() => {
-        const p = window.__pavecad.E.P.find((q) => q.meta.name === 'SP-333 · TH50 · Crescente');
+        const p = window.__pavecad.E.P.find((q) => q.meta.name === 'RD-001 · TH01 · Crescente');
         const i = p.rows.findIndex((r) => r.lanes[0] && r.lanes[0].code === 'F4R4');
         return { id: p.id, i };
       });
@@ -582,7 +582,7 @@ const TESTES = {
       // a cor vem do catálogo: F4R4 usa a de Fres. funcional (a de FS4), e o código original continua o da planilha
       const cor = await pg.evaluate((a) => { const p = window.__pavecad.E.P.find((q) => q.id === a.id); return { code: p.rows[a.i].lanes[0].code, main: p.model[a.i].tr[0].main }; }, alvo);
       assert.deepEqual(cor, { code: 'F4R4', main: 'F4R4' });
-    }, { arquivos: ['planservi_TH50.xlsx', 'planservi_TH51.xlsx'], projetos: 4 }],
+    }, { arquivos: ['planservi_amostra_1.xlsx', 'planservi_amostra_2.xlsx'], projetos: 4 }],
     ['Planservi: a aba Revisão mostra a qualidade da importação, com o km de cada ocorrência, e o log traz o mesmo', ['1366x768'], async (pg) => {
       await aba(pg, 'notas');
       const sec = await pg.evaluate(() => ({ titulo: [...document.querySelectorAll('#t-notas .sect')].map((e) => e.textContent.trim()), itens: [...document.querySelectorAll('#t-notas details.qual')].map((d) => d.querySelector('summary b').textContent) }));
@@ -590,7 +590,7 @@ const TESTES = {
       assert.equal(sec.itens.length, 4, 'um item por projeto: ' + sec.itens.join(' | '));
       // o resumo bate com o que o leitor calculou, e cada ocorrência traz o km
       const q = await pg.evaluate(() => window.__pavecad.E.P.map((p) => ({ nome: p.meta.name, corr: (p.qualidade.corrigidos || []).length, saltos: p.qualidade.saltos.length, sent: p.qualidade.sentidos.length })));
-      const crescA = q.find((x) => x.nome === 'SP-333 · TH50 · Crescente');
+      const crescA = q.find((x) => x.nome === 'RD-001 · TH01 · Crescente');
       assert.ok(crescA.corr >= 1 && crescA.saltos === 0 && crescA.sent === 0, 'o ponto fora do lugar foi reconstruído e já não há salto nem distância entre sentidos: ' + JSON.stringify(crescA));
       await pg.click('#t-notas details.qual[data-qp] summary'); await pg.waitForTimeout(300);
       const lista = await pg.evaluate(() => [...document.querySelectorAll('#t-notas details.qual[open] [data-q]')].map((b) => b.textContent.trim()));
@@ -601,16 +601,16 @@ const TESTES = {
       assert.equal(await pg.evaluate(() => { const s = window.__pavecad.E.sel; return s ? s.pid + ':' + s.row : null; }), alvo);
       // o log do projeto (aba Ajustes) traz o mesmo resumo
       await aba(pg, 'aj');
-      const log = await pg.evaluate(() => { const E = window.__pavecad.E; return E.P.find((p) => p.meta.name === 'SP-333 · TH50 · Crescente').log.filter((l) => /^planservi/.test(l.code)).map((l) => l.code + ': ' + l.msg); });
+      const log = await pg.evaluate(() => { const E = window.__pavecad.E; return E.P.find((p) => p.meta.name === 'RD-001 · TH01 · Crescente').log.filter((l) => /^planservi/.test(l.code)).map((l) => l.code + ': ' + l.msg); });
       assert.ok(log.some((l) => /planservi-corrigidos/.test(l) && /reconstruída/.test(l) && /deslocamento|m\)/.test(l)), 'log com as coordenadas reconstruídas');
       assert.ok(log.some((l) => /Aba IRI ignorada/.test(l)), 'log da aba IRI ignorada');
       assert.ok(log.some((l) => /Larguras assumidas/.test(l)), 'log das larguras assumidas');
-    }, { arquivos: ['planservi_TH50.xlsx', 'planservi_TH51.xlsx'], projetos: 4 }],
+    }, { arquivos: ['planservi_amostra_1.xlsx', 'planservi_amostra_2.xlsx'], projetos: 4 }],
     ['Planservi: os quatro projetos sobrevivem ao recarregar, com a qualidade da importação', ['1366x768'], async (pg) => {
       await pg.reload(); await pg.waitForTimeout(2500);
       assert.equal(await pg.evaluate(() => window.__pavecad.E.P.length), 4, 'projetos restaurados do aparelho');
       assert.ok(await pg.evaluate(() => window.__pavecad.E.P.every((p) => p.qualidade && p.meta.format === 'planservi')));
-    }, { arquivos: ['planservi_TH50.xlsx', 'planservi_TH51.xlsx'], projetos: 4 }],
+    }, { arquivos: ['planservi_amostra_1.xlsx', 'planservi_amostra_2.xlsx'], projetos: 4 }],
     ['RoadRunner: continua com os seis modos e sem IGG e FC', ['1366x768'], async (pg) => {
       const modos = await pg.evaluate(() => [...document.querySelectorAll('#modes button')].filter((b) => !b.hidden).map((b) => b.textContent));
       assert.deepEqual(modos, ['Solução', 'IRI', 'ATR', 'D0', 'Rc', 'Defeitos']);
@@ -689,17 +689,17 @@ const TESTES = {
       const outras = info.todas.filter((p) => p.id !== info.pid);
       assert.equal(await pg.locator('#seletor input[data-id]').count(), outras.length, 'a origem não aparece');
       assert.equal(await pg.locator(`#seletor input[data-id="${info.pid}"]`).count(), 0);
-      const linhas = await pg.locator('.sel-item').allInnerTexts();
+      const linhas = await pg.locator('#seletor .sel-item').allInnerTexts();
       assert.ok(linhas.every((t) => /Crescente|Decrescente/.test(t) && /\S+/.test(t.split('\n')[1] || '')), 'cada linha traz nome, rodovia e sentido: ' + linhas.join(' | '));
       assert.equal(await pg.isDisabled('#selOk'), true, 'nada marcado: Aplicar desabilitado');
       assert.match(await pg.innerText('#selCont'), new RegExp(`^0 de ${outras.length} selecionadas`));
       const marcados = () => pg.evaluate(() => [...document.querySelectorAll('#seletor input[data-id]')].filter((c) => c.checked).map((c) => c.dataset.id).sort());
       const ids = (f) => outras.filter(f).map((p) => p.id).sort();
-      await pg.click('[data-atalho=todas]'); assert.deepEqual(await marcados(), ids(() => true));
-      await pg.click('[data-atalho=nenhuma]'); assert.deepEqual(await marcados(), []);
-      await pg.click('[data-atalho=crescentes]'); assert.deepEqual(await marcados(), ids((p) => p.travel === 1));
-      await pg.click('[data-atalho=rodovia]'); const orig = info.todas.find((p) => p.id === info.pid); assert.deepEqual(await marcados(), ids((p) => p.uf === orig.uf));
-      await pg.click('[data-atalho=decrescentes]');
+      await pg.click('#seletor [data-atalho=todas]'); assert.deepEqual(await marcados(), ids(() => true));
+      await pg.click('#seletor [data-atalho=nenhuma]'); assert.deepEqual(await marcados(), []);
+      await pg.click('#seletor [data-atalho=crescentes]'); assert.deepEqual(await marcados(), ids((p) => p.travel === 1));
+      await pg.click('#seletor [data-atalho=rodovia]'); const orig = info.todas.find((p) => p.id === info.pid); assert.deepEqual(await marcados(), ids((p) => p.uf === orig.uf));
+      await pg.click('#seletor [data-atalho=decrescentes]');
       assert.deepEqual(await marcados(), ids((p) => p.travel === -1), 'Só decrescentes marca apenas as decrescentes');
       assert.equal(await pg.isDisabled('#selOk'), false);
       const nDec = ids((p) => p.travel === -1).length;
@@ -745,7 +745,7 @@ const TESTES = {
       const ajustou = async (l, t) => { await pg.waitForFunction(([pid, l, t]) => { const p = window.__pavecad.E.P.find((q) => q.id === pid); return p.desloc.l === l && p.desloc.t === t; }, [(await medir()).pid, l, t], { timeout: 15000 }); await pg.waitForTimeout(400); };
       await aba(pg, 'aj');
       const pid = (await medir()).pid;
-      await pg.selectOption('#a-proj', pid); await pg.waitForSelector('#d-l');
+      await pg.click('[data-atalho=nenhuma]'); await pg.check(`#a-lista input[data-id="${pid}"]`); await pg.waitForSelector('#d-l');
       const m0 = await medir();
       assert.deepEqual(m0.desloc, { l: 0, t: 0 });
       // transversal +5 m (direita do sentido de percurso)
@@ -789,33 +789,53 @@ const TESTES = {
       assert.equal(await pg.inputValue('#d-l'), '0');
       void antes;
     }],
-    ['deslocamento: "Aplicar a outras planilhas…" copia o valor absoluto só para as marcadas (Só decrescentes) e desfaz', '1366x768', async (pg) => {
+    ['ajustes: marcar planilhas por checkbox aplica o deslocamento só nelas ("Só decrescentes"), cada uma soma ao seu valor, e desfaz', '1366x768', async (pg) => {
       await aba(pg, 'aj');
-      const origem = await pg.inputValue('#a-proj');
-      await pg.click('[data-d=l][data-s="5"]'); await pg.waitForFunction((pid) => window.__pavecad.E.P.find((p) => p.id === pid).desloc.l === 5, origem);
-      await pg.click('[data-d=t][data-s="-1"]'); await pg.waitForFunction((pid) => window.__pavecad.E.P.find((p) => p.id === pid).desloc.t === -1, origem);
-      await pg.click('#d-outras'); await pg.waitForSelector('#seletor');
-      assert.equal(await pg.locator(`#seletor input[data-id="${origem}"]`).count(), 0, 'a origem não aparece');
+      await pg.waitForSelector('#a-lista');
+      const ver = () => pg.evaluate(() => window.__pavecad.E.P.map((p) => ({ id: p.id, travel: p.meta.travel, d: { ...p.desloc } })));
+      const todas = await ver();
+      assert.equal(await pg.locator('#a-lista input[data-id]').count(), todas.length, 'todas as planilhas aparecem na lista');
+      assert.equal(await pg.locator('#a-lista [data-id]').first().evaluate((e) => e.tagName), 'INPUT');
+      assert.equal(await pg.locator('select#a-proj').count(), 0, 'a lista suspensa deixou de existir');
+      // atalhos
       await pg.click('[data-atalho=decrescentes]');
-      await pg.click('#selOk');
-      const ver = () => pg.evaluate((o) => window.__pavecad.E.P.map((p) => ({ id: p.id, travel: p.meta.travel, d: { ...p.desloc } })), origem);
-      await pg.waitForFunction((o) => window.__pavecad.E.P.filter((p) => p.id !== o && p.meta.travel === -1).every((p) => p.desloc.l === 5 && p.desloc.t === -1), origem, { timeout: 30000 });
-      for (const p of await ver()) {
-        const esp = p.id === origem || p.travel === -1 ? { l: 5, t: -1 } : { l: 0, t: 0 };
-        assert.deepEqual(p.d, esp, `${p.id} (${p.travel})`);
-      }
+      const marc = () => pg.evaluate(() => [...document.querySelectorAll('#a-lista input[data-id]')].filter((c) => c.checked).map((c) => c.dataset.id).sort());
+      assert.deepEqual(await marc(), todas.filter((p) => p.travel === -1).map((p) => p.id).sort(), 'Só decrescentes marca apenas as decrescentes');
+      assert.match(await pg.innerText('#a-cont'), new RegExp(`^${todas.filter((p) => p.travel === -1).length} de ${todas.length}`, 'i'));
+      // +5 longitudinal e −1 transversal valem para as marcadas e só para elas
+      await pg.click('[data-d=l][data-s="5"]');
+      await pg.waitForFunction(() => window.__pavecad.E.P.filter((p) => p.meta.travel === -1).every((p) => p.desloc.l === 5), null, { timeout: 30000 });
+      await pg.click('[data-d=t][data-s="-1"]');
+      await pg.waitForFunction(() => window.__pavecad.E.P.filter((p) => p.meta.travel === -1).every((p) => p.desloc.t === -1), null, { timeout: 30000 });
+      for (const p of await ver()) assert.deepEqual(p.d, p.travel === -1 ? { l: 5, t: -1 } : { l: 0, t: 0 }, `${p.id} (${p.travel})`);
+      // individual: uma só marcada, o passo soma ao valor dela e as outras ficam como estão
+      const uma = todas.find((p) => p.travel === -1).id;
+      await pg.click('[data-atalho=nenhuma]'); await pg.check(`#a-lista input[data-id="${uma}"]`);
+      await pg.click('[data-d=l][data-s="1"]');
+      await pg.waitForFunction((id) => window.__pavecad.E.P.find((p) => p.id === id).desloc.l === 6, uma, { timeout: 30000 });
+      for (const p of await ver()) assert.deepEqual(p.d, p.id === uma ? { l: 6, t: -1 } : p.travel === -1 ? { l: 5, t: -1 } : { l: 0, t: 0 }, `${p.id} depois do ajuste individual: ${JSON.stringify(p.d)}`);
+      // valores diferentes entre as marcadas aparecem como "vários"
+      await pg.click('[data-atalho=decrescentes]');
+      if (todas.filter((p) => p.travel === -1).length > 1) assert.equal(await pg.inputValue('#d-l'), '', 'valores diferentes: campo vazio');
+      assert.equal(await pg.getAttribute('#d-l', 'placeholder'), todas.filter((p) => p.travel === -1).length > 1 ? 'vários' : null);
+      // nenhuma marcada: nada para ajustar
+      await pg.click('[data-atalho=nenhuma]');
+      assert.equal(await pg.locator('#desloc').count(), 0, 'sem planilha marcada, não há o que ajustar');
+      // desfazer (aviso com botão) de uma aplicação em várias planilhas
+      await pg.click('[data-atalho=decrescentes]');
+      await pg.click('#d-zero');
+      await pg.waitForFunction(() => window.__pavecad.E.P.filter((p) => p.meta.travel === -1).every((p) => p.desloc.l === 0 && p.desloc.t === 0), null, { timeout: 30000 });
       await pg.click('.toast-acao button');
-      await pg.waitForFunction((o) => window.__pavecad.E.P.every((p) => p.id === o || (p.desloc.l === 0 && p.desloc.t === 0)), origem, { timeout: 30000 });
-      assert.deepEqual((await ver()).find((p) => p.id === origem).d, { l: 5, t: -1 }, 'a origem continua deslocada');
+      await pg.waitForFunction((id) => window.__pavecad.E.P.find((p) => p.id === id).desloc.l === 6, uma, { timeout: 30000 });
     }, { exemplos: true }],
-    ['deslocamento: o controle fica na aba Ajustes, com ±1 e ±5 m, campo, Zerar e Aplicar a outras; alvos de 44 px (falha se sumir)', TODOS, async (pg) => {
+    ['deslocamento: o controle fica na aba Ajustes, com ±1 e ±5 m, campo, Zerar e a lista de planilhas com checkbox; alvos de 44 px (falha se sumir)', TODOS, async (pg) => {
       await aba(pg, 'aj');
       await pg.waitForSelector('#desloc', { state: 'visible' });
       const m = await pg.evaluate(() => {
         const alvo = (s) => { const r = document.querySelector(s)?.getBoundingClientRect(); return r ? [Math.round(r.width), Math.round(r.height)] : null; };
         return {
           passos: ['l', 't'].map((e) => [-5, -1, 1, 5].map((v) => alvo(`[data-d=${e}][data-s="${v}"]`))),
-          campos: [alvo('#d-l'), alvo('#d-t')], zero: alvo('#d-zero'), outras: alvo('#d-outras'),
+          campos: [alvo('#d-l'), alvo('#d-t')], zero: alvo('#d-zero'), outras: alvo('#a-lista .sel-item'),
           dentro: document.querySelector('#desloc').getBoundingClientRect().right <= window.innerWidth + 0.5,
         };
       });
@@ -848,10 +868,45 @@ const TESTES = {
       assert.ok(itens.some((t) => /andou [\d.,]+ m em relação à planilha/.test(t) && /km \d+\+\d+/.test(t)), 'cada ponto traz km, tipo e deslocamento: ' + itens.slice(0, 3).join(' | '));
       // o log da aba Ajustes traz o mesmo resumo
       await aba(pg, 'aj');
-      await pg.selectOption('#a-proj', alvo.id);
+      await pg.click('[data-atalho=nenhuma]'); await pg.check(`#a-lista input[data-id="${alvo.id}"]`);
       assert.match(await pg.innerText('#t-aj'), /coordenadas corrigidas: \d+/);
       assert.equal(log.erros.filter((e) => !/Failed to load resource/i.test(e)).length, 0, log.erros.join(' | '));
-    }, { arquivos: ['planservi_TH50.xlsx', 'planservi_TH51.xlsx'], projetos: 4 }],
+    }, { arquivos: ['planservi_amostra_1.xlsx', 'planservi_amostra_2.xlsx'], projetos: 4 }],
+  ],
+  t13: [
+    ['modo privacidade: oculta nomes, rodovia e km na tela, vale para o "Ir para km", persiste e desliga', '1366x768', async (pg) => {
+      const corpo = () => pg.evaluate(() => document.body.innerText);
+      assert.match(await corpo(), /RD-001/, 'sem privacidade, a rodovia aparece');
+      await aba(pg, 'aj');
+      await pg.click('#s-priv');
+      await pg.waitForFunction(() => window.__pavecad.E.privacidade === true);
+      await pg.waitForTimeout(600);
+      let txt = await corpo();
+      assert.doesNotMatch(txt, /RD-001|TH0[12]/, 'nenhum nome de rodovia ou trecho na tela');
+      assert.equal(await pg.textContent('#title'), 'Rodovia A');
+      const nomes = await pg.evaluate(() => [...document.querySelectorAll('#t-resumo .prow .nm b:not(.selo)')].map((b) => b.textContent));
+      assert.ok(nomes.every((n) => /^Planilha \d+ · (Crescente|Decrescente)$/.test(n)), nomes.join(' | '));
+      // km: contado a partir do início da primeira planilha
+      const k = await pg.evaluate(() => { const p = window.__pavecad.E.P[0]; return { real: p.kmNum[5], lab: p.kmLab[5], base: Math.floor(Math.min(...window.__pavecad.E.P.map((q) => q.kmNum[0]))) }; });
+      assert.equal(k.lab, '0+100', `o km real ${k.real} aparece como ${k.lab}`);
+      await pg.evaluate(() => window.__pavecad.select(window.__pavecad.E.P[0].id, 5, 1, { tab: false }));
+      await pg.waitForTimeout(400);
+      assert.match(await pg.textContent('#ikm'), /^km 0\+100 · Planilha 1 · /);
+      // "Ir para km" aceita o km mostrado
+      await pg.fill('#gokm', '0+300'); await pg.click('#goBtn'); await pg.waitForTimeout(1200);
+      assert.equal(await pg.evaluate(() => window.__pavecad.E.sel && window.__pavecad.E.sel.row), 15, 'o km 0+300 mostrado é a linha 15 da planilha');
+      // a escolha fica salva e vale depois de recarregar
+      await pg.reload(); await pg.waitForFunction(() => window.__pavecad && window.__pavecad.E.P.length >= 4, null, { timeout: 60000 }); await pg.waitForTimeout(2500);
+      assert.equal(await pg.evaluate(() => window.__pavecad.E.privacidade), true);
+      assert.doesNotMatch(await corpo(), /RD-001|TH0[12]/, 'depois de recarregar continua oculto');
+      // desliga
+      await aba(pg, 'aj');
+      await pg.click('#s-priv');
+      await pg.waitForFunction(() => window.__pavecad.E.privacidade === false);
+      await pg.waitForTimeout(600);
+      assert.match(await corpo(), /RD-001/);
+      assert.equal(await pg.evaluate(() => window.__pavecad.E.P[0].kmLab[5]), await pg.evaluate(() => { const k = window.__pavecad.E.P[0].kmNum[5]; return `${Math.floor(k)}+${String(Math.round((k % 1) * 1000)).padStart(3, '0')}`; }));
+    }, { arquivos: ['planservi_amostra_1.xlsx', 'planservi_amostra_2.xlsx'], projetos: 4 }],
   ],
   g03: [
     ['a seção é o seletor de faixa (clique, aria-pressed, teclado)', '1366x768', async (pg) => {

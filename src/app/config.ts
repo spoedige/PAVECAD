@@ -2,8 +2,8 @@ import * as catalogo from '../dominio/catalogo';
 import { getLimites, IND, IND_KEYS, restaurarLimites, rotulosPara, setLimites, validarLimites, type IndKey, type Limites } from '../dominio/indicadores';
 import { LARGURA_ACOSTAMENTO, LARGURA_FAIXA, larguraPadrao, planejarCopia, validarAjuste, contarAlteradas, type AjusteLargura } from '../dominio/larguras';
 import { trColor } from '../dominio/solucoes';
-import { kmLabel, parseKmTexto } from '../formats/km';
-import { E, H, getP, projName, type AppProj } from './estado';
+import { parseKmTexto } from '../formats/km';
+import { E, H, getP, kmFmt, kmReal, projName, type AppProj } from './estado';
 import { applyPaint } from './mapa';
 import { renderAll } from './paineis';
 import * as db from './persist';
@@ -233,7 +233,7 @@ function renderLarguras(body: HTMLElement) {
       <p class="note num">Faixas de ${fmt(kmIni, 0)} a ${fmt(kmFim, 0)} km. ${alt ? `${alt.toLocaleString('pt-BR')} segmentos de 20 m com largura diferente da planilha.` : 'Nenhum ajuste ativo.'}</p>
     </div>
     <div><div class="sect">Ajustes desta planilha <span>${ajustes.length}</span></div>
-      ${ajustes.length ? `<table class="ctable"><thead><tr><th>Faixa</th><th>Alcance</th><th>Largura</th><th></th></tr></thead><tbody>${ajustes.map((a) => `<tr><td>${nomeFaixa(a.lane)}</td><td class="num">${a.km0 === null ? 'Planilha toda' : `km ${kmLabel(a.km0)} a ${kmLabel(a.km1!)}`}</td><td class="num">${numStr(a.largura)} m</td><td><button class="btn d" data-del="${a.id}" style="min-height:30px;padding:3px 10px">Remover</button></td></tr>`).join('')}</tbody></table>`
+      ${ajustes.length ? `<table class="ctable"><thead><tr><th>Faixa</th><th>Alcance</th><th>Largura</th><th></th></tr></thead><tbody>${ajustes.map((a) => `<tr><td>${nomeFaixa(a.lane)}</td><td class="num">${a.km0 === null ? 'Planilha toda' : `km ${kmFmt(a.km0)} a ${kmFmt(a.km1!)}`}</td><td class="num">${numStr(a.largura)} m</td><td><button class="btn d" data-del="${a.id}" style="min-height:30px;padding:3px 10px">Remover</button></td></tr>`).join('')}</tbody></table>`
         : '<p class="note">Sem ajustes. As larguras são as da planilha.</p>'}</div>
     <div class="cfg-card cfg-lote"><div class="sect" style="margin:0">Replicar para outras planilhas</div>
       <div class="btns"><button class="btn" id="lgOutras" ${ajustes.length && outras.length ? '' : 'disabled'}>Aplicar a outras planilhas…</button></div>
@@ -251,7 +251,7 @@ function renderLarguras(body: HTMLElement) {
       <p class="note">Km no formato 120+000 ou 120,5. Deixe os dois km vazios para valer na planilha toda. O intervalo vai do km inicial até o final, sem incluir o final. Faixa de ${fmt(LARGURA_FAIXA.min, 1)} a ${fmt(LARGURA_FAIXA.max, 0)} m, acostamento de ${fmt(LARGURA_ACOSTAMENTO.min, 0)} a ${fmt(LARGURA_ACOSTAMENTO.max, 0)} m. Se dois intervalos se sobrepõem, vale o adicionado por último.</p>
     </div>
     <div class="cfg-card"><div class="sect" style="margin:0">Pré-visualização da seção</div>
-      <div class="cfg-row"><label>Km<input class="in" type="text" id="lgPv" value="${kmLabel(kmPrevia)}" style="width:120px"></label></div>
+      <div class="cfg-row"><label>Km<input class="in" type="text" id="lgPv" value="${kmFmt(kmPrevia)}" style="width:120px"></label></div>
       <div id="lgSvg">${previaSecao(p, kmPrevia)}</div></div>`;
 
   $<HTMLSelectElement>('#lgProj').value = p.id;
@@ -261,7 +261,7 @@ function renderLarguras(body: HTMLElement) {
   $('#lgPv').onchange = (e) => {
     const k = parseKmTexto((e.target as HTMLInputElement).value);
     if (k === null) { toast('Use o formato 59+740 ou 59,74'); return; }
-    kmPrevia = k;
+    kmPrevia = kmReal(k);
     $('#lgSvg').innerHTML = previaSecao(p, k);
   };
   body.querySelectorAll<HTMLElement>('[data-del]').forEach((b) => (b.onclick = async () => {
@@ -271,11 +271,11 @@ function renderLarguras(body: HTMLElement) {
   $('#lgOutras').onclick = () => void replicarAjustes(p, () => renderLarguras(body));
   $('#lgAdd').onclick = async () => {
     const err = $('#lgErr'), t0 = $<HTMLInputElement>('#lgK0').value.trim(), t1 = $<HTMLInputElement>('#lgK1').value.trim();
-    const km0 = t0 ? parseKmTexto(t0) : null, km1 = t1 ? parseKmTexto(t1) : null;
-    if ((t0 && km0 === null) || (t1 && km1 === null)) { err.textContent = 'Km inválido. Use 120+000 ou 120,5.'; return; }
+    const r0 = t0 ? parseKmTexto(t0) : null, r1 = t1 ? parseKmTexto(t1) : null, km0 = r0 === null ? null : kmReal(r0), km1 = r1 === null ? null : kmReal(r1);
+    if ((t0 && r0 === null) || (t1 && r1 === null)) { err.textContent = 'Km inválido. Use 120+000 ou 120,5.'; return; }
     const novo: AjusteLargura = { id: 'a' + Date.now().toString(36), pname: p.meta.name, lane: +$<HTMLSelectElement>('#lgLane').value, km0, km1, largura: parseFloat($<HTMLInputElement>('#lgW').value.replace(',', '.')) };
     let msg = validarAjuste(novo, N);
-    if (!msg && novo.km0 !== null && (novo.km1! <= kmIni || novo.km0 >= kmFim)) msg = `Esse intervalo está fora da planilha (km ${kmLabel(kmIni)} a ${kmLabel(kmFim)}).`;
+    if (!msg && novo.km0 !== null && (novo.km1! <= kmIni || novo.km0 >= kmFim)) msg = `Esse intervalo está fora da planilha (km ${kmFmt(kmIni)} a ${kmFmt(kmFim)}).`;
     err.textContent = msg ?? '';
     if (msg) return;
     await aplicarAjustes(p, [...p.ajustes, novo]);

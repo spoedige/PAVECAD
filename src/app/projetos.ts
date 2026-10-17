@@ -5,7 +5,7 @@ import { deslocarLongitudinal, deslocZerado, type Desloc } from '../geometry/des
 import { fromUtm } from '../geometry/utm';
 import type { ParsedProject } from '../formats/types';
 import { carregarLido, lerPlanilha, recalcular } from '../mapa/cliente';
-import { aplicarGeometria, baseOf, criarProjeto, E, H, novoId, type AppProj } from './estado';
+import { aplicarGeometria, atualizarRotulosKm, baseOf, criarProjeto, E, H, novoId, type AppProj } from './estado';
 import { addProjectToMap, applyPaint, clearFocus, fitList, removeProjectFromMap, setProjectData, updateSelLayer, updateStakes } from './mapa';
 import * as db from './persist';
 import { renderAll } from './paineis';
@@ -51,6 +51,7 @@ function addProject(p: AppProj) {
   const old = E.P.find((x) => x.meta.name === p.meta.name);
   if (old) { if (E.mapReady) removeProjectFromMap(old); E.P = E.P.filter((x) => x !== old); }
   E.P.push(p);
+  atualizarRotulosKm();
   if (E.mapReady) addProjectToMap(p);
 }
 
@@ -157,6 +158,7 @@ async function incluir(carregar: (id: string) => Promise<Resp>, rotulo: string, 
 function terminar(novos: AppProj[], enquadrar = true) {
   if (!novos.length) return;
   E.settingsPid ??= novos[0].id;
+  if (!E.settingsSel.size) E.settingsSel = new Set([novos[0].id]);
   E.activeGroup ??= novos[0].meta.uf;
   resolveProps();
   refreshProp();
@@ -167,14 +169,15 @@ function terminar(novos: AppProj[], enquadrar = true) {
 
 export async function abrirArquivos(files: File[]) {
   const novos: AppProj[] = [];
-  for (const f of files) {
-    toast(`Lendo ${f.name}... arquivos grandes podem levar alguns segundos`, 60000);
+  for (const [n, f] of files.entries()) {
+    const nome = E.privacidade ? `arquivo ${n + 1}` : f.name; // no modo privacidade o nome do arquivo não aparece
+    toast(`Lendo ${nome}... arquivos grandes podem levar alguns segundos`, 60000);
     const buf = await f.arrayBuffer();
     let lista: ParsedProject[];
-    try { lista = await lerPlanilha(buf); } catch (err) { toast(`${f.name}: ${(err as Error).message}`, 6000); continue; }
+    try { lista = await lerPlanilha(buf); } catch (err) { toast(`${nome}: ${(err as Error).message}`, 6000); continue; }
     // um arquivo pode gerar mais de um projeto (Planservi: Crescente e Decrescente)
     for (const parsed of lista) {
-      const p = await incluir((id) => carregarLido(id, parsed), lista.length > 1 ? `${f.name} (${parsed.meta.name})` : f.name, true);
+      const p = await incluir((id) => carregarLido(id, parsed), lista.length > 1 && !E.privacidade ? `${nome} (${parsed.meta.name})` : nome, true);
       if (p) novos.push(p);
     }
   }
@@ -205,5 +208,6 @@ export async function restaurarProjetos(): Promise<number> {
 export function removerProjeto(p: AppProj, esquecer: boolean) {
   removeProjectFromMap(p);
   E.P = E.P.filter((x) => x !== p);
+  atualizarRotulosKm();
   if (esquecer) esquecerProjeto(p.meta.name);
 }

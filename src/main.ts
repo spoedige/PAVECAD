@@ -11,7 +11,7 @@ import { gpsToggle } from './app/gps';
 import { initRevisao, onToolClick, refreshNotesLayer, refreshPropLayers, resolveProps, setTool } from './app/revisao';
 import { abrirArquivos, abrirLidas, carregarConfig, restaurarProjetos } from './app/projetos';
 import { abrirConfig, atualizarAviso, configAberta, initConfig } from './app/config';
-import { modosVisiveis, renderAll, renderSeg, setField, setMode, setTab, syncBaseSeg } from './app/paineis';
+import { focarAjustes, modosVisiveis, renderAll, renderSeg, setField, setMode, setTab, syncBaseSeg } from './app/paineis';
 import { blocosDoUnifilar, drawUni, initUnifilar } from './app/unifilar';
 import { initLayout } from './app/layout';
 import { alternarLimpo, initGrupos } from './app/grupos';
@@ -112,7 +112,7 @@ window.addEventListener('keydown', (e) => {
 
 /* ---- ganchos entre mapa e painéis ---- */
 H.onSelect = (opt) => {
-  if (E.sel) E.settingsPid = E.sel.pid;
+  if (E.sel) focarAjustes(E.sel.pid);
   renderSeg();
   drawUni();
   if (opt.tab) setTab('seg');
@@ -130,6 +130,7 @@ if (import.meta.env.DEV) {
 
 async function boot() {
   try { E.field = localStorage.getItem('pavecad-field') === '1'; } catch { /* sem storage */ }
+  try { E.privacidade = localStorage.getItem('pavecad-privacidade') === '1'; } catch { /* sem storage */ }
   if (E.field) { document.documentElement.setAttribute('data-contrast', 'field'); $('#btnField').setAttribute('aria-pressed', 'true'); }
   await abrirDb();
   await carregarConfig();

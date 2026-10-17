@@ -5,10 +5,10 @@ import { edgesOf, offsetLL } from '../geometry/build';
 import { IND, Q5, Q5F, type IndKey } from '../dominio/indicadores';
 import { trColor, trLabel, trOrder, trShort } from '../dominio/solucoes';
 import type { Nota } from './estado';
-import { kmLabel, parseKmTexto } from '../formats/km';
+import { parseKmTexto } from '../formats/km';
 import { baseSources, CHAVE_NITIDEZ, MAP_MAX_ZOOM, nitidezSalva, recarregarEsri, type Nitidez } from '../mapa/base';
 import { agendarRotulos, PRIO, prioDeEstaca, resolverRotulos } from './rotulos';
-import { E, H, NOTE_CATS, getP, projName, visibleProjects, type AppProj, type FocoPred } from './estado';
+import { E, H, NOTE_CATS, getP, kmFmt, kmReal, projName, visibleProjects, type AppProj, type FocoPred } from './estado';
 import { $, cssv, esc, fmt, syncSeg, toast } from './ui';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -388,7 +388,7 @@ function tipHtml(h: Exclude<Hit, { note: Nota }>): string {
   const multi = E.P.length > 1;
   if ('drain' in h) {
     const { p, t, r0, r1 } = h.drain;
-    return `<b>Dreno tipo ${esc(t)}</b> <span>· ${(r1 - r0 + 1) * 20} m · lado ${p.opts.drainSide === 'in' ? 'interno' : 'externo'}</span><br>km ${p.kmLab[r0]} a ${kmLabel(p.kmNum[r1] + 0.02)}${multi ? ' · ' + esc(projName(p)) : ''}`;
+    return `<b>Dreno tipo ${esc(t)}</b> <span>· ${(r1 - r0 + 1) * 20} m · lado ${p.opts.drainSide === 'in' ? 'interno' : 'externo'}</span><br>km ${p.kmLab[r0]} a ${kmFmt(p.kmNum[r1] + 0.02)}${multi ? ' · ' + esc(projName(p)) : ''}`;
   }
   const { p, row, lane } = h, L = lane ? p.rows[row].lanes[lane - 1] : null;
   let l2: string;
@@ -512,7 +512,7 @@ export function updateStakes() {
       if (p !== ref) continue;
       const el = document.createElement('div');
       el.className = 'stake' + (m % 1000 === 0 ? ' km' : '');
-      el.textContent = kmLabel(m / 1000);
+      el.textContent = kmFmt(m / 1000);
       Object.assign(el.dataset, { rot: 'estaca', pid: p.id, prio: String(prioDeEstaca(m)) });
       stakeMk.push(new maplibregl.Marker({ element: el, anchor: left ? 'right' : 'left', offset: [left ? -3 : 3, 0] }).setLngLat(offsetLL(p, p, i, left ? lo - 1 : hi + 1)).addTo(map));
     }
@@ -550,7 +550,7 @@ export function alignToRoad() {
 
 /** "59+740" ou "59,74". */
 export function goLabel(text: string) {
-  const t = parseKmTexto(text);
+  const t0 = parseKmTexto(text), t = t0 === null ? null : kmReal(t0);
   if (t === null) { toast('Use o formato 59+740 ou 59,74'); return; }
   // Procura primeiro no grupo ativo; se o km não existir lá, nos demais visíveis.
   const procurar = (lista: AppProj[]) => {
