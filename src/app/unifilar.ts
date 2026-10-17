@@ -21,9 +21,22 @@ function rr(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: num
 
 const card0 = () => $('#unicard');
 
+/** Filtro de projeto no cabeçalho do unifilar. Com mais de uma rodovia, os grupos vêm sob o rótulo da rodovia; a linha rola na horizontal. */
 export function renderGroups() {
   const gs = [...new Set(E.P.filter((p) => p.visible).map((p) => p.meta.uf))], el = $('#unigroups');
-  el.innerHTML = gs.length > 1 ? gs.map((g) => `<button class="chipbtn" data-g="${esc(g)}" style="${g === E.activeGroup ? 'background:var(--accent);color:var(--accent-ink)' : ''}">${esc(g.replace('BR-', ''))}</button>`).join('') : '';
+  const via = (g: string) => g.split('/')[0];
+  const vias = [...new Set(gs.map(via))];
+  const chip = (g: string, txt: string) => `<button class="chipbtn" data-g="${esc(g)}" aria-pressed="${g === E.activeGroup}" style="${g === E.activeGroup ? 'background:var(--accent);color:var(--accent-ink)' : ''}">${esc(txt)}</button>`;
+  let h = '';
+  if (gs.length > 1) {
+    for (const v of vias) {
+      const doVia = gs.filter((g) => via(g) === v);
+      const comUf = doVia.some((g) => g.includes('/'));
+      if (vias.length > 1 && comUf) h += `<span class="hwy">${esc(v.replace('BR-', ''))}</span>`;
+      h += doVia.map((g) => chip(g, !g.includes('/') ? g : vias.length > 1 ? g.split('/')[1] : g.replace('BR-', ''))).join('');
+    }
+  }
+  el.innerHTML = h;
   el.querySelectorAll<HTMLElement>('button').forEach((b) => (b.onclick = () => { E.activeGroup = b.dataset.g!; renderGroups(); drawUni(); }));
 }
 

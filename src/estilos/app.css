@@ -81,14 +81,6 @@ svg.i{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.8;stro
 .search:focus-within{box-shadow:var(--shadow),0 0 0 2px var(--accent)}
 .search .go{width:26px;height:26px;border-radius:50%;border:0;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;flex:none}
 .rotbar{display:flex;align-items:center;gap:2px;padding:3px;border-radius:14px}
-/* Chips de projeto: cartão de vidro próprio (padding de 6 px, mesmo fundo, borda e desfoque dos outros cartões). Quem rola na horizontal e
-   esmaece na borda direita é o elemento interno .views-in, nunca o cartão. Os chips de dentro são pílulas lisas, sem desfoque próprio. */
-.views{flex:none;width:100%;padding:6px;border-radius:14px}
-.views-in{display:flex;flex-wrap:nowrap;gap:6px;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;overscroll-behavior-x:contain}
-.views-in::-webkit-scrollbar{display:none}
-.views-in .chipbtn{flex:none;background:var(--fill);border:0;-webkit-backdrop-filter:none;backdrop-filter:none}
-.views-in .chipbtn:hover{background:var(--fill2)}
-.views-in.mais{-webkit-mask-image:linear-gradient(to right,#000 calc(100% - 22px),transparent);mask-image:linear-gradient(to right,#000 calc(100% - 22px),transparent)}
 .chipbtn{height:max(28px,var(--tap));padding:0 11px;border-radius:999px;border:var(--bw) solid var(--hair);background:var(--glass);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);color:var(--fg);font-size:12px;font-weight:500;white-space:nowrap}
 .chipbtn:hover{background:var(--solid)}
 #zoomhost{display:flex;flex-direction:column;gap:8px;align-items:flex-start}
@@ -461,10 +453,21 @@ html.h-painel:not(.limpo) .grestaura[data-g=painel]{display:grid}
 /* mapa limpo: só o zoom (com a escala) e o botão de olho ficam; o estado de cada grupo não muda */
 html.limpo .hud,html.limpo .dock,html.limpo .inspector,html.limpo .uni,html.limpo .drawer,html.limpo #btnMore,html.limpo .grestaura{display:none!important}
 
-/* Coluna esquerda (título, busca, chips): nenhum filho encolhe; se a coluna não couber entre o topo e a barra lateral, ela mesma rola
+/* Coluna esquerda (título e busca): nenhum filho encolhe; se a coluna não couber entre o topo e a barra lateral, ela mesma rola
    (--tools-t é a posição real da barra lateral). Folga de 20 px à direita, 28 px embaixo e 16 px à esquerda, com margem negativa,
    para a sombra dos cartões não ser cortada pelo overflow. */
 .leftcol>*{flex:none}
-.unico .leftcol{box-sizing:border-box;width:calc(220px + 36px);padding:8px 20px 28px 16px;margin:-8px 0 -28px -16px;max-height:calc(var(--tools-t,9999px) - 24px + 36px);overflow-y:auto;overflow-x:hidden;scrollbar-width:none;overscroll-behavior:contain}
+.unico .leftcol{box-sizing:border-box;width:calc(240px + 36px);padding:8px 20px 28px 16px;margin:-8px 0 -28px -16px;max-height:calc(var(--tools-t,9999px) - 24px + 36px);overflow-y:auto;overflow-x:hidden;scrollbar-width:none;overscroll-behavior:contain}
 .unico .leftcol::-webkit-scrollbar{display:none}
 .unico .search{height:44px}
+
+/* Cartão do título: texto, botão de visão geral (44 px) e botão de ocultar. */
+.title #btnOverview{width:44px;height:44px;border-radius:12px;margin:-6px 0;flex:none}
+@media (pointer: coarse){.title .gocultar{width:32px!important;height:32px!important}}
+/* Filtro de projeto no cabeçalho do unifilar: uma linha só, com rolagem horizontal e fade na borda direita. */
+.uni-h #unigroups{display:flex;flex-wrap:nowrap;align-items:center;gap:6px;flex:0 1 auto;min-width:0;max-width:52%;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;overscroll-behavior-x:contain}
+.uni-h #unigroups::-webkit-scrollbar{display:none}
+.uni-h #unigroups>*{flex:none}
+.uni-h #unigroups.mais{-webkit-mask-image:linear-gradient(to right,#000 calc(100% - 22px),transparent);mask-image:linear-gradient(to right,#000 calc(100% - 22px),transparent)}
+.uni-h .hwy{font-size:11px;font-weight:600;color:var(--muted);white-space:nowrap;padding:0 2px 0 6px}
+@media (max-width:899px){.unico .modes button{padding:6px 9px}}

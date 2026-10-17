@@ -111,7 +111,7 @@ const TESTES = {
       for (const [w, h] of [[1568, 760], [1366, 768], [1024, 768], [820, 1180]]) {
         await pg.setViewportSize({ width: w, height: h }); await pg.waitForTimeout(600);
         const r = await pg.evaluate(() => {
-          const sel = ['.leftcol > .title', '.leftcol > .search', '.leftcol > .views', '.topbar > .modes', '.topright > .trrow', '#zoomhost .maplibregl-ctrl-group', '#toolbar', '#drawer', '#btnMore', '#legend', '#propbar:not([hidden])', '#inspector', '#unicard'];
+          const sel = ['.leftcol > .title', '.leftcol > .search', '.topbar > .modes', '.topright > .trrow', '#zoomhost .maplibregl-ctrl-group', '#toolbar', '#drawer', '#btnMore', '#legend', '#propbar:not([hidden])', '#inspector', '#unicard'];
           const caixas = sel.map((s) => [s, document.querySelector(s)]).filter(([, e]) => e && e.checkVisibility()).map(([s, e]) => [s, e.getBoundingClientRect()]);
           const ruins = [];
           for (let i = 0; i < caixas.length; i++) for (let j = i + 1; j < caixas.length; j++) {
@@ -196,7 +196,7 @@ const TESTES = {
       for (const [w, h] of [[1568, 760], [1366, 768], [1024, 768], [820, 1180]]) {
         await pg.setViewportSize({ width: w, height: h }); await pg.waitForTimeout(600);
         const r = await pg.evaluate(() => {
-          const sel = ['.leftcol > .title', '.leftcol > .search', '.leftcol > .views', '.topbar > .modes', '.topright > .trrow', '#zoomhost .maplibregl-ctrl-group', '#toolbar', '#btnMore', '#legend', '#inspector', '#unicard'];
+          const sel = ['.leftcol > .title', '.leftcol > .search', '.topbar > .modes', '.topright > .trrow', '#zoomhost .maplibregl-ctrl-group', '#toolbar', '#btnMore', '#legend', '#inspector', '#unicard'];
           const cx = sel.map((s) => [s, document.querySelector(s)]).filter(([, e]) => e && e.checkVisibility()).map(([s, e]) => [s, e.getBoundingClientRect()]);
           const ruins = [];
           for (let i = 0; i < cx.length; i++) for (let j = i + 1; j < cx.length; j++) { const a = cx[i][1], b = cx[j][1]; if (Math.min(a.right, b.right) - Math.max(a.left, b.left) > 1 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 1) ruins.push(cx[i][0] + ' x ' + cx[j][0]); }
@@ -251,7 +251,7 @@ const TESTES = {
       await toque('touchStart', r.y); for (let i = 1; i <= 6; i++) await toque('touchMove', r.y + i * 12); await toque('touchEnd', r.y + 72); await pg.waitForTimeout(400);
       assert.equal(await estado(pg, 'E => E.uniCollapsed'), true, 'o toque arrastado recolhe');
       const ruins = await pg.evaluate(() => {
-        const sel = ['.leftcol > .title', '.leftcol > .search', '.leftcol > .views', '.topbar > .modes', '.topright > .trrow', '#zoomhost .maplibregl-ctrl-group', '#toolbar', '#btnMore', '#legend', '#inspector', '#unicard'];
+        const sel = ['.leftcol > .title', '.leftcol > .search', '.topbar > .modes', '.topright > .trrow', '#zoomhost .maplibregl-ctrl-group', '#toolbar', '#btnMore', '#legend', '#inspector', '#unicard'];
         const cx = sel.map((s) => [s, document.querySelector(s)]).filter(([, e]) => e && e.checkVisibility()).map(([s, e]) => [s, e.getBoundingClientRect()]);
         const out = [];
         for (let i = 0; i < cx.length; i++) for (let j = i + 1; j < cx.length; j++) { const a = cx[i][1], b = cx[j][1]; if (Math.min(a.right, b.right) - Math.max(a.left, b.left) > 1 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 1) out.push(cx[i][0] + ' x ' + cx[j][0]); }
@@ -325,37 +325,56 @@ const TESTES = {
     }],
   ],
   t06: [
-    ['chips de projeto numa linha só, sem quebra e com rolagem horizontal', TODOS, async (pg) => {
-      const m = () => pg.evaluate(() => {
-        const v = document.querySelector('#viewsIn'), cs = [...v.querySelectorAll('.chipbtn')], tops = cs.map((c) => Math.round(c.getBoundingClientRect().top));
-        return { n: cs.length, mesmaLinha: new Set(tops).size === 1, wrap: getComputedStyle(v).flexWrap, ox: getComputedStyle(v).overflowX, sobra: v.scrollWidth - v.clientWidth, mais: v.classList.contains('mais'), h: v.getBoundingClientRect().height, vr: v.getBoundingClientRect().right, tr: document.querySelector('.leftcol').getBoundingClientRect().right };
+    ['sem chips na coluna esquerda; Visão geral é um botão de 44 px dentro do cartão do título', TODOS, async (pg) => {
+      assert.equal(await pg.locator('#views, #viewsIn').count(), 0, 'a linha de chips saiu da coluna esquerda');
+      const m = await pg.evaluate(() => {
+        const t = document.querySelector('#titlebox').getBoundingClientRect(), b = document.querySelector('#btnOverview').getBoundingClientRect(), s = document.querySelector('.leftcol .search').getBoundingClientRect();
+        const txt = document.querySelector('#title'), g = document.querySelector('#titlebox [data-ocultar]').getBoundingClientRect();
+        return { dentro: b.left >= t.left && b.right <= t.right && b.top >= t.top - 0.5 && b.bottom <= t.bottom + 0.5, w: b.width, h: b.height, rot: document.querySelector('#btnOverview').getAttribute('aria-label'),
+          cortado: txt.scrollWidth > txt.clientWidth + 1, buscaAbaixo: s.top >= t.bottom - 0.5, folga: s.top - t.bottom, buscaH: s.height, semEncontro: b.right <= g.left + 0.5 };
       });
-      const a = await m();
-      assert.ok(a.n >= 2 && a.mesmaLinha, 'Visão geral e o grupo numa linha só');
-      assert.equal(a.wrap, 'nowrap'); assert.equal(a.ox, 'auto');
-      assert.equal(a.mais, false, 'sem excesso não há fade');
-      // com muitos grupos (050/GO, 050/MG, 040/MG...) a linha rola em vez de quebrar
-      await pg.evaluate(() => { const v = document.querySelector('#viewsIn'); for (const g of ['050/MG', '040/MG', '262/MG', '365/MG', '153/GO']) { const b = document.createElement('button'); b.className = 'chipbtn'; b.textContent = g; v.appendChild(b); } });
-      await pg.waitForTimeout(300);
-      const b = await m();
-      assert.ok(b.mesmaLinha, 'continua numa linha com muitos chips');
-      assert.equal(b.h, a.h, 'a altura da linha não cresce: ' + a.h + ' x ' + b.h);
-      assert.ok(b.sobra > 20, 'a linha rola na horizontal (+' + b.sobra + 'px)');
-      assert.equal(b.mais, true, 'fade na borda direita enquanto há mais chips');
-      assert.ok(b.vr <= b.tr + 1, 'a linha não ultrapassa a coluna esquerda');
-      await pg.evaluate(() => { const v = document.querySelector('#viewsIn'); v.scrollLeft = v.scrollWidth; });
-      await pg.waitForTimeout(200);
-      const c = await m();
-      assert.equal(c.mais, false, 'no fim da rolagem o fade some');
-      const ult = await pg.evaluate(() => { const v = document.querySelector('#viewsIn'), u = v.lastElementChild.getBoundingClientRect(), r = v.getBoundingClientRect(); return u.right <= r.right + 1; });
-      assert.ok(ult, 'o último chip fica inteiro e alcançável');
+      assert.ok(m.dentro, 'o botão fica dentro do cartão do título');
+      assert.ok(m.w >= 43.5 && m.h >= 43.5, `44 px: ${m.w}x${m.h}`);
+      assert.equal(m.rot, 'Visão geral');
+      assert.equal(m.cortado, false, 'o título não pode ser cortado');
+      assert.ok(m.buscaAbaixo && m.folga >= 4, 'busca e título não se sobrepõem: ' + m.folga);
+      assert.ok(Math.abs(m.buscaH - 44) <= 0.5, 'a busca tem 44 px: ' + m.buscaH);
+      assert.ok(m.semEncontro, 'visão geral e ocultar não se sobrepõem');
+      // clique faz o enquadramento
+      await pg.evaluate(() => window.__pavecad.map().jumpTo({ zoom: 18 })); await pg.waitForTimeout(400);
+      const z0 = await pg.evaluate(() => window.__pavecad.map().getZoom());
+      await pg.click('#btnOverview'); await pg.waitForTimeout(2200);
+      assert.ok((await pg.evaluate(() => window.__pavecad.map().getZoom())) < z0 - 1, 'Visão geral afasta o mapa para enquadrar tudo');
     }],
+    ['filtro de projeto no cabeçalho do unifilar: clicável, numa linha só e com rolagem horizontal', TODOS, async (pg) => {
+      const bt = pg.locator('#unigroups button');
+      assert.ok((await bt.count()) >= 2, 'GO e MG como grupos');
+      const a = await pg.evaluate(() => { const v = document.querySelector('#unigroups'), cs = [...v.querySelectorAll('button')], tops = cs.map((c) => Math.round(c.getBoundingClientRect().top)); return { mesma: new Set(tops).size === 1, wrap: getComputedStyle(v).flexWrap, ox: getComputedStyle(v).overflowX, ativo: window.__pavecad.E.activeGroup, h: v.getBoundingClientRect().height }; });
+      assert.ok(a.mesma && a.wrap === 'nowrap' && a.ox === 'auto', 'uma linha só, rolável');
+      // clicar de verdade num grupo diferente do ativo (o ponto precisa pertencer ao botão: clicável, não coberto)
+      const outro = await pg.evaluate(() => { const b = [...document.querySelectorAll('#unigroups button')].find((x) => x.dataset.g !== window.__pavecad.E.activeGroup), r = b.getBoundingClientRect(); const el = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return { g: b.dataset.g, acerta: el === b || b.contains(el) }; });
+      assert.equal(outro.acerta, true, 'o botão do filtro recebe o clique (nada por cima)');
+      await pg.click(`#unigroups button[data-g="${outro.g}"]`); await pg.waitForTimeout(400);
+      assert.equal(await pg.evaluate(() => window.__pavecad.E.activeGroup), outro.g, 'o clique troca o grupo ativo');
+      assert.equal(await pg.getAttribute(`#unigroups button[data-g="${outro.g}"]`, 'aria-pressed'), 'true');
+      // com muitos grupos a linha rola em vez de quebrar; o último fica alcançável; o fade só aparece enquanto há o que rolar
+      await pg.evaluate(() => { const v = document.querySelector('#unigroups'); for (const g of Array.from({ length: 40 }, (_, i) => `${100 + i}/MG`)) { const b = document.createElement('button'); b.className = 'chipbtn'; b.textContent = g; v.appendChild(b); } });
+      await pg.waitForTimeout(300);
+      const b = await pg.evaluate(() => { const v = document.querySelector('#unigroups'), cs = [...v.querySelectorAll('button')]; return { mesma: new Set(cs.map((c) => Math.round(c.getBoundingClientRect().top))).size === 1, sobra: v.scrollWidth - v.clientWidth, mais: v.classList.contains('mais'), h: v.getBoundingClientRect().height }; });
+      assert.ok(b.mesma, 'continua numa linha'); assert.ok(b.sobra > 20, 'rola na horizontal'); assert.equal(b.mais, true, 'fade enquanto há mais');
+      await pg.evaluate(() => { const v = document.querySelector('#unigroups'); v.scrollLeft = v.scrollWidth; }); await pg.waitForTimeout(200);
+      const c = await pg.evaluate(() => { const v = document.querySelector('#unigroups'), u = v.lastElementChild.getBoundingClientRect(), r = v.getBoundingClientRect(); return { mais: v.classList.contains('mais'), inteiro: u.right <= r.right + 1 }; });
+      assert.equal(c.mais, false); assert.ok(c.inteiro, 'o último chip fica inteiro');
+      // o filtro não cobre o título "Unifilar" nem o texto de posição
+      const k = await pg.evaluate(() => { const g = document.querySelector('#unigroups').getBoundingClientRect(), t = document.querySelector('#unicard .uni-h b').getBoundingClientRect(), bt = document.querySelector('#unicard .uni-h [data-ocultar]').getBoundingClientRect(); return { sobreTitulo: g.left < t.right - 0.5, sobreBotoes: g.right > bt.left + 0.5 }; });
+      assert.equal(k.sobreTitulo, false); assert.equal(k.sobreBotoes, false);
+    }, { exemplos: true }],
   ],
   t07: [
     ['ocultar e mostrar cada grupo: some o grupo, aparece o botão de 44 px no lugar e restaura', TODOS, async (pg) => {
       await irParaKm(pg, '170+500'); await aba(pg, 'seg');
       const GRUPOS = {
-        titulo: { alvos: ['#titlebox', '.leftcol .search', '#views'] },
+        titulo: { alvos: ['#titlebox', '.leftcol .search', '#btnOverview'] },
         ferramentas: { alvos: ['#toolbar'] },
         girar: { alvos: ['#btnMore'], gaveta: true },
         legenda: { alvos: ['#legend'] },
@@ -460,62 +479,41 @@ const TESTES = {
     }],
   ],
   t08: [
-    ['coluna esquerda (4 planilhas, satélite): título, busca e chips sem corte nem sobreposição, nos três temas', ['1568x760', '1366x768', 'tablet-h-1024x768'], async (pg) => {
+    ['coluna esquerda (4 planilhas, satélite): título e busca sem corte nem sobreposição, nos três temas', ['1568x760', '1366x768', 'tablet-h-1024x768'], async (pg) => {
       assert.ok((await pg.evaluate(() => window.__pavecad.E.P.length)) >= 4, 'quatro planilhas carregadas');
       await escolherBase(pg, 'esri'); await irParaKm(pg, '34+780', 3000); await pg.waitForTimeout(500);
       assert.equal(await pg.evaluate(() => window.__pavecad.E.base), 'esri');
       const caixas = () => pg.evaluate(() => {
         const R = (s) => { const r = document.querySelector(s).getBoundingClientRect(); return { t: r.top, b: r.bottom, l: r.left, r: r.right, h: r.height }; };
         const cs = (s) => getComputedStyle(document.querySelector(s));
-        const vidro = (s) => { const c = cs(s); return { bg: c.backgroundColor, borda: c.borderTopWidth + ' ' + c.borderTopColor, blur: c.backdropFilter || c.webkitBackdropFilter, raio: c.borderTopLeftRadius }; };
-        return {
-          titulo: R('#titlebox'), busca: R('.leftcol .search'), chips: R('#views'), coluna: R('.leftcol'), tools: R('#tools'),
-          shrink: ['#titlebox', '.leftcol .search', '#views'].map((s) => cs(s).flexShrink),
-          vidroTitulo: vidro('#titlebox'), vidroBusca: vidro('.leftcol .search'), vidroChips: vidro('#views'),
-          pad: cs('#views').padding, maskCartao: cs('#views').maskImage || cs('#views').webkitMaskImage, maskInterno: cs('#viewsIn').maskImage || cs('#viewsIn').webkitMaskImage,
-          interno: (() => { const v = document.querySelector('#viewsIn'), c = v.querySelector('.chipbtn'), cc = getComputedStyle(c); return { sobra: v.scrollWidth - v.clientWidth, bd: cc.backdropFilter, bg: cc.backgroundColor }; })(),
-        };
+        return { titulo: R('#titlebox'), busca: R('.leftcol .search'), coluna: R('.leftcol'), tools: R('#tools'), shrink: ['#titlebox', '.leftcol .search'].map((s) => cs(s).flexShrink),
+          tituloCortado: (() => { const e = document.querySelector('#title'), f = document.querySelector('#subtitle'); return e.scrollWidth > e.clientWidth + 1 || f.scrollWidth > f.clientWidth + 1; })(),
+          campo: (() => { const i = document.querySelector('#gokm'), r = i.getBoundingClientRect(), b = document.querySelector('.leftcol .search').getBoundingClientRect(); return { dentro: r.top >= b.top - 0.5 && r.bottom <= b.bottom + 0.5, cortado: i.scrollHeight > i.clientHeight + 1 }; })() };
       });
       for (const t of ['claro', 'escuro', 'campo']) {
         await tema(pg, t);
         const m = await caixas();
-        assert.ok(m.busca.t >= m.titulo.b - 0.5, `${t}: a busca não pode entrar no título (${m.busca.t} x ${m.titulo.b})`);
-        assert.ok(m.chips.t >= m.busca.b - 0.5, `${t}: os chips não podem cobrir a busca (chips ${m.chips.t} x busca ${m.busca.b})`);
+        assert.ok(m.busca.t >= m.titulo.b + 4 - 0.5, `${t}: a busca não pode entrar no título (${m.busca.t} x ${m.titulo.b})`);
         assert.ok(Math.abs(m.busca.h - 44) <= 0.5, `${t}: a busca tem 44 px: ${m.busca.h}`);
-        assert.deepEqual(m.shrink, ['0', '0', '0'], `${t}: título, busca e chips não encolhem`);
-        assert.ok(m.chips.t - m.busca.b >= 4 && m.busca.t - m.titulo.b >= 4, `${t}: espaço entre os cartões`);
-        // cartão de vidro próprio, igual aos outros
-        for (const k of ['bg', 'borda', 'blur', 'raio']) if (k !== 'raio') assert.equal(m.vidroChips[k], m.vidroTitulo[k], `${t}: ${k} do cartão de chips igual ao do título`);
-        assert.ok(!/rgba?\(\s*\d+,\s*\d+,\s*\d+,\s*0\s*\)/.test(m.vidroChips.bg) && m.vidroChips.bg !== 'rgba(0, 0, 0, 0)', `${t}: o cartão de chips tem fundo`);
-        if (t !== 'campo') assert.notEqual(m.vidroChips.blur, 'none', `${t}: com desfoque`);
-        assert.equal(m.pad, '6px', `${t}: padding de 6 px`);
-        assert.ok(!m.maskCartao || m.maskCartao === 'none', `${t}: o fade não pode estar no cartão`);
-        assert.ok(m.interno.bd === 'none', `${t}: os chips de dentro não têm desfoque próprio`);
-        assert.ok(m.coluna.b <= m.tools.t, `${t}: a coluna não encosta na barra lateral (${m.coluna.b} x ${m.tools.t})`);
+        assert.deepEqual(m.shrink, ['0', '0'], `${t}: título e busca não encolhem`);
+        assert.ok(m.campo.dentro && !m.campo.cortado, `${t}: o campo "Ir para km" aparece inteiro dentro da busca`);
+        assert.equal(m.tituloCortado, false, `${t}: título e subtítulo sem corte`);
+        assert.ok(m.coluna.b <= m.tools.t, `${t}: a coluna não encosta na barra lateral`);
       }
-      // o fade só vale no elemento interno e só se houver o que rolar
-      await pg.evaluate(() => { const v = document.querySelector('#viewsIn'); for (const g of ['040/MG', '262/MG', '365/MG']) { const b = document.createElement('button'); b.className = 'chipbtn'; b.textContent = g; v.appendChild(b); } });
-      await pg.waitForTimeout(300);
-      const m2 = await caixas();
-      assert.ok(m2.interno.sobra > 10, 'a linha rola');
-      assert.ok(m2.maskInterno && m2.maskInterno !== 'none', 'o fade fica no elemento interno que rola');
-      assert.ok(!m2.maskCartao || m2.maskCartao === 'none', 'e nunca no cartão');
     }, { exemplos: true }],
-    ['coluna esquerda mais alta que a tela: rola sozinha e nada fica cortado nem sobreposto à barra lateral', ['1366x768'], async (pg) => {
-      await pg.setViewportSize({ width: 1366, height: 520 }); await pg.waitForTimeout(700);
+    ['coluna esquerda em tela baixa: rola sozinha, sem sobrepor a barra lateral', ['1366x768'], async (pg) => {
+      await pg.click('#uniToggle'); await pg.waitForTimeout(400);
+      await pg.setViewportSize({ width: 1366, height: 300 }); await pg.waitForTimeout(800);
       const m = await pg.evaluate(() => {
-        const c = document.querySelector('.leftcol'), t = document.querySelector('#tools').getBoundingClientRect(), cr = c.getBoundingClientRect();
-        const antes = { rola: c.scrollHeight > c.clientHeight + 1, fim: false };
+        const c = document.querySelector('.leftcol'), t = document.querySelector('#tools').getBoundingClientRect();
+        const rola = c.scrollHeight > c.clientHeight + 1;
         c.scrollTop = c.scrollHeight;
-        const ult = document.querySelector('#views').getBoundingClientRect();
-        return { antes, colB: cr.bottom, toolsT: t.top, ultB: ult.bottom, cB: c.getBoundingClientRect().bottom, padB: parseFloat(getComputedStyle(c).paddingBottom), ox: getComputedStyle(c).overflowY };
+        const pad = parseFloat(getComputedStyle(c).paddingBottom), ult = document.querySelector('.leftcol .search').getBoundingClientRect();
+        return { rola, fimConteudo: c.getBoundingClientRect().bottom - pad, toolsT: t.top, buscaB: ult.bottom };
       });
-      assert.ok(m.colB - m.padB <= m.toolsT + 1, `a coluna (sem a folga de sombra) termina antes da barra lateral: ${m.colB - m.padB} x ${m.toolsT}`);
-      assert.ok(m.antes.rola, 'em tela baixa a coluna rola');
-      assert.ok(m.ultB <= m.cB - m.padB + 1, 'rolada até o fim, o cartão de chips aparece inteiro');
-      // com o botão de ocultar o grupo some e libera a tela
-      await pg.click('[data-ocultar=titulo]'); await pg.waitForTimeout(300);
-      assert.equal(await pg.evaluate(() => document.querySelector('.leftcol .search').checkVisibility()), false);
+      assert.ok(m.rola, 'em tela baixa a coluna rola');
+      assert.ok(m.fimConteudo <= m.toolsT + 1, `a coluna termina antes da barra lateral: ${m.fimConteudo} x ${m.toolsT}`);
+      assert.ok(m.buscaB <= m.fimConteudo + 1, 'rolada até o fim, a busca aparece inteira');
     }],
   ],
   g03: [
