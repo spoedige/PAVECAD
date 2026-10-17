@@ -85,7 +85,7 @@ export const roadrunner: FormatDef = {
 
   detect: (wb: SheetBook) => wb.names.includes('Unifilar') && wb.names.includes('Solução'),
 
-  parse(wb: SheetBook): ParsedProject {
+  parse(wb: SheetBook): ParsedProject[] {
     const log: LogEntry[] = [];
     const solRows = wb.sheet('Solução');
     const U = wb.sheet('Unifilar').filter((r, i) => i >= U_FIRST && typeof r[C.hod] === 'number');
@@ -159,7 +159,7 @@ export const roadrunner: FormatDef = {
     const parts = name.split(' - ').map((s) => s.trim());
     const kmi = solRows[2]?.[2];
     const kmf = solRows[3]?.[2];
-    return {
+    return [{
       meta: {
         name,
         uf: parts[0],
@@ -172,6 +172,6 @@ export const roadrunner: FormatDef = {
       rows,
       log,
       codes,
-    };
+    }];
   },
 };

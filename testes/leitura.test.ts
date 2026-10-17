@@ -13,8 +13,8 @@ const CRESC = 'U_BR-050_GO_Crescente.xlsx';
 const DECR = 'U_BR-050_GO_Decrescente.xlsx';
 
 describe('registro FORMATS', () => {
-  it('traz o padrão RoadRunner', () => {
-    expect(FORMATS.map((f) => f.id)).toEqual(['roadrunner']);
+  it('traz o RoadRunner e, depois dele, o Planservi', () => {
+    expect(FORMATS.map((f) => f.id)).toEqual(['roadrunner', 'planservi']);
   });
 });
 

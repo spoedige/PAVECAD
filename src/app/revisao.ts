@@ -7,7 +7,7 @@ import { trColor, trLabel, trOrder } from '../dominio/solucoes';
 import { kmLabel } from '../formats/km';
 import { E, H, NOTE_CATS, getP, projName, type AppProj, type Nota, type NoteCat } from './estado';
 import { IC } from './icones';
-import { getMap, hitAt, renderLegend, setData } from './mapa';
+import { getMap, hitAt, renderLegend, select, setData } from './mapa';
 import * as db from './persist';
 import { setTab } from './paineis';
 import { $, cssv, esc, fmt, syncSeg, toast } from './ui';
@@ -244,6 +244,22 @@ export function refreshNotesLayer() {
 
 const noteSummary = (n: Nota) => (n.type === 'pin' ? 'Ponto' : n.type === 'line' ? `Linha · ${fmtLen(lenM(n.coords))}` : `Área · ${fmt(areaM2(n.coords), 0)} m²`);
 
+/** Verificação de qualidade feita na importação (Planservi): saltos de coordenada e distância entre sentidos, com o km de cada ocorrência.
+ *  Só sinaliza; nenhuma linha foi corrigida nem descartada. */
+const qualAbertas = new Set<string>();
+function qualidadeHtml(): string {
+  const com = E.P.filter((p) => p.qualidade);
+  if (!com.length) return '';
+  const linhas = com.map((p) => {
+    const q = p.qualidade!;
+    const n = q.saltos.length + q.sentidos.length;
+    const oc = (tipo: string, i: number, km: string, rot: string) => `<button class="row" data-q="${p.id}:${i}" aria-label="Ir ao km ${esc(km)}"><div class="grow"><b class="num">km ${esc(km)}</b> <span class="muted">${esc(rot)}</span></div>${IC.next}</button>`;
+    return `<details class="qual" data-qp="${p.id}"><summary><span><b>${esc(projName(p))}</b><span class="muted num" style="display:block;font-size:11px;font-weight:400">${q.saltos.length} salto${q.saltos.length === 1 ? '' : 's'} fora de ${q.faixaSalto[0]} a ${q.faixaSalto[1]} m · ${q.sentidos.length} acima de ${q.maxSentidos} m entre os sentidos</span></span><span class="num ${n ? '' : 'muted'}">${n}</span></summary>
+      ${n ? `<div class="list" style="margin-top:8px">${q.saltos.map((x) => oc('salto', x.i, x.km, `salto de ${x.dist.toLocaleString('pt-BR')} m até o km ${x.kmFim}`)).join('')}${q.sentidos.map((x) => oc('sentidos', x.i, x.km, `${x.dist} m entre os sentidos`)).join('')}</div>` : '<p class="vazio" style="margin-top:8px">Nenhuma ocorrência.</p>'}</details>`;
+  }).join('');
+  return `<div><div class="sect">Qualidade da importação</div>${linhas}<p class="note" style="margin-top:7px">Só sinalizado: nenhuma coordenada foi corrigida nem descartada. O mesmo resumo está no log da aba Ajustes.</p></div>`;
+}
+
 export function renderNotes() {
   const el = document.getElementById('t-notas');
   if (!el) return;
@@ -256,7 +272,7 @@ export function renderNotes() {
       <div class="photos">${ed.photos.map((src, i) => `<div><img src="${src}" alt="Foto ${i + 1}"><button data-ph="${i}" aria-label="Remover foto">${IC.x}</button></div>`).join('')}</div>
       <div class="btns"><button class="btn" id="nPhoto">${IC.cam} Foto</button><button class="btn p" id="nSave">Salvar</button><button class="btn" id="nCancel">${ed.isNew ? 'Descartar' : 'Fechar'}</button>${ed.isNew ? '' : `<button class="btn d" id="nDel">${IC.trash} Excluir</button>`}</div></div></div>` : '';
   const list = E.notes.filter((n) => !ed || n.id !== ed.id).sort((a, b) => b.t.localeCompare(a.t));
-  el.innerHTML = `${form}${propsHtml()}
+  el.innerHTML = `${form}${propsHtml()}${qualidadeHtml()}
     <div><div class="sect">Anotações <span style="text-transform:none;font-weight:500">${E.notes.length}</span></div>
       ${list.length ? `<div class="list">${list.map((n) => `<div class="note-card"><button class="note-top" data-n="${n.id}"><span class="sw" style="background:${NOTE_CATS[n.cat].c};width:12px;height:12px"></span>
         <span class="t"><b>${esc(n.text || 'Sem texto')}</b><span>${NOTE_CATS[n.cat].l} · ${noteSummary(n)}${n.loc ? ' · ' + esc(n.loc.name) + ' km ' + esc(n.loc.km) : ''} · ${new Date(n.t).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}${n.photos?.length ? ' · ' + n.photos.length + ' foto(s)' : ''}</span></span></button></div>`).join('')}</div>`
@@ -285,6 +301,9 @@ export function renderNotes() {
     if (dl) dl.onclick = () => { E.notes = E.notes.filter((x) => x.id !== ed.id); db.apagar('notes', ed.id); E.editing = null; refreshNotesLayer(); renderNotes(); toast('Nota excluída'); };
   }
   el.querySelectorAll<HTMLElement>('[data-n]').forEach((b) => (b.onclick = () => openNote(b.dataset.n!)));
+  el.querySelectorAll<HTMLElement>('[data-q]').forEach((b) => (b.onclick = () => { const [pid, i] = b.dataset.q!.split(':'); const r = getP(pid)?.rows[+i]; if (!r) return; getMap().flyTo({ center: [r.lon, r.lat], zoom: Math.max(getMap().getZoom(), 17.2), duration: 800 }); select(pid, +i, 1, { tab: false }); }));
+  // as listas abertas continuam abertas quando o painel é refeito
+  el.querySelectorAll<HTMLDetailsElement>('details.qual').forEach((d) => { if (qualAbertas.has(d.dataset.qp!)) d.open = true; d.addEventListener('toggle', () => { d.open ? qualAbertas.add(d.dataset.qp!) : qualAbertas.delete(d.dataset.qp!); }); });
   bindProps(el);
   $('#exCopy').onclick = () => copiar(JSON.stringify(notesGeoJSON(false), null, 1), 'GeoJSON copiado');
   $('#exDown').onclick = () => {

@@ -2,7 +2,7 @@ import * as catalogo from '../dominio/catalogo';
 import { getLimites, setLimites, type Limites } from '../dominio/indicadores';
 import { aplicarLarguras, type AjusteLargura } from '../dominio/larguras';
 import type { ParsedProject } from '../formats/types';
-import { carregarLido, carregarPlanilha, recalcular } from '../mapa/cliente';
+import { carregarLido, lerPlanilha, recalcular } from '../mapa/cliente';
 import { aplicarGeometria, baseOf, criarProjeto, E, H, novoId, type AppProj } from './estado';
 import { addProjectToMap, applyPaint, clearFocus, fitList, removeProjectFromMap, setProjectData, updateSelLayer } from './mapa';
 import * as db from './persist';
@@ -10,7 +10,7 @@ import { renderAll } from './paineis';
 import { refreshProp, refreshPropLayers, resolveProps } from './revisao';
 import { toast } from './ui';
 
-type Resp = Awaited<ReturnType<typeof carregarPlanilha>>;
+type Resp = Awaited<ReturnType<typeof carregarLido>>;
 
 /* ---------------------------------------------------------------- */
 /* Configuração salva no aparelho                                    */
@@ -47,8 +47,8 @@ function addProject(p: AppProj) {
 
 /** Guarda a planilha (como veio, sem ajustes) para reabrir sem o arquivo, inclusive offline. */
 export function salvarProjeto(p: AppProj) {
-  const { meta, log, codes } = p;
-  db.gravar('projetos', { id: meta.name, parsed: { meta, rows: p.rowsPlanilha, log, codes }, zone: p.crs.source === 'fixo' ? p.crs.zone : undefined, t: new Date().toISOString() });
+  const { meta, log, codes, qualidade } = p;
+  db.gravar('projetos', { id: meta.name, parsed: { meta, rows: p.rowsPlanilha, log, codes, qualidade }, zone: p.crs.source === 'fixo' ? p.crs.zone : undefined, t: new Date().toISOString() });
 }
 export const esquecerProjeto = (nome: string) => db.apagar('projetos', nome);
 
@@ -133,8 +133,13 @@ export async function abrirArquivos(files: File[]) {
   for (const f of files) {
     toast(`Lendo ${f.name}... arquivos grandes podem levar alguns segundos`, 60000);
     const buf = await f.arrayBuffer();
-    const p = await incluir((id) => carregarPlanilha(id, buf), f.name, true);
-    if (p) novos.push(p);
+    let lista: ParsedProject[];
+    try { lista = await lerPlanilha(buf); } catch (err) { toast(`${f.name}: ${(err as Error).message}`, 6000); continue; }
+    // um arquivo pode gerar mais de um projeto (Planservi: Crescente e Decrescente)
+    for (const parsed of lista) {
+      const p = await incluir((id) => carregarLido(id, parsed), lista.length > 1 ? `${f.name} (${parsed.meta.name})` : f.name, true);
+      if (p) novos.push(p);
+    }
   }
   terminar(novos);
   if (novos.length) toast(`${novos.length} planilha(s) carregada(s)`);

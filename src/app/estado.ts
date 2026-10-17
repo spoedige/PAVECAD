@@ -98,7 +98,8 @@ export const H = {
 export const visibleProjects = () => E.P.filter((p) => p.visible);
 export const getP = (id: string) => E.P.find((p) => p.id === id);
 const short = (p: Pick<AppProj, 'meta'>) => (/Marginal/i.test(p.meta.via) ? p.meta.via.replace(/\s*-\s*Crescente|\s*-\s*Decrescente/, '') : p.meta.via);
-export const projName = (p: Pick<AppProj, 'meta'>) => `${p.meta.uf.split('/')[1] || p.meta.uf} ${short(p)}`;
+/** O Planservi já traz o nome pronto ("SP-333 · TH36 · Crescente"). */
+export const projName = (p: Pick<AppProj, 'meta'>) => (p.meta.format === 'planservi' ? p.meta.name : `${p.meta.uf.split('/')[1] || p.meta.uf} ${short(p)}`);
 
 export const novoId = () => 'p' + ++E.seq;
 

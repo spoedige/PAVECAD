@@ -4,12 +4,13 @@ import type { ParsedProject } from '../formats/types';
 import type { Project } from '../geometry/project';
 import type { Req, Res } from './worker';
 
-type Ok = Extract<Res, { ok: true }>;
+type Ok = Extract<Res, { ok: true; projeto: Project }>;
+type OkLer = Extract<Res, { ok: true; lista: ParsedProject[] }>;
 type Pedido = Req extends infer R ? (R extends { id: number } ? Omit<R, 'id'> : never) : never;
 
 let worker: Worker | null = null;
 let seq = 0;
-const espera = new Map<number, { ok: (r: Ok) => void; erro: (e: Error) => void }>();
+const espera = new Map<number, { ok: (r: unknown) => void; erro: (e: Error) => void }>();
 
 function iniciar(): Worker {
   if (worker) return worker;
@@ -27,13 +28,16 @@ function iniciar(): Worker {
   return worker;
 }
 
-function chamar(req: Pedido, transfer: Transferable[] = []): Promise<Ok> {
+function chamar<T = Ok>(req: Pedido, transfer: Transferable[] = []): Promise<T> {
   const id = ++seq;
-  return new Promise((ok, erro) => {
-    espera.set(id, { ok, erro });
+  return new Promise<T>((ok, erro) => {
+    espera.set(id, { ok: ok as (r: unknown) => void, erro });
     iniciar().postMessage({ ...req, id, limites: getLimites() }, transfer);
   });
 }
+
+/** Lê o arquivo e devolve os projetos que ele traz, sem geometria. */
+export const lerPlanilha = (dados: ArrayBuffer) => chamar<OkLer>({ tipo: 'ler', dados }, [dados]).then((r) => r.lista);
 
 export const carregarPlanilha = (pid: string, dados: ArrayBuffer, zone?: number) =>
   chamar({ tipo: 'carregar', pid, dados, zone }, [dados]);

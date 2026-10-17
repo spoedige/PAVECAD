@@ -107,6 +107,7 @@ export function drawUni() {
       g.fillStyle = fill; g.globalAlpha = 0.55; rr(g, x0, rw.y, x1 - x0, rw.h, Math.min(4, rw.h / 2)); g.fill(); g.globalAlpha = 1;
     }
     const p = b.p, nPx = Math.max(1, Math.floor(x1 - x0)), sev = b.rows.map(() => new Int8Array(nPx).fill(-2));
+    const passo = Math.max(1, Math.round((0.02 / (kmf - kmi)) * nPx));
     for (let i = 0; i < p.rows.length; i++) {
       const px = Math.min(nPx - 1, Math.max(0, Math.floor(((p.rows[i].hod - kmi) / (kmf - kmi)) * nPx))), md = p.model[i], r = p.rows[i];
       b.rows.forEach((rw, ri) => {
@@ -119,7 +120,8 @@ export function drawUni() {
           if (!(r.shoulder > 0)) return;
           s = !M ? (md.sh.main === '-' ? -1 : Math.max(0, keys.indexOf(md.sh.main))) : -1;
         }
-        if (s > sev[ri][px] || sev[ri][px] === -2) sev[ri][px] = s;
+        // com pouco km na tela cada linha de 20 m ocupa vários pixels: preenche o passo inteiro, para não ficar pontilhado
+        for (let q = px; q < Math.min(nPx, px + passo); q++) if (s > sev[ri][q] || sev[ri][q] === -2) sev[ri][q] = s;
       });
     }
     b.rows.forEach((rw, ri) => {
@@ -158,6 +160,9 @@ export function drawUni() {
     }
   }
 }
+
+/** Nomes dos projetos desenhados no unifilar, na ordem de cima para baixo (para os testes de interface). */
+export const blocosDoUnifilar = () => (lay ? lay.blocks.map((b) => b.p.meta.name) : []);
 
 function uniHit(e: MouseEvent, uw: HTMLElement) {
   if (!lay) return null;

@@ -5,14 +5,14 @@ import { E, H } from './app/estado';
 import {
   agendarReaplicar, alignToRoad, applyLayers, clearSel, fitAll, getMap, goLabel, initMap, north, rotate, select, setBase, stepSel, updateStakes,
 } from './app/mapa';
-import { MODE_KEYS, type ModeKey } from './dominio/indicadores';
+import type { ModeKey } from './dominio/indicadores';
 import { abrirDb } from './app/persist';
 import { gpsToggle } from './app/gps';
 import { initRevisao, onToolClick, refreshNotesLayer, refreshPropLayers, resolveProps, setTool } from './app/revisao';
 import { abrirArquivos, abrirLidas, carregarConfig, restaurarProjetos } from './app/projetos';
 import { abrirConfig, atualizarAviso, configAberta, initConfig } from './app/config';
-import { renderAll, renderSeg, setField, setMode, setTab, syncBaseSeg } from './app/paineis';
-import { drawUni, initUnifilar } from './app/unifilar';
+import { modosVisiveis, renderAll, renderSeg, setField, setMode, setTab, syncBaseSeg } from './app/paineis';
+import { blocosDoUnifilar, drawUni, initUnifilar } from './app/unifilar';
 import { initLayout } from './app/layout';
 import { alternarLimpo, initGrupos } from './app/grupos';
 import { clearFocus } from './app/mapa';
@@ -83,7 +83,7 @@ window.addEventListener('keydown', (e) => {
   const k = e.key;
   if (k === '?' && !matchMedia('(pointer: coarse)').matches) { abrirAjuda(); return; }
   if (k === ',') { abrirConfig(); return; }
-  if (k >= '1' && k <= '6') { setMode(MODE_KEYS[+k - 1]); return; }
+  if (k >= '1' && k <= '9') { const v = modosVisiveis(); if (+k - 1 < v.length) setMode(v[+k - 1]); return; }
   if (k === '/') { e.preventDefault(); $('#gokm').focus(); return; }
   if (k === 'Escape') {
     if (E.tool) { setTool(null); return; }
@@ -123,7 +123,7 @@ if (import.meta.env.DEV) {
   (window as unknown as { __pavecad: unknown }).__pavecad = {
     E,
     setField: (on: boolean, silencioso?: boolean) => { if (E.field !== on) setField(on); if (silencioso) $('#toast').classList.remove('on'); },
-    select, setTab, map: getMap,
+    select, setTab, map: getMap, blocosDoUnifilar,
   };
 }
 
