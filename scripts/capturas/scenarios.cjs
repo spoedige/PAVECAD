@@ -104,6 +104,34 @@ const CENARIOS = {
 
 CENARIOS.colunaEsquerda.exemplos = true;
 
+/** Planservi com os arquivos reais (TH38 e TH39, que não ficam no repositório). Caminho em PAVECAD_PLANSERVI (pasta com os .xlsx). */
+const PS = process.env.PAVECAD_PLANSERVI || '/root/.claude/uploads/cde62ba2-1e72-5783-bd3b-09396233492a';
+const psOpts = { arquivos: [`${PS}/86f46219-C0866_UNIFILAR_SOLU__ES_TH38_R02_1.xlsx`, `${PS}/c65a789d-C0867_UNIFILAR_SOLU__ES_TH39_R02_1.xlsx`], projetos: 4 };
+/** Vai ao km, aproxima até ver as faixas e escolhe a base lisa. */
+const psVai = async (pg, km, zoom = 17.3) => {
+  await irParaKm(pg, km, 3500);
+  await pg.evaluate((z) => window.__pavecad.map().jumpTo({ zoom: z }), zoom);
+  await pg.mouse.move(1, 1); await pg.waitForTimeout(1500);
+};
+CENARIOS.planserviMapa = async (pg) => { await psVai(pg, '150+500'); };
+CENARIOS.planserviIgg = async (pg) => { await psVai(pg, '150+500'); await pg.keyboard.press('4'); await pg.waitForTimeout(800); };
+CENARIOS.planserviDetalhe = async (pg) => {
+  await psVai(pg, '150+500');
+  // um segmento do crescente com fresagem e reforço, para o detalhe mostrar as quatro camadas
+  const alvo = await pg.evaluate(() => {
+    const p = window.__pavecad.E.P.find((q) => /TH38 · Crescente/.test(q.meta.name));
+    const i = p.rows.findIndex((r, k) => k > 280 && r.lanes[0] && r.lanes[0].code === 'F4R10');
+    const j = i >= 0 ? i : p.rows.findIndex((r, k) => k > 280 && r.lanes[0] && r.lanes[0].code === 'F4R4');
+    return { id: p.id, i: j };
+  });
+  await pg.evaluate((a) => window.__pavecad.select(a.id, a.i, 1, { tab: true, pan: true }), alvo);
+  await pg.waitForTimeout(2500);
+  // com o painel baixo, as camadas ficam abaixo dos cartões: rola até o fim do corpo da aba
+  await pg.evaluate(() => { const b = document.querySelector('#t-seg'); b.scrollTop = b.scrollHeight; });
+  await pg.waitForTimeout(500);
+};
+for (const k of ['planserviMapa', 'planserviIgg', 'planserviDetalhe']) CENARIOS[k].opts = psOpts;
+
 const GRUPOS = {
   g01: ['inicio'],
   g02: ['estacas500', 'estacas100', 'estacas20'],
@@ -122,6 +150,7 @@ const GRUPOS = {
   g12: ['config'],
   p01: ['painelAbertoUniAberto', 'painelRecolhidoUniAberto', 'painelAbertoUniRecolhido', 'painelRecolhidoUniRecolhido', 'mapaLimpo', 'tudoOculto'],
   c01: ['colunaEsquerda'],
+  s01: ['planserviMapa', 'planserviIgg', 'planserviDetalhe'],
   u01: ['inicio', 'segmento', 'gaveta', 'recolhidos', 'propor0'],
   t01: ['inicio', 'segmento', 'segmentoFim', 'gaveta', 'recolhidos'],
 };

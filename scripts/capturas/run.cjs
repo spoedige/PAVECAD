@@ -21,7 +21,7 @@ const { RAIZ, VPS, TEMAS, abrir, tema, lancar } = require('./lib.cjs');
     const fn = CENARIOS[cen];
     if (!fn) throw new Error('cenário desconhecido: ' + cen);
     for (const vp of VPS.filter((v) => !process.env.PAVECAD_VPS || process.env.PAVECAD_VPS.split(',').includes(v.nome))) {
-      const { ctx, pg, log } = await abrir(browser, vp, { exemplos: CENARIOS[cen].exemplos });
+      const { ctx, pg, log } = await abrir(browser, vp, CENARIOS[cen].opts || { exemplos: CENARIOS[cen].exemplos });
       await fn(pg, { vp, log });
       await pg.waitForTimeout(700);
       for (const t of TEMAS) {

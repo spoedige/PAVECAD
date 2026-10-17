@@ -49,7 +49,7 @@ async function abrir(browser, vp, opts = {}) {
     await pg.waitForTimeout(500);
   } else if (opts.arquivos) {
     // opts.arquivos: nomes em testes/fixtures; opts.projetos: quantos projetos esperar (um arquivo Planservi gera dois)
-    await pg.setInputFiles('#file', opts.arquivos.map((f) => path.join(RAIZ, 'testes/fixtures', f)));
+    await pg.setInputFiles('#file', opts.arquivos.map((f) => path.resolve(RAIZ, 'testes/fixtures', f)));
     await pg.waitForFunction((n) => window.__pavecad && window.__pavecad.E.P.length === n, opts.projetos, { timeout: 90000 });
   } else {
     await pg.setInputFiles('#file', FIXTURES);
