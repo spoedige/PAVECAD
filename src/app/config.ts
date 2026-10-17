@@ -1,6 +1,6 @@
 import * as catalogo from '../dominio/catalogo';
 import { getLimites, IND, IND_KEYS, restaurarLimites, rotulosPara, setLimites, validarLimites, type IndKey, type Limites } from '../dominio/indicadores';
-import { LARGURA_ACOSTAMENTO, LARGURA_FAIXA, larguraPadrao, validarAjuste, contarAlteradas, type AjusteLargura } from '../dominio/larguras';
+import { LARGURA_ACOSTAMENTO, LARGURA_FAIXA, larguraPadrao, planejarCopia, validarAjuste, contarAlteradas, type AjusteLargura } from '../dominio/larguras';
 import { trColor } from '../dominio/solucoes';
 import { kmLabel, parseKmTexto } from '../formats/km';
 import { E, H, getP, projName, type AppProj } from './estado';
@@ -8,7 +8,8 @@ import { applyPaint } from './mapa';
 import { renderAll } from './paineis';
 import * as db from './persist';
 import { aplicarAjustes, esquecerProjeto, reclassificarTodos, regeometrar, salvarCatalogo, salvarLimiares } from './projetos';
-import { $, cssv, esc, fmt, syncSeg, toast } from './ui';
+import { selecionarPlanilhas } from './seletor';
+import { $, cssv, esc, fmt, syncSeg, toast, toastAcao } from './ui';
 import { Q5, Q5F } from '../dominio/indicadores';
 
 type Aba = 'sol' | 'larg' | 'lim' | 'dados';
@@ -178,6 +179,36 @@ function previaSecao(p: AppProj, km: number): string {
     <p class="note num">Seção do km ${p.kmLab[i]} · largura total ${numStr(plan.widths.reduce((a, b) => a + b, 0))} m na planilha e ${numStr(ef.widths.reduce((a, b) => a + b, 0))} m efetiva (sem acostamento).</p>`;
 }
 
+/** Copia os ajustes de largura da planilha atual para as planilhas que o usuário marcar. */
+async function replicarAjustes(origem: AppProj, depois: () => void) {
+  if (!origem.ajustes.length) return;
+  const maxFaixas = (q: AppProj) => q.rowsPlanilha.reduce((m, r) => Math.max(m, r.widths.length), 0);
+  let n = 0;
+  const novoId = () => 'a' + Date.now().toString(36) + (n++).toString(36);
+  const planoDe = (qs: AppProj[]) => planejarCopia(origem.ajustes, qs.map((q) => ({ pname: q.meta.name, nome: projName(q), maxFaixas: maxFaixas(q) })), novoId);
+  const faixas = (x: { ignorados: AjusteLargura[] }) => [...new Set(x.ignorados.map((a) => nomeFaixa(a.lane)))].join(', ');
+  const destinos = await selecionarPlanilhas(origem, {
+    titulo: 'Aplicar larguras a outras planilhas',
+    descricao: `Copia os ${origem.ajustes.length} ajuste(s) de ${projName(origem)}. Os ajustes que a planilha marcada já tem são substituídos. Só entram as faixas que ela possui.`,
+    aviso: (qs) => {
+      const ign = planoDe(qs).filter((x) => x.ignorados.length);
+      return ign.length ? `<p class="cfg-err" style="min-height:0">Faixas inexistentes, ignoradas: ${ign.map((x) => `${esc(x.nome)} (${esc(faixas(x))})`).join('; ')}.</p>` : '';
+    },
+  });
+  if (!destinos?.length) return;
+  const plano = planoDe(destinos);
+  const antes = destinos.map((q) => ({ q, ajustes: q.ajustes }));
+  for (const x of plano) await aplicarAjustes(destinos.find((q) => q.meta.name === x.pname)!, x.ajustes);
+  const ign = plano.filter((x) => x.ignorados.length);
+  depois();
+  toastAcao(
+    `Larguras aplicadas a ${destinos.length} planilha(s).${ign.length ? ` Faixas ignoradas em: ${ign.map((x) => `${x.nome} (${faixas(x)})`).join('; ')}.` : ''}`,
+    'Desfazer',
+    async () => { for (const a of antes) await aplicarAjustes(a.q, a.ajustes); toast('Aplicação desfeita'); depois(); },
+    ign.length ? 14000 : 9000,
+  );
+}
+
 function renderLarguras(body: HTMLElement) {
   if (!E.P.length) { body.innerHTML = '<div class="empty"><b>Nenhuma planilha aberta</b>Abra uma planilha no mapa para editar as larguras.</div>'; return; }
   const p = getP(pidLarg ?? '') ?? getP(E.settingsPid ?? '') ?? E.P[0];
@@ -188,6 +219,7 @@ function renderLarguras(body: HTMLElement) {
   const kmIni = p.kmNum[0], kmFim = p.kmNum[p.kmNum.length - 1] + 0.02;
   kmPrevia ??= E.sel && E.sel.pid === p.id ? p.kmNum[E.sel.row] : p.kmNum[Math.floor(p.kmNum.length / 2)];
   const ajustes = p.ajustes;
+  const outras = E.P.filter((q) => q !== p);
   body.innerHTML = `
     <div><h2 class="h2">Largura das faixas</h2>
       <p class="lead">A planilha é o valor padrão. Por cima dela você edita por planilha e faixa, ou por faixa de km (por exemplo, Fx 1 com 3,50 m do km 120 ao 135). A geometria no mapa e as áreas calculadas aqui recalculam.</p></div>
@@ -203,6 +235,10 @@ function renderLarguras(body: HTMLElement) {
     <div><div class="sect">Ajustes desta planilha <span>${ajustes.length}</span></div>
       ${ajustes.length ? `<table class="ctable"><thead><tr><th>Faixa</th><th>Alcance</th><th>Largura</th><th></th></tr></thead><tbody>${ajustes.map((a) => `<tr><td>${nomeFaixa(a.lane)}</td><td class="num">${a.km0 === null ? 'Planilha toda' : `km ${kmLabel(a.km0)} a ${kmLabel(a.km1!)}`}</td><td class="num">${numStr(a.largura)} m</td><td><button class="btn d" data-del="${a.id}" style="min-height:30px;padding:3px 10px">Remover</button></td></tr>`).join('')}</tbody></table>`
         : '<p class="note">Sem ajustes. As larguras são as da planilha.</p>'}</div>
+    <div class="cfg-card cfg-lote"><div class="sect" style="margin:0">Replicar para outras planilhas</div>
+      <div class="btns"><button class="btn" id="lgOutras" ${ajustes.length && outras.length ? '' : 'disabled'}>Aplicar a outras planilhas…</button></div>
+      <p class="note">${!ajustes.length ? 'Esta planilha não tem ajustes para copiar.' : !outras.length ? 'Não há outras planilhas abertas.' : `Copia os ${ajustes.length} ajuste(s) desta planilha para as planilhas que você marcar.`}</p>
+    </div>
     <div class="cfg-card"><div class="sect" style="margin:0">Novo ajuste</div>
       <div class="cfg-row">
         <label>Faixa<select class="in" id="lgLane">${Array.from({ length: N }, (_, k) => `<option value="${k + 1}">Fx ${k + 1}</option>`).join('')}<option value="0">Acostamento</option></select></label>
@@ -232,6 +268,7 @@ function renderLarguras(body: HTMLElement) {
     await aplicarAjustes(p, p.ajustes.filter((a) => a.id !== b.dataset.del));
     renderLarguras(body);
   }));
+  $('#lgOutras').onclick = () => void replicarAjustes(p, () => renderLarguras(body));
   $('#lgAdd').onclick = async () => {
     const err = $('#lgErr'), t0 = $<HTMLInputElement>('#lgK0').value.trim(), t1 = $<HTMLInputElement>('#lgK1').value.trim();
     const km0 = t0 ? parseKmTexto(t0) : null, km1 = t1 ? parseKmTexto(t1) : null;

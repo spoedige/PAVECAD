@@ -86,3 +86,17 @@ export function observarRolagemH(el: HTMLElement) {
   new MutationObserver(att).observe(el, { childList: true, subtree: true });
   att();
 }
+
+let acaoT: ReturnType<typeof setTimeout> | undefined;
+/** Aviso com um botão de ação (ex.: Desfazer). Fica acima de qualquer tela, inclusive Configurações. */
+export function toastAcao(msg: string, rotulo: string, aoClicar: () => void, ms = 9000) {
+  document.querySelector('.toast-acao')?.remove();
+  clearTimeout(acaoT);
+  const t = document.createElement('div');
+  t.className = 'toast-acao';
+  t.setAttribute('role', 'status');
+  t.innerHTML = `<span>${esc(msg)}</span><button type="button" class="btn p">${esc(rotulo)}</button>`;
+  t.querySelector('button')!.addEventListener('click', () => { clearTimeout(acaoT); t.remove(); aoClicar(); });
+  document.body.appendChild(t);
+  acaoT = setTimeout(() => t.remove(), ms);
+}
