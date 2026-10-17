@@ -586,12 +586,12 @@ const TESTES = {
     ['Planservi: a aba Revisão mostra a qualidade da importação, com o km de cada ocorrência, e o log traz o mesmo', ['1366x768'], async (pg) => {
       await aba(pg, 'notas');
       const sec = await pg.evaluate(() => ({ titulo: [...document.querySelectorAll('#t-notas .sect')].map((e) => e.textContent.trim()), itens: [...document.querySelectorAll('#t-notas details.qual')].map((d) => d.querySelector('summary b').textContent) }));
-      assert.ok(sec.titulo.some((t) => /Qualidade da importação/.test(t)));
+      assert.ok(sec.titulo.some((t) => /Qualidade das coordenadas/.test(t)));
       assert.equal(sec.itens.length, 4, 'um item por projeto: ' + sec.itens.join(' | '));
       // o resumo bate com o que o leitor calculou, e cada ocorrência traz o km
-      const q = await pg.evaluate(() => window.__pavecad.E.P.map((p) => ({ nome: p.meta.name, saltos: p.qualidade.saltos.length, sent: p.qualidade.sentidos.length, kms: [...p.qualidade.saltos.map((s) => s.km), ...p.qualidade.sentidos.map((s) => s.km)] })));
+      const q = await pg.evaluate(() => window.__pavecad.E.P.map((p) => ({ nome: p.meta.name, corr: (p.qualidade.corrigidos || []).length, saltos: p.qualidade.saltos.length, sent: p.qualidade.sentidos.length })));
       const crescA = q.find((x) => x.nome === 'SP-333 · TH50 · Crescente');
-      assert.ok(crescA.saltos >= 2 && crescA.sent >= 1, 'a amostra tem salto e distância entre sentidos');
+      assert.ok(crescA.corr >= 1 && crescA.saltos === 0 && crescA.sent === 0, 'o ponto fora do lugar foi reconstruído e já não há salto nem distância entre sentidos: ' + JSON.stringify(crescA));
       await pg.click('#t-notas details.qual[data-qp] summary'); await pg.waitForTimeout(300);
       const lista = await pg.evaluate(() => [...document.querySelectorAll('#t-notas details.qual[open] [data-q]')].map((b) => b.textContent.trim()));
       assert.ok(lista.length > 0 && lista.every((t) => /^km \d+\+\d+/.test(t)), 'cada ocorrência começa pelo km: ' + lista.slice(0, 3).join(' | '));
@@ -602,8 +602,7 @@ const TESTES = {
       // o log do projeto (aba Ajustes) traz o mesmo resumo
       await aba(pg, 'aj');
       const log = await pg.evaluate(() => { const E = window.__pavecad.E; return E.P.find((p) => p.meta.name === 'SP-333 · TH50 · Crescente').log.filter((l) => /^planservi/.test(l.code)).map((l) => l.code + ': ' + l.msg); });
-      assert.ok(log.some((l) => /salto/.test(l) && /Nada foi corrigido/.test(l)), 'log com os saltos');
-      assert.ok(log.some((l) => /entre os sentidos/.test(l)), 'log com a distância entre os sentidos');
+      assert.ok(log.some((l) => /planservi-corrigidos/.test(l) && /reconstruída/.test(l) && /deslocamento|m\)/.test(l)), 'log com as coordenadas reconstruídas');
       assert.ok(log.some((l) => /Aba IRI ignorada/.test(l)), 'log da aba IRI ignorada');
       assert.ok(log.some((l) => /Larguras assumidas/.test(l)), 'log das larguras assumidas');
     }, { arquivos: ['planservi_TH50.xlsx', 'planservi_TH51.xlsx'], projetos: 4 }],
@@ -824,6 +823,35 @@ const TESTES = {
       for (const a of [...m.campos, m.zero, m.outras]) assert.ok(a && a[1] >= 44, 'alvo ≥ 44 px: ' + JSON.stringify(m));
       assert.ok(m.dentro, 'cabe na largura da tela');
     }],
+  ],
+  t12: [
+    ['coordenadas reconstruídas: o selo aparece na planilha e o relatório lista os pontos com km, tipo e deslocamento', '1366x768', async (pg, { log }) => {
+      const info = await pg.evaluate(() => window.__pavecad.E.P.map((p) => ({ id: p.id, nome: p.meta.name, n: p.qualidade?.corrigidos?.length ?? 0, cortes: p.qualidade?.cortes?.length ?? 0, inv: p.camadas.invalidos.length })));
+      assert.equal(info.length, 4);
+      const com = info.filter((i) => i.n > 0);
+      assert.ok(com.length >= 1, 'ao menos uma planilha da amostra tem ponto reconstruído: ' + JSON.stringify(info));
+      // selo no Resumo: só nas planilhas com correção, com o número certo
+      const selos = await pg.evaluate(() => [...document.querySelectorAll('#t-resumo .prow')].map((r) => ({ nome: r.querySelector('.nm b')?.textContent, selo: r.querySelector('.selo')?.textContent ?? null })));
+      for (const i of info) {
+        const s = selos.find((x) => x.nome === i.nome);
+        assert.equal(s.selo, i.n ? `coordenadas corrigidas: ${i.n}` : null, i.nome);
+      }
+      // relatório na aba Revisão
+      await aba(pg, 'notas');
+      const rel = await pg.innerText('#t-notas');
+      assert.match(rel, /qualidade das coordenadas/i);
+      assert.match(rel, /corrigidas?/);
+      // abre a primeira planilha com correção e confere as linhas do relatório
+      const alvo = com[0];
+      await pg.click(`[data-qp="${alvo.id}"] summary`);
+      const itens = await pg.locator(`[data-qp="${alvo.id}"] .row`).allInnerTexts();
+      assert.ok(itens.some((t) => /andou [\d.,]+ m em relação à planilha/.test(t) && /km \d+\+\d+/.test(t)), 'cada ponto traz km, tipo e deslocamento: ' + itens.slice(0, 3).join(' | '));
+      // o log da aba Ajustes traz o mesmo resumo
+      await aba(pg, 'aj');
+      await pg.selectOption('#a-proj', alvo.id);
+      assert.match(await pg.innerText('#t-aj'), /coordenadas corrigidas: \d+/);
+      assert.equal(log.erros.filter((e) => !/Failed to load resource/i.test(e)).length, 0, log.erros.join(' | '));
+    }, { arquivos: ['planservi_TH50.xlsx', 'planservi_TH51.xlsx'], projetos: 4 }],
   ],
   g03: [
     ['a seção é o seletor de faixa (clique, aria-pressed, teclado)', '1366x768', async (pg) => {

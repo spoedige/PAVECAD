@@ -16,7 +16,9 @@ export function polysToGeoJSON(p: Project, g: Geometry, attrs: (q: LanePoly) => 
     features: g.polys.map((q) => ({
       type: 'Feature',
       properties: { pid, fid: q.fid, row: q.row, lane: q.lane, ...attrs(q) },
-      geometry: { type: 'Polygon', coordinates: [q.ring.map((pt) => lonLat(p, pt))] },
+      geometry: q.invalido && q.central
+        ? { type: 'LineString', coordinates: q.central.map((pt) => lonLat(p, pt)) }
+        : { type: 'Polygon', coordinates: [q.ring.map((pt) => lonLat(p, pt))] },
     })),
   };
 }

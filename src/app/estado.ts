@@ -120,11 +120,13 @@ export function criarProjeto(
   }
   const polyByFid = new Map<number, Feature>();
   for (const f of extra.camadas.polys.features) polyByFid.set(f.properties.fid as number, f as unknown as Feature);
-  return {
+  const proj: AppProj = {
     ...base, ...extra, id, label: base.meta.name, visible: true, model: modelOf(base.rows),
     polyByFid, bounds: [[x0, y0], [x1, y1]], markers: [], rowsPlanilha: base.rows, ajustes: [],
     x0: Float64Array.from(base.x), y0: Float64Array.from(base.y), desloc: { l: 0, t: 0 },
   };
+  registrarInvalidos(proj, extra.camadas);
+  return proj;
 }
 
 /** Parte do projeto que vai ao worker; o resto é estado de interface. */
@@ -133,9 +135,22 @@ export function baseOf(p: AppProj): Project {
   return { meta, rows, log, codes, segs, segOf, crs, x, y, kmNum, kmLab };
 }
 
+/** Polígonos que falharam na validação ficam no log da planilha (um só registro, refeito a cada geometria). */
+export function registrarInvalidos(p: Pick<AppProj, 'log' | 'kmLab'>, c: Camadas) {
+  p.log = p.log.filter((l) => l.code !== 'poligonos-invalidos');
+  const inv = c.invalidos ?? [];
+  if (!inv.length) return;
+  const porLinha = new Map<number, string>();
+  for (const x of inv) if (!porLinha.has(x.row)) porLinha.set(x.row, x.motivo);
+  const nome: Record<string, string> = { curto: 'menos de 1 m', cruzado: 'cruzado', 'sem-area': 'sem área' };
+  const lista = [...porLinha].slice(0, 30).map(([r, m]) => `${p.kmLab[r]} (${nome[m] ?? m})`).join(', ');
+  p.log.push({ level: 'warn', code: 'poligonos-invalidos', msg: `${inv.length} polígono${inv.length > 1 ? 's' : ''} em ${porLinha.size} segmento${porLinha.size > 1 ? 's' : ''} não passou${inv.length > 1 ? 'aram' : ''} na validação (anel simples, comprimento acima de 1 m); desenhado${inv.length > 1 ? 's' : ''} só a linha central. Km: ${lista}${porLinha.size > 30 ? ` e mais ${porLinha.size - 30}` : ''}` });
+}
+
 /** Aplica o resultado de uma nova geometria ao projeto. */
 export function aplicarGeometria(p: AppProj, r: { opts: GeoOptions; normals: (Normais | null)[]; camadas: Camadas }) {
   p.opts = r.opts;
+  registrarInvalidos(p, r.camadas);
   p.normals = r.normals;
   p.camadas = r.camadas;
   p.polyByFid = new Map();

@@ -46,6 +46,29 @@ export interface LanePoly {
   e1: number;
   /** Quadrilátero fechado (5 pontos) em metros projetados. */
   ring: XY[];
+  /** Presente quando o polígono falhou na validação: só a linha central é desenhada. */
+  invalido?: MotivoInvalido;
+  central?: XY[];
+}
+
+export type MotivoInvalido = 'curto' | 'cruzado' | 'sem-area';
+/** Menor comprimento (m) de um segmento para desenhar o polígono. */
+export const COMPRIMENTO_MIN = 1;
+
+const cruza = (a: XY, b: XY, c: XY, d: XY) => {
+  const o = (p: XY, q: XY, r: XY) => (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0]);
+  const d1 = o(a, b, c), d2 = o(a, b, d), d3 = o(c, d, a), d4 = o(c, d, b);
+  return d1 * d2 < 0 && d3 * d4 < 0;
+};
+
+/** Anel simples (sem autointerseção), com área e comprimento. Devolve o motivo da falha, ou null. */
+export function validarAnel(ring: XY[], comprimento: number): MotivoInvalido | null {
+  if (!(comprimento > COMPRIMENTO_MIN)) return 'curto';
+  const [a, b, c, d] = ring;
+  if (cruza(a, b, c, d) || cruza(b, c, d, a)) return 'cruzado';
+  let ar = 0;
+  for (let i = 0; i < 4; i++) ar += ring[i][0] * ring[i + 1][1] - ring[i + 1][0] * ring[i][1];
+  return Math.abs(ar) / 2 > 1e-6 ? null : 'sem-area';
 }
 
 export interface DrainRun {
@@ -110,7 +133,11 @@ export function buildGeometry(p: Project, options: Partial<GeoOptions> = {}): Ge
       for (let k = 0; k < e.length - 1; k++) {
         const lane = k < nLanes ? k + 1 : 0;
         const a = e[k], b = e[k + 1];
-        polys.push({ row: i, lane, fid: polyId(i, lane), e0: a, e1: b, ring: [at(i, a), at(i, b), at(i + 1, b), at(i + 1, a), at(i, a)] });
+        const ring: XY[] = [at(i, a), at(i, b), at(i + 1, b), at(i + 1, a), at(i, a)];
+        const q: LanePoly = { row: i, lane, fid: polyId(i, lane), e0: a, e1: b, ring };
+        const falha = validarAnel(ring, Math.hypot(p.x[i + 1] - p.x[i], p.y[i + 1] - p.y[i]));
+        if (falha) { q.invalido = falha; q.central = [at(i, (a + b) / 2), at(i + 1, (a + b) / 2)]; }
+        polys.push(q);
       }
     }
 

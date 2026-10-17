@@ -58,6 +58,8 @@ export interface Row {
   he: [number | null, number | null];
   /** Planservi: texto do revestimento do acostamento como veio ("PMQ2,5", "R2,5", "*"). */
   shoulderRaw?: string | null;
+  /** A linha começa um trecho novo: a coordenada tem uma descontinuidade real entre ela e a anterior. */
+  quebra?: boolean;
 }
 
 export interface ProjectMeta {
@@ -85,6 +87,12 @@ export interface Qualidade {
   sentidos: { i: number; km: string; dist: number }[];
   faixaSalto: [number, number];
   maxSentidos: number;
+  /** Pontos cujas coordenadas foram reconstruídas (km, tipo, quanto andaram em relação à coordenada da planilha). */
+  corrigidos?: { i: number; km: string; tipo: 'repetido' | 'salto' | 'retrocedendo' | 'inicial' | 'final'; causa?: string; deslocamento: number; orig: [number, number] }[];
+  /** Descontinuidades reais: a linha foi cortada antes da linha `i`. */
+  cortes?: { i: number; km: string; kmFim: string; dist: number; esperado: number }[];
+  /** Anomalias deixadas como estão: trecho parado ou passo atípico. */
+  avisos?: { tipo: 'estacionario' | 'passo'; km: string; kmFim: string; dist: number; esperado: number }[];
 }
 
 export interface ParsedProject {
