@@ -101,11 +101,16 @@ export function drawUni() {
   lay = { x0, x1, kmi, kmf, blocks, top };
   const fm = E.field ? 13 : 12, muted = cssv('--muted'), none = cssv('--none'), fill = cssv('--fill2'), sans = cssv('--sans');
   const pxKm = (x1 - x0) / (kmf - kmi), step = [1, 2, 5, 10, 20, 25, 50, 100].find((s) => s * pxKm >= 70) || 100, bottom = y - bgap;
-  g.font = `500 ${fm}px ` + sans;
-  g.textBaseline = 'alphabetic';
+  // a régua de km fica num canvas próprio, grudado no topo da área rolável (sticky); as linhas finas seguem no desenho principal
+  const rg = document.getElementById('uniregua') as HTMLCanvasElement | null, gr = rg?.getContext('2d') ?? null;
+  if (rg && gr) {
+    if (rg.width !== Math.round(W * dpr) || rg.height !== Math.round(top * dpr)) { rg.width = Math.round(W * dpr); rg.height = Math.round(top * dpr); }
+    gr.setTransform(dpr, 0, 0, dpr, 0, 0); gr.clearRect(0, 0, W, top);
+    gr.font = `500 ${fm}px ` + sans; gr.textBaseline = 'alphabetic';
+  }
   for (let k = Math.ceil(kmi / step) * step; k <= kmf; k += step) {
-    const x = Math.round(sx(k)), txt = kmVis(k) + ' km', tw = g.measureText(txt).width;
-    g.fillStyle = muted; g.fillText(txt, Math.min(x - 8, W - tw - 1), top - 5);
+    const x = Math.round(sx(k)), txt = kmVis(k) + ' km';
+    if (gr) { const tw = gr.measureText(txt).width; gr.fillStyle = muted; gr.fillText(txt, Math.min(x - 8, W - tw - 1), top - 5); }
     g.fillStyle = cssv('--hair'); g.fillRect(x, top - 2, 1, bottom - top + 4);
   }
   const keys = [...trOrder(), '-'], tc = (k: string) => trColor(k, E.field, none);
@@ -241,10 +246,12 @@ export function initUnifilar() {
     if (!h || !h.near) { el.style.display = 'none'; return; }
     el.style.display = 'block';
     el.style.left = h.x + 'px';
-    (el.firstElementChild as HTMLElement).style.top = uw.scrollTop + 2 + 'px';
+    (el.firstElementChild as HTMLElement).style.top = uw.scrollTop + 20 + 'px';
     el.firstElementChild!.textContent = 'km ' + h.p.kmLab[h.i] + (h.multi ? ' · ' + projName(h.p) : '');
   });
   uw.addEventListener('mouseleave', () => { $('#unihover').style.display = 'none'; });
+  // com o cartão rolado, a régua ganha fundo para não ficar sobre as faixas
+  uw.addEventListener('scroll', () => uw.classList.toggle('rolado', uw.scrollTop > 0), { passive: true });
   window.addEventListener('resize', drawUni);
   if (window.ResizeObserver) new ResizeObserver(() => drawUni()).observe(uw);
   const tg = $('#uniToggle'), cab = card0().querySelector<HTMLElement>('.uni-h')!;

@@ -288,6 +288,9 @@ textarea:focus{box-shadow:inset 0 0 0 2px var(--accent)}
 .uni-h .chipbtn{height:24px;font-size:var(--fs-meta);padding:0 9px;min-height:0}
 .uni-wrap{position:relative;flex:none;cursor:crosshair;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}
 #uni{display:block;width:100%}
+/* régua de km: fica no topo da área rolável; sobre as faixas rolando ganha o fundo do cartão */
+#uniregua{position:sticky;top:0;display:block;width:100%;height:18px;margin-bottom:-18px;z-index:2;pointer-events:none}
+.uni-wrap.rolado #uniregua{background:var(--solid);box-shadow:0 1px 0 var(--hair)}
 #unihover{position:absolute;top:0;width:0;border-left:1px solid var(--muted);display:none;pointer-events:none}
 #unihover span{position:absolute;top:2px;left:6px;background:var(--solid);border:var(--bw) solid var(--hair);border-radius:6px;padding:1px 6px;font-size:var(--fs-meta);font-weight:600;white-space:nowrap;box-shadow:var(--shadow)}
 .uni.collapsed .uni-wrap{display:none}

@@ -1236,6 +1236,17 @@ const TESTES = {
       assert.ok(r.rola, `deve rolar por dentro (${r.sh} > ${r.ch})`);
       const topo = await pg.evaluate(() => { const w = document.querySelector('#uniwrap'); w.scrollTop = w.scrollHeight; return w.scrollTop; });
       assert.ok(topo > 0, 'a rolagem anda');
+      // a régua de km é sticky: continua no topo da área visível e com texto desenhado depois de rolar até o fim
+      await pg.waitForTimeout(200);
+      const reg = await pg.evaluate(() => {
+        const w = document.querySelector('#uniwrap'), r = document.querySelector('#uniregua'), a = w.getBoundingClientRect(), b = r.getBoundingClientRect();
+        const d = r.getContext('2d').getImageData(0, 0, r.width, r.height).data; let tinta = 0; for (let i = 3; i < d.length; i += 4) if (d[i] > 0) tinta++;
+        return { dy: b.top - a.top, h: b.height, tinta, rolado: w.classList.contains('rolado'), scroll: w.scrollTop, vis: r.checkVisibility() };
+      });
+      assert.ok(reg.scroll > 0 && reg.rolado, 'cartão rolado');
+      assert.ok(Math.abs(reg.dy) <= 1, `régua colada no topo da área visível depois de rolar (deslocada ${reg.dy}px)`);
+      assert.ok(reg.h >= 17 && reg.vis, 'régua visível com 18 px');
+      assert.ok(reg.tinta > 200, 'a régua tem os rótulos de km desenhados (' + reg.tinta + ' px)');
       // com o cartão rolado até o fim, o clique na última faixa visível cai no decrescente
       const box = await pg.evaluate(() => { const r = document.querySelector('#uniwrap').getBoundingClientRect(); return { l: r.left, w: r.width, b: r.bottom }; });
       await pg.mouse.click(box.l + 44 + 0.2 * (box.w - 46), box.b - 8); await pg.waitForTimeout(500);
