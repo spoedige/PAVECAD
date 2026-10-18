@@ -7,3 +7,6 @@ dist
 .env.*
 !.env.example
 /capturas/
+
+# capturas geradas localmente
+scripts/capturas/saida*

@@ -2,13 +2,13 @@ import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import type { GeoJSONSource, MapMouseEvent, PointLike } from 'maplibre-gl';
 import { edgesOf, offsetLL } from '../geometry/build';
-import { IND, Q5, Q5F, type IndKey } from '../dominio/indicadores';
+import { ABREVIACOES_FAIXA, CLASSE_CRITICA, DESCRICAO_MODO, IND, INDICADORES_CRITICOS, Q5, Q5F, SOLUCOES_CRITICAS, type IndKey } from '../dominio/indicadores';
 import { trColor, trLabel, trOrder, trShort } from '../dominio/solucoes';
 import type { Nota } from './estado';
 import { parseKmTexto } from '../formats/km';
 import { baseSources, CHAVE_NITIDEZ, MAP_MAX_ZOOM, nitidezSalva, recarregarEsri, type Nitidez } from '../mapa/base';
 import { agendarRotulos, PRIO, prioDeEstaca, resolverRotulos } from './rotulos';
-import { E, H, NOTE_CATS, getP, kmFmt, kmReal, projName, visibleProjects, type AppProj, type FocoPred } from './estado';
+import { E, H, NOTE_CATS, getP, kmFmt, kmReal, hachuraRP, padraoAtivo, projName, visibleProjects, type AppProj, type FocoPred } from './estado';
 import { $, cssv, esc, fmt, syncSeg, toast } from './ui';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -55,6 +55,7 @@ export function initMap(onReady: () => void) {
   zh.appendChild(new maplibregl.ScaleControl({ unit: 'metric' }).onAdd(map));
 
   map.on('load', () => {
+    map.addImage('hachura', criarHachura(), { pixelRatio: 2 });
     const offs: Expr = ['interpolate', ['linear'], ['zoom'], 9, ['*', ['get', 'k'], 2.7], 15, ['*', ['get', 'k'], 0.4], 16.2, 0];
     map.addSource('sel', { type: 'geojson', data: EMPTY });
     map.addLayer({ id: 'sel-halo', type: 'line', source: 'sel', filter: ['==', ['get', 'kind'], 'poly'], paint: { 'line-color': '#07f', 'line-opacity': 0.25, 'line-width': ['interpolate', ['linear'], ['zoom'], 14, 6, 18, 10], 'line-blur': 3 } });
@@ -112,7 +113,7 @@ export function initMap(onReady: () => void) {
   map.on('zoom', onZ);
   onZ();
   map.on('rotate', () => { $('#compass').style.transform = `rotate(${-map.getBearing()}deg)`; });
-  map.on('moveend', updateStakes);
+  map.on('moveend', () => { updateStakes(); if (!legendAberta()) renderLegend(); });
   map.on('move', () => H.onView());
   new MutationObserver(() => setTimeout(applyPaint, 20)).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => setTimeout(applyPaint, 40));
@@ -155,6 +156,8 @@ export function addProjectToMap(p: AppProj) {
   map.addSource('drain-' + id, { type: 'geojson', data: p.camadas.drains as Expr });
   map.addLayer({ id: 'lines-' + id, type: 'line', source: 'lines-' + id, maxzoom: 16.7, layout: { 'line-cap': 'butt' }, paint: { 'line-width': 2.4, 'line-offset': offs, 'line-color': '#888' } }, before);
   map.addLayer({ id: 'poly-' + id, type: 'fill', source: 'poly-' + id, minzoom: 14, paint: { 'fill-color': '#888', 'fill-opacity': 0.9 } }, before);
+  // hachura nas classes críticas (padrão além da cor); o filtro e a visibilidade vêm de paintProject
+  map.addLayer({ id: 'hach-' + id, type: 'fill', source: 'poly-' + id, minzoom: 15.2, filter: ['==', ['get', 'fid'], -1], layout: { visibility: 'none' }, paint: { 'fill-pattern': 'hachura', 'fill-opacity': ['interpolate', ['linear'], ['zoom'], 15.2, 0, 16.6, 0.9] } }, before);
   map.addLayer({ id: 'pline-' + id, type: 'line', source: 'poly-' + id, minzoom: 16, filter: ['==', ['geometry-type'], 'Polygon'], paint: { 'line-color': '#000', 'line-width': 0.8 } }, before);
   // polígono que falhou na validação (curto, cruzado): só a linha central do segmento
   map.addLayer({ id: 'cline-' + id, type: 'line', source: 'poly-' + id, minzoom: 14, filter: ['==', ['geometry-type'], 'LineString'], layout: { 'line-cap': 'butt' }, paint: { 'line-color': '#888', 'line-width': 3 } }, before);
@@ -174,7 +177,7 @@ export function setProjectData(p: AppProj) {
 }
 
 export function removeProjectFromMap(p: AppProj) {
-  for (const l of ['lines-', 'poly-', 'pline-', 'cline-', 'drainR-', 'drainP-']) if (map.getLayer(l + p.id)) map.removeLayer(l + p.id);
+  for (const l of ['lines-', 'poly-', 'hach-', 'pline-', 'cline-', 'drainR-', 'drainP-']) if (map.getLayer(l + p.id)) map.removeLayer(l + p.id);
   for (const s of ['poly-', 'lines-', 'drain-']) if (map.getSource(s + p.id)) map.removeSource(s + p.id);
   p.markers.forEach((m) => m.remove());
   p.markers = [];
@@ -183,6 +186,7 @@ export function removeProjectFromMap(p: AppProj) {
 export function applyVisibility(p: AppProj) {
   const v = p.visible ? 'visible' : 'none', d = p.visible && E.layers.drain ? 'visible' : 'none';
   for (const l of ['lines-', 'poly-', 'pline-', 'cline-']) if (map.getLayer(l + p.id)) map.setLayoutProperty(l + p.id, 'visibility', v);
+  paintHachura(p);
   for (const l of ['drainR-', 'drainP-']) if (map.getLayer(l + p.id)) map.setLayoutProperty(l + p.id, 'visibility', d);
   p.markers.forEach((m) => (m.getElement().style.display = p.visible ? '' : 'none'));
 }
@@ -248,6 +252,39 @@ function dimCond(): Expr | null {
   return ['in', ['to-number', ['get', slot(E.mode)!.prop], -1], ['literal', [...E.dim].map(Number)]];
 }
 
+/** Hachura diagonal de duas cores (preta e branca translúcidas): aparece sobre qualquer cor de classe, no claro e no escuro. */
+function criarHachura(): ImageData {
+  const n = 16, c = document.createElement('canvas');
+  c.width = n; c.height = n;
+  const g = c.getContext('2d')!;
+  g.clearRect(0, 0, n, n);
+  g.lineWidth = 2.2;
+  for (const [cor, d] of [['rgba(0,0,0,.62)', 0], ['rgba(255,255,255,.7)', 3]] as const) {
+    g.strokeStyle = cor;
+    for (let k = -n; k <= n * 2; k += 8) { g.beginPath(); g.moveTo(k + d, n); g.lineTo(k + d + n, 0); g.stroke(); }
+  }
+  return g.getImageData(0, 0, n, n);
+}
+
+/** Classes críticas do modo atual: RE e RP em Solução; as piores classes de IGG, FC e ATR. Os demais modos não têm hachura. */
+/** Soluções com hachura agora: com "Padrão além da cor" ligado, todas as críticas; sem escolha, só o RP. */
+export const solucoesComHachura = () => (padraoAtivo() ? SOLUCOES_CRITICAS : hachuraRP() ? ['RP'] : []);
+
+export function criticasDoModo(): Expr | null {
+  if (E.mode === 'sol') { const c = solucoesComHachura(); return c.length ? ['in', ['get', 'main'], ['literal', c]] : null; }
+  if (padraoAtivo() && INDICADORES_CRITICOS.includes(E.mode as IndKey)) return ['>=', ['to-number', ['get', IND[E.mode as IndKey].prop], -1], CLASSE_CRITICA];
+  return null;
+}
+
+/** Filtro e visibilidade da camada de hachura de uma planilha, de acordo com o modo e com "Padrão além da cor". */
+export function paintHachura(p: AppProj) {
+  const l = 'hach-' + p.id;
+  if (!E.mapReady || !map.getLayer(l)) return;
+  const f = criticasDoModo(), on = !!f && p.visible;
+  map.setFilter(l, f ?? ['==', ['get', 'fid'], -1]);
+  map.setLayoutProperty(l, 'visibility', on ? 'visible' : 'none');
+}
+
 export function paintProject(p: AppProj) {
   const id = p.id, ce = colorExpr(), dc = dimCond(), f = E.field;
   let op: Expr = E.mode === 'sol' ? ['case', ['<', ['get', 'pct'], 100], f ? 0.72 : 0.62, f ? 1 : 0.94] : f ? 1 : 0.94;
@@ -260,6 +297,7 @@ export function paintProject(p: AppProj) {
   const S = (l: string, k: string, v: Expr) => { if (map.getLayer(l)) map.setPaintProperty(l, k, v); };
   S('poly-' + id, 'fill-color', ce);
   S('poly-' + id, 'fill-opacity', ['interpolate', ['linear'], ['zoom'], 15.2, 0, 16.6, op]);
+  paintHachura(p);
   S('cline-' + id, 'line-color', ce);
   S('cline-' + id, 'line-opacity', f ? 1 : 0.94);
   S('lines-' + id, 'line-color', ce);
@@ -316,22 +354,64 @@ function legendItems(): LegItem[] {
 
 // No layout único (601 px ou mais) a legenda começa recolhida (botão pequeno); a escolha do usuário, quando existe, vale sobre o padrão.
 const OCULTAR_LEGENDA = `<button class="gocultar" type="button" data-ocultar="legenda" aria-label="Ocultar legenda" title="Ocultar legenda"><svg class="i" viewBox="0 0 24 24"><path d="M3 3l18 18"/><path d="M10.6 6.1A10 10 0 0 1 12 6c6.5 0 10 6 10 6a17 17 0 0 1-3.2 3.9M6.2 7C3.7 8.7 2 12 2 12s3.5 6 10 6c1.6 0 3-.4 4.2-.9"/><path d="M9.9 10a3 3 0 0 0 4.1 4.1"/></svg></button>`;
+const legendAberta = () => legendOpen && E.tool !== 'prop';
 let legendOpen = !window.matchMedia('(min-width: 601px)').matches;
 try { const v = localStorage.getItem('pavecad-leg'); if (v !== null) legendOpen = v !== '0'; } catch { /* sem storage */ }
+
+/** Quantos segmentos de cada classe aparecem na vista atual (chave da legenda -> contagem). */
+function contagemNaVista(): Map<string, number> {
+  const out = new Map<string, number>();
+  if (!E.mapReady) return out;
+  const bb = map.getBounds(), I = slot(E.mode);
+  for (const p of visibleProjects()) {
+    for (let i = 0; i < p.rows.length; i++) {
+      const r = p.rows[i];
+      if (r.lon < bb.getWest() || r.lon > bb.getEast() || r.lat < bb.getSouth() || r.lat > bb.getNorth()) continue;
+      if (!I) {
+        for (const t of p.model[i].tr) out.set(t.main, (out.get(t.main) ?? 0) + 1);
+        if (p.model[i].sh.main) out.set(p.model[i].sh.main, (out.get(p.model[i].sh.main) ?? 0) + 1);
+      } else {
+        for (const l of r.lanes) {
+          const v = I.value(l);
+          if (v == null) continue;
+          const k = String(I.cls(v));
+          out.set(k, (out.get(k) ?? 0) + 1);
+        }
+      }
+    }
+  }
+  return out;
+}
+
+/** As classes mais presentes na vista (até 3) e quantas outras também aparecem ("Sem intervenção" fica de fora das duas contas, salvo se for a única). "Sem intervenção" só entra se for a única. */
+export function topoDaLegenda(items: LegItem[]): { top: LegItem[]; mais: number } {
+  const c = contagemNaVista();
+  const presentes = items.filter((it) => (c.get(it.key) ?? 0) > 0).sort((a, b) => (c.get(b.key) ?? 0) - (c.get(a.key) ?? 0));
+  const uteis = presentes.filter((it) => it.key !== '-');
+  const base = uteis.length ? uteis : presentes;
+  const top = base.slice(0, 3);
+  return { top, mais: Math.max(0, base.length - top.length) };
+}
+
+/** Classe crítica: recebe hachura quando "Padrão além da cor" está ligado. */
+const ehCritica = (it: LegItem) => (E.mode === 'sol' ? solucoesComHachura().includes(it.key) : padraoAtivo() && INDICADORES_CRITICOS.includes(E.mode as IndKey) && +it.key >= CLASSE_CRITICA);
 
 export function renderLegend() {
   const el = $('#legend'), items = legendItems();
   // com a barra Propor solução aberta a legenda fica compacta, para a pilha de baixo caber em telas baixas
-  const aberta = legendOpen && E.tool !== 'prop';
+  const aberta = legendAberta();
   const I = slot(E.mode);
   const title = I ? `${I.label} · ${I.unit}${I.lim ? ' · ' + I.lim : ''}` : 'Solução';
   let h = '';
   if (!aberta) {
-    h += `<div class="legrow"><button class="legtog" id="legTog" aria-expanded="false" aria-label="Expandir legenda"><span class="dots">${items.map((it) => `<i style="background:${it.c}"></i>`).join('')}</span>Legenda</button>${OCULTAR_LEGENDA}</div>`;
+    const { top, mais } = topoDaLegenda(items);
+    const nomes = top.map((it) => `<span class="lt"><i class="${ehCritica(it) ? 'crit' : ''}" style="background-color:${it.c}"></i>${esc(it.s)}</span>`).join('');
+    h += `<div class="legrow"><button class="legtog" id="legTog" aria-expanded="false" aria-label="Expandir legenda" title="${esc(DESCRICAO_MODO[E.mode])}"><span class="legtop">${nomes || '<span class="lt">Legenda</span>'}</span>${mais ? `<span class="legmais" aria-label="mais ${mais} classes na vista">+${mais}</span>` : ''}</button>${OCULTAR_LEGENDA}</div>`;
   } else {
-    h += `<div class="leghead"><h4>${title}</h4><span class="legbtns"><button class="legtog sm" id="legTog" aria-expanded="true" aria-label="Recolher legenda" title="Recolher"><svg class="i" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>${OCULTAR_LEGENDA}</span></div>`;
+    h += `<div class="leghead"><h4 title="${esc(DESCRICAO_MODO[E.mode])}">${title}</h4><span class="legbtns"><button class="legtog sm" id="legTog" aria-expanded="true" aria-label="Recolher legenda" title="Recolher"><svg class="i" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>${OCULTAR_LEGENDA}</span></div>`;
     h += `<ul title="Toque em um item para ocultar. Cor mais clara = 50% da área">` +
-      items.map((it) => `<li><button type="button" data-k="${esc(it.key)}" aria-pressed="${!E.dim.has(it.key)}"><span class="sw" style="background:${it.c}"></span>${esc(it.s)}</button></li>`).join('') + '</ul>';
+      items.map((it) => `<li><button type="button" data-k="${esc(it.key)}" aria-pressed="${!E.dim.has(it.key)}"><span class="sw${ehCritica(it) ? ' crit' : ''}" style="background-color:${it.c}"></span>${esc(it.s)}</button></li>`).join('') + '</ul>';
+    h += `<p class="legnote">${esc(DESCRICAO_MODO[E.mode])}<br>${ABREVIACOES_FAIXA}${items.some(ehCritica) ? '<br>Hachura: classe crítica' : ''}</p>`;
   }
   el.innerHTML = h;
   el.querySelectorAll<HTMLButtonElement>('li button').forEach((b) =>
@@ -463,14 +543,17 @@ const fitPad = () => {
   const ret = (s: string) => { const e = document.querySelector<HTMLElement>(s); return e && e.checkVisibility() ? e.getBoundingClientRect() : null; };
   const m = 12;
   const topo = Math.max(0, ...['#modes', '.topright', '#titlecard'].map((s) => ret(s)?.bottom ?? 0)) + m;
-  const esq = Math.max(0, ...['#tools', '#legend'].map((s) => ret(s)?.right ?? 0)) + m;
+  // a legenda recolhida muda de largura conforme as classes da vista (até 330 px): reserva o máximo
+  const leg = ret('#legend');
+  const esq = Math.max(0, ret('#tools')?.right ?? 0, leg ? Math.max(leg.right, leg.left + 330) : 0) + m;
   const dir = ret('#inspector'), uni = ret('#unicard');
   const direita = dir ? innerWidth - dir.left + m : 60;
-  const baixo = uni ? innerHeight - uni.top + m : 60;
+  // o unifilar pode ainda não ter a altura final no primeiro enquadramento: vale o maior entre o medido e a altura padrão (190 px), salvo recolhido
+  const baixo = uni ? Math.max(innerHeight - uni.top, E.uniCollapsed ? 0 : 204) + m : 60;
   const w = innerWidth, h = innerHeight;
-  // sem folga demais: sobra ao menos metade da tela para a rodovia
-  const f = Math.min(1, (w * 0.5) / Math.max(1, esq + direita), (h * 0.5) / Math.max(1, topo + baixo));
-  return { top: Math.round(topo * f), left: Math.round(esq * f), right: Math.round(direita * f), bottom: Math.round(baixo * f) };
+  // sem folga demais: sobra ao menos metade da tela para a rodovia (cada eixo com o seu fator)
+  const fx = Math.min(1, (w * 0.5) / Math.max(1, esq + direita)), fy = Math.min(1, (h * 0.5) / Math.max(1, topo + baixo));
+  return { top: Math.round(topo * fy), left: Math.round(esq * fx), right: Math.round(direita * fx), bottom: Math.round(baixo * fy) };
 };
 
 export function fitList(list: AppProj[], instant = false) {

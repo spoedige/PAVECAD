@@ -86,6 +86,8 @@ export const E = {
   anInd: 'iri' as IndKey,
   /** Modo privacidade: nomes, rodovias e km saem da tela e das exportações. Os dados guardados não mudam. */
   privacidade: false,
+  /** Padrão além da cor (hachura nas classes críticas). null = automático: ligado no modo campo. */
+  padrao: null as boolean | null,
   settingsPid: null as string | null,
   /** Planilhas marcadas na aba Ajustes: geometria e deslocamento valem para todas. */
   settingsSel: new Set<string>(),
@@ -119,6 +121,11 @@ export const projName = (p: Pick<AppProj, 'meta'>) => {
   }
   return p.meta.format === 'planservi' ? p.meta.name : `${p.meta.uf.split('/')[1] || p.meta.uf} ${short(p)}`;
 };
+
+/** Hachura ativa? A escolha explícita vale; sem escolha, liga junto com o modo campo. */
+export const padraoAtivo = () => E.padrao ?? E.field;
+/** O RP (vermelho crítico) tem hachura por padrão em todos os temas: a cor dele fica a menos de 15 de ΔE00 do REF em deuteranopia. Só some se o usuário desligar "Padrão além da cor". */
+export const hachuraRP = () => E.padrao ?? true;
 
 /** Nome da rodovia (ou do grupo) para exibir: "Rodovia A", "Rodovia B"... na ordem em que aparecem, no modo privacidade. */
 export function rodoviaNome(uf: string): string {

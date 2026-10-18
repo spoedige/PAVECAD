@@ -24,7 +24,7 @@ export const CATALOGO_PADRAO: ItemCatalogo[] = [
   item('FS4', 'Fresagem funcional 4 cm', 'Fres. funcional 4', '#0a84ff', '#0033b3', 'Fresagem'),
   item('FSE', 'Fresagem estrutural', 'Fres. estrutural', '#af52de', '#7b2fbe', 'Restauração'),
   item('MFS', 'Microfresagem', 'Microfresagem', '#30b0c7', '#00788f', 'Fresagem'),
-  item('RP', 'Reparo profundo', 'Reparo prof.', '#ff3b30', '#d0021b', 'Reparo'),
+  item('RP', 'Reparo profundo', 'Reparo prof.', '#e42e08', '#d0021b', 'Reparo'),
   item('REC', 'Reconstrução', 'Reconstrução', '#a2231d', '#6b0f0a', 'Restauração'),
   item('Micro', 'Microrrevestimento', 'Micro', '#ffcc00', '#e6a800', 'Revestimento fino'),
   item('GAP', 'Gap graded', 'Gap graded', '#ff9500', '#ff6a00', 'Reforço'),
@@ -39,7 +39,7 @@ export const CATALOGO_PADRAO: ItemCatalogo[] = [
   // Entradas novas, com cores que não existiam no catálogo.
   item('ST', 'Selagem de trincas', 'Selagem de trincas', '#a2845e', '#6f5a40', 'Reparo'),
   item('REF', 'Reforço (R e PMQ)', 'Reforço', '#8bc34a', '#4e7a1d', 'Reforço'),
-  item('VP', 'Ver projeto à parte', 'Ver projeto à parte', '#7d7aff', '#3b38c9', 'Outro'),
+  item('VP', 'Ver projeto à parte', 'Ver projeto à parte', '#ff7a9a', '#ad5369', 'Outro'),
 ];
 
 const copia = (l: ItemCatalogo[]) => l.map((x) => ({ ...x }));

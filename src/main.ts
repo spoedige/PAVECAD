@@ -135,6 +135,7 @@ if (import.meta.env.DEV) {
 async function boot() {
   try { E.field = localStorage.getItem('pavecad-field') === '1'; } catch { /* sem storage */ }
   try { E.privacidade = localStorage.getItem('pavecad-privacidade') === '1'; } catch { /* sem storage */ }
+  try { const v = localStorage.getItem('pavecad-padrao'); E.padrao = v === null ? null : v === '1'; } catch { /* sem storage */ }
   if (E.field) { document.documentElement.setAttribute('data-contrast', 'field'); $('#btnField').setAttribute('aria-pressed', 'true'); }
   await abrirDb();
   await carregarConfig();

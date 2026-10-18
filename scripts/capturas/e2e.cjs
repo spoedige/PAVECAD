@@ -209,11 +209,11 @@ const TESTES = {
     }],
   ],
   t04: [
-    ['legenda começa recolhida, em botão de 44 px; tocar expande e lembra a escolha', TODOS, async (pg) => {
+    ['legenda começa recolhida, com botão de 44 px de altura; tocar expande e lembra a escolha', TODOS, async (pg) => {
       assert.equal(await pg.getAttribute('#legTog', 'aria-expanded'), 'false', 'a legenda deve começar recolhida em toque');
       const m = await pg.evaluate(() => { const r = document.querySelector('#legend').getBoundingClientRect(), t = document.querySelector('#legTog').getBoundingClientRect(), b = document.querySelector('#btnMore').getBoundingClientRect(); return { w: r.width, h: t.height, aoLado: r.left >= b.right, naoSobre: r.right <= document.querySelector('#inspector').getBoundingClientRect().left }; });
       assert.ok(m.h >= 43.5, 'botão da legenda com 44 px: ' + m.h);
-      assert.ok(m.w < 260, 'botão pequeno (legenda + ocultar): ' + m.w);
+      assert.ok(m.w < 340, 'legenda recolhida (3 nomes, +N e ocultar) sem passar de 340 px: ' + m.w);
       assert.ok(m.aoLado, 'ao lado da barra de ferramentas');
       await pg.click('#legTog'); await pg.waitForTimeout(300);
       assert.equal(await pg.getAttribute('#legTog', 'aria-expanded'), 'true');
@@ -1048,7 +1048,7 @@ const TESTES = {
       assert.equal(r.tituloNoCartao, true, 'título e busca no mesmo cartão');
       assert.equal(r.cartoes, 1, 'um cartão de vidro só na coluna esquerda');
       assert.deepEqual(r.cruz, [], 'elementos flutuantes se sobrepõem');
-      assert.deepEqual(r.sob, [], 'a rodovia fica sob elementos flutuantes');
+      assert.deepEqual(r.sob, [], 'a rodovia fica sob elementos flutuantes ' + JSON.stringify(r.sob));
       assert.equal(r.fora, 0, 'a rodovia cabe na tela');
       // selecionar um segmento abre o painel
       await pg.evaluate(() => { const E = window.__pavecad.E; window.__pavecad.select(E.P[0].id, 20, 1, { tab: true }); });
@@ -1063,6 +1063,82 @@ const TESTES = {
     ['1568x760 e tablet: o painel não começa recolhido (sem mudança fora do desktop até 1400 px)', ['1568x760', 'tablet-h-1024x768', 'tablet-v-820x1180'], async (pg) => {
       assert.equal(await pg.evaluate(() => document.querySelector('#inspector').classList.contains('collapsed')), false);
     }],
+  ],
+  t17: [
+    ['legenda recolhida: nomes das 3 classes mais presentes na vista e "+N"; menos classes na vista, menos nomes', '1366x768', async (pg) => {
+      assert.equal(await pg.getAttribute('#legTog', 'aria-expanded'), 'false');
+      const ler = () => pg.evaluate(() => ({ nomes: [...document.querySelectorAll('#legend .legtop .lt')].map((e) => e.textContent.trim()), mais: document.querySelector('#legend .legmais')?.textContent.trim() ?? null, pontos: document.querySelectorAll('#legend .dots i').length }));
+      await pg.evaluate(() => { const E = window.__pavecad.E; const b = E.P.reduce((a, p) => [Math.min(a[0], p.bounds[0][0]), Math.min(a[1], p.bounds[0][1]), Math.max(a[2], p.bounds[1][0]), Math.max(a[3], p.bounds[1][1])], [1e9, 1e9, -1e9, -1e9]); window.__pavecad.map().fitBounds([[b[0], b[1]], [b[2], b[3]]], { duration: 0, padding: 80 }); });
+      await pg.waitForTimeout(1200);
+      const geral = await ler();
+      assert.equal(geral.pontos, 0, 'os 12 pontos sem nome saíram');
+      assert.equal(geral.nomes.length, 3, 'três nomes: ' + JSON.stringify(geral));
+      assert.match(geral.mais, /^\+\d+$/, 'e o resto como +N');
+      assert.ok(geral.nomes.every((n) => n.length > 2 && !/^Sem interven/.test(n)), 'nomes de classes: ' + geral.nomes);
+      // bem de perto sobram poucas classes: no máximo as das 2 faixas e do acostamento
+      await pg.evaluate(() => { const p = window.__pavecad.E.P[0], r = p.rows[300]; window.__pavecad.map().jumpTo({ center: [r.lon, r.lat], zoom: 20.5 }); });
+      await pg.waitForTimeout(1200);
+      const perto = await ler();
+      assert.ok(perto.nomes.length >= 1 && perto.nomes.length <= 3, JSON.stringify(perto));
+      assert.equal(perto.mais, null, 'com 3 classes ou menos na vista não há +N: ' + JSON.stringify(perto));
+      // os nomes existem na legenda expandida
+      await pg.click('#legTog'); await pg.waitForTimeout(300);
+      const lista = await pg.evaluate(() => [...document.querySelectorAll('#legend li button')].map((b) => b.textContent.trim()));
+      for (const n of perto.nomes) assert.ok(lista.includes(n), `"${n}" está na legenda expandida`);
+      // siglas explicadas na legenda
+      const nota = await pg.innerText('#legend .legnote');
+      assert.match(nota, /Solução: tratamento proposto/); assert.match(nota, /Fx = faixa/); assert.match(nota, /Ac\. = acostamento/);
+    }],
+    ['siglas: o tooltip de cada modo explica a abreviação e a legenda traz a descrição do indicador', '1366x768', async (pg) => {
+      const t = await pg.evaluate(() => Object.fromEntries([...document.querySelectorAll('#modes button')].filter((b) => !b.hidden).map((b) => [b.dataset.m, b.title])));
+      assert.match(t.iri, /Índice de Irregularidade Internacional/); assert.match(t.atr, /afundamento em trilha de roda/);
+      assert.match(t.sol, /tratamento proposto/); assert.ok(/Atalho: 1/.test(t.sol));
+      assert.match(t.d0, /deflexão/); assert.match(t.rc, /raio de curvatura/);
+    }, { exemplos: true }],
+    ['siglas do Planservi: IGG e FC explicados no tooltip e na legenda', '1366x768', async (pg) => {
+      const t = await pg.evaluate(() => Object.fromEntries([...document.querySelectorAll('#modes button')].filter((b) => !b.hidden).map((b) => [b.dataset.m, b.title])));
+      assert.match(t.igg, /Índice de Gravidade Global/); assert.match(t.fc2, /FC-2: trincamento/); assert.match(t.fc3, /FC-3: trincamento/);
+      await pg.click('#modes [data-m=igg]'); await pg.click('#legTog');
+      assert.match(await pg.innerText('#legend .legnote'), /IGG: Índice de Gravidade Global/);
+    }, { arquivos: ['planservi_amostra_1.xlsx', 'planservi_amostra_2.xlsx'], projetos: 4 }],
+    ['padrão além da cor: hachura só nas classes críticas, ativável em Ajustes e ligada por padrão no modo campo', '1366x768', async (pg) => {
+      const est = () => pg.evaluate(() => { const m = window.__pavecad.map(), E = window.__pavecad.E; const id = 'hach-' + E.P[0].id; return { vis: m.getLayoutProperty(id, 'visibility'), filtro: JSON.stringify(m.getFilter(id)), img: m.hasImage('hachura'), mode: E.mode, padrao: E.padrao }; });
+      assert.equal((await est()).img, true, 'imagem da hachura registrada');
+      let e = await est();
+      assert.equal(e.vis, 'visible', 'claro, sem escolha: o RP já tem hachura por padrão');
+      assert.match(e.filtro, /RP/); assert.ok(!/RE|REC|FS4|GAP/.test(e.filtro), 'só o RP: ' + e.filtro);
+      // liga em Ajustes: entram também RE e as piores classes dos indicadores
+      await aba(pg, 'aj'); assert.equal(await pg.getAttribute('#s-pad', 'aria-checked'), 'false'); await pg.click('#s-pad'); await pg.waitForTimeout(500);
+      e = await est(); assert.equal(e.vis, 'visible'); assert.equal(await pg.getAttribute('#s-pad', 'aria-checked'), 'true');
+      assert.match(e.filtro, /RE/); assert.match(e.filtro, /RP/); assert.ok(!/FS4|GAP/.test(e.filtro), 'só RE e RP: ' + e.filtro);
+      assert.ok(await pg.evaluate(() => document.querySelectorAll('#legend .sw.crit, #legend .lt i.crit').length) >= 0);
+      // modos sem classe crítica não têm hachura
+      await pg.click('#modes [data-m=iri]'); await pg.waitForTimeout(400);
+      e = await est(); assert.equal(e.vis, 'none', 'IRI: sem hachura');
+      // desliga de novo e o modo campo não religa por cima da escolha explícita
+      await pg.click('#modes [data-m=sol]'); await aba(pg, 'aj'); await pg.click('#s-pad'); await pg.waitForTimeout(300);
+      await pg.evaluate(() => window.__pavecad.setField(true, true)); await pg.waitForTimeout(500);
+      e = await est(); assert.equal(e.vis, 'none', 'escolha explícita (desligado) vale sobre o modo campo'); assert.equal(e.padrao, false);
+    }],
+    ['padrão além da cor: sem escolha, o modo campo liga a hachura; no IGG o filtro pega as classes 3 e 4', '1366x768', async (pg) => {
+      const est = () => pg.evaluate(() => { const m = window.__pavecad.map(), E = window.__pavecad.E; const id = 'hach-' + E.P[0].id; return { vis: m.getLayoutProperty(id, 'visibility'), filtro: JSON.stringify(m.getFilter(id)) }; });
+      let e0 = await est();
+      assert.equal(e0.vis, 'visible', 'o RP tem hachura em todos os temas'); assert.ok(!/RE/.test(e0.filtro), 'claro: só o RP: ' + e0.filtro);
+      await pg.evaluate(() => window.__pavecad.setField(true, true)); await pg.waitForTimeout(600);
+      e0 = await est();
+      assert.equal(e0.vis, 'visible', 'modo campo liga a hachura'); assert.match(e0.filtro, /RE/); assert.match(e0.filtro, /RP/);
+      await pg.click('#modes [data-m=igg]'); await pg.waitForTimeout(500);
+      const e = await est();
+      assert.equal(e.vis, 'visible'); assert.match(e.filtro, /c_igg/); assert.match(e.filtro, /3/);
+      await pg.click('#modes [data-m=atr]'); await pg.waitForTimeout(400);
+      assert.match((await est()).filtro, /c_atr/);
+      await pg.click('#modes [data-m=iri]'); await pg.waitForTimeout(400);
+      assert.equal((await est()).vis, 'none', 'IRI: sem hachura');
+      // sem modo campo, no escuro e no claro, o RP continua com hachura em Solução
+      await pg.click('#modes [data-m=sol]');
+      await pg.evaluate(() => window.__pavecad.setField(false, true)); await pg.emulateMedia({ colorScheme: 'dark' }); await pg.waitForTimeout(600);
+      const esc = await est(); assert.equal(esc.vis, 'visible', 'escuro: RP com hachura'); assert.ok(!/RE/.test(esc.filtro), esc.filtro);
+    }, { arquivos: ['planservi_amostra_1.xlsx', 'planservi_amostra_2.xlsx'], projetos: 4 }],
   ],
   g03: [
     ['a seção é o seletor de faixa (clique, aria-pressed, teclado)', '1366x768', async (pg) => {

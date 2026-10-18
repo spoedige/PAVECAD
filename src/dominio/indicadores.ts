@@ -112,6 +112,27 @@ export const IND: Record<IndKey, Indicador> = {
 
 export const IND_KEYS = Object.keys(IND) as IndKey[];
 
+/** O que cada sigla quer dizer, para o tooltip dos modos e para a legenda. */
+export const DESCRICAO_MODO: Record<ModeKey, string> = {
+  sol: 'Solução: tratamento proposto em cada faixa',
+  iri: 'IRI: Índice de Irregularidade Internacional (m/km)',
+  atr: 'ATR: afundamento em trilha de roda, máximo (mm)',
+  d0: 'D0: deflexão máxima no ponto de carga (0,01 mm)',
+  rc: 'Rc: raio de curvatura da bacia de deflexão (m)',
+  def: 'Defeitos: percentual da área com defeitos de superfície',
+  igg: 'IGG: Índice de Gravidade Global do pavimento',
+  fc2: 'FC-2: trincamento de classe 2 (% da área)',
+  fc3: 'FC-3: trincamento de classe 3 (% da área)',
+};
+export const ABREVIACOES_FAIXA = 'Fx = faixa · Ac. = acostamento';
+
+/** Indicadores em que as piores classes recebem hachura (padrão além da cor). */
+export const INDICADORES_CRITICOS: IndKey[] = ['igg', 'fc2', 'fc3', 'atr'];
+/** A partir desta classe (0 a 4, da melhor para a pior) o indicador é crítico. */
+export const CLASSE_CRITICA = 3;
+/** Soluções críticas (hachura no modo Solução). */
+export const SOLUCOES_CRITICAS = ['RE', 'RP'];
+
 /** Classes pré-calculadas de uma faixa: troca de modo de cor só troca a expressão de pintura. */
 export function classProps(l: Lane): Record<string, number> {
   const o: Record<string, number> = {};

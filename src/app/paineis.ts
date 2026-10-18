@@ -1,10 +1,10 @@
 import { criticos, matriz, resumo, violacoes, REGRAS } from '../dominio/analise';
-import { IND, indicadoresComDados, MODE_KEYS, Q5, Q5F, type IndKey, type ModeKey } from '../dominio/indicadores';
+import { DESCRICAO_MODO, IND, indicadoresComDados, MODE_KEYS, Q5, Q5F, type IndKey, type ModeKey } from '../dominio/indicadores';
 import { descreverCamada } from '../formats/planservi';
 import { trColor, trLabel, trOrder } from '../dominio/solucoes';
 import { edgesOf } from '../geometry/build';
 import { tituloDe } from '../dominio/titulo';
-import { atualizarRotulosKm, E, getP, kmVis, projName, rodoviaNome, visibleProjects, type AppProj } from './estado';
+import { atualizarRotulosKm, E, getP, kmVis, padraoAtivo, projName, rodoviaNome, visibleProjects, type AppProj } from './estado';
 import { abrirLidas, regeometrar, removerProjeto } from './projetos';
 import { abrirAlinhar, aoSairDeAlinhar, renderAlinhar } from './alinhar';
 import { contadorSelecao, htmlSelecao, itemDe, ligarSelecao } from './selecaoPlanilhas';
@@ -53,7 +53,7 @@ export function renderModes() {
   document.querySelectorAll<HTMLButtonElement>('#modes button').forEach((b) => {
     const k = b.dataset.m as ModeKey, i = vis.indexOf(k);
     b.hidden = i < 0;
-    if (i >= 0) b.title = `Atalho: ${i + 1}`;
+    if (i >= 0) b.title = `${DESCRICAO_MODO[k]}. Atalho: ${i + 1}`;
   });
   if (!vis.includes(E.mode)) setMode('sol', true);
   syncSeg($('#modes'));
@@ -364,6 +364,7 @@ export function renderAj() {
       ${p.log.length && E.privacidade ? '<p class="note" style="margin-top:8px">Log de importação oculto no modo privacidade: traz km e nomes.</p>' : p.log.length ? `<details style="margin-top:8px"><summary>Log de importação (${p.log.length})</summary><div class="formula">${p.log.map((l) => `${l.level === 'warn' ? '! ' : '· '}${esc(l.msg)}`).join('\n')}</div></details>` : ''}</div>` : '';
   el.innerHTML = `
     <div><div class="sect">Aparência</div><div class="list">
+      <div class="field"><div><div>Padrão além da cor</div><div class="note">Hachura nas classes críticas (RE, RP e as piores de IGG, FC e ATR). Liga sozinho no modo campo. O RP sempre tem hachura, até você desligar aqui</div></div><button class="sw2" id="s-pad" role="switch" aria-checked="${padraoAtivo()}" aria-label="Padrão além da cor"></button></div>
       <div class="field"><div><div>Modo privacidade</div><div class="note">Oculta nomes de planilha, rodovia e km na tela e nas exportações. Os dados no aparelho não mudam</div></div><button class="sw2" id="s-priv" role="switch" aria-checked="${E.privacidade}" aria-label="Modo privacidade"></button></div>
       <div class="field"><div><div>Modo campo (sol)</div><div class="note">Contraste máximo, cores fortes, alvos de toque maiores</div></div><button class="sw2" id="s-field" role="switch" aria-checked="${E.field}" aria-label="Modo campo"></button></div></div></div>
     <div><div class="sect">Camadas</div><div class="list">
@@ -410,6 +411,13 @@ P(n) = P + e(n) · (nE , nN)</div>
   bs.onchange = () => { setBase(bs.value as typeof E.base); syncBaseSeg(); };
   $('#s-field').onclick = () => setField(!E.field);
   $('#s-priv').onclick = () => setPrivacidade(!E.privacidade);
+  $('#s-pad').onclick = () => {
+    E.padrao = !padraoAtivo();
+    try { localStorage.setItem('pavecad-padrao', E.padrao ? '1' : '0'); } catch { /* sem storage */ }
+    $('#s-pad').setAttribute('aria-checked', String(E.padrao));
+    applyPaint();
+    renderLegend();
+  };
   el.querySelectorAll<HTMLElement>('[data-layer]').forEach((b) => (b.onclick = () => {
     const k = b.dataset.layer as keyof typeof E.layers;
     E.layers[k] = !E.layers[k];
