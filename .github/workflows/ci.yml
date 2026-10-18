@@ -42,6 +42,9 @@ jobs:
       - name: Instalar só as dependências do sistema (Chromium veio do cache)
         if: steps.cache-pw.outputs.cache-hit == 'true'
         run: npx playwright install-deps chromium
+      # O layout é medido com a fonte do desenho (Inter). Sem ela o runner cai numa fonte mais larga e os testes de largura falham.
+      - name: Fonte Inter
+        run: sudo apt-get install -y --no-install-recommends fonts-inter && fc-list | grep -ci inter
       - name: Subir o servidor de desenvolvimento
         run: |
           npm run dev -- --port 5199 --strictPort > dev.log 2>&1 &
