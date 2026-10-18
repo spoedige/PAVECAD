@@ -1709,6 +1709,8 @@ const TESTES = {
         } catch (e) {
           falhas++;
           console.log(`FALHA ${g}: ${rotulo}\n     ${String(e.message).split('\n').slice(0, 4).join('\n     ')}`);
+          // no GitHub Actions a falha vira annotation (legível pela API mesmo quando o log do job não é)
+          if (process.env.GITHUB_ACTIONS) console.log(`::error title=e2e ${g}::${rotulo} | ${String(e.message).split('\n').slice(0, 3).join(' / ').replace(/%/g, '%25')}`);
         }
         await ctx.close();
       }
