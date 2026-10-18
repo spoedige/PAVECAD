@@ -132,6 +132,35 @@ export function descreverCamada(valor: string | number | null | undefined, camad
   return nomes[t.toUpperCase()] ? `${t} · ${nomes[t.toUpperCase()]}` : t;
 }
 
+/** Significado curto de um código de camada, para o tooltip: "Reforço estrutural de 2,5 cm". Vazio quando não há descrição. */
+export function significado(valor: string | number | null | undefined): string {
+  if (valor === null || valor === undefined || valor === '' || valor === '-') return '';
+  if (valor === '*') return 'Ver projeto à parte';
+  const t = String(valor).trim(), n = (x: string) => x.replace('.', ',');
+  let m = /^F(\d+(?:[.,]\d+)?)R(\d+(?:[.,]\d+)?)$/i.exec(t);
+  if (m) return `Fresagem de ${n(m[1])} cm e recomposição de ${n(m[2])} cm`;
+  m = /^(?:PMQ|R)\s*(\d+(?:[.,]\d+)?)$/i.exec(t);
+  if (m) return `Reforço estrutural de ${n(m[1])} cm`;
+  const nomes: Record<string, string> = { ST: 'Selagem de trincas', MF: 'Microfresagem', RE: 'Reconstrução', RP: 'Reparo profundo' };
+  return nomes[t.toUpperCase()] ?? '';
+}
+
+/** Uma linha por camada com intervenção, no formato "REF · PMQ2,5 (Reforço estrutural de 2,5 cm)": classe, código da planilha e significado.
+ *  Só o Planservi guarda o código por camada; nos outros formatos a lista vem vazia. */
+export function codigosOriginais(r: Row, lane: number): string[] {
+  const peca = (bruto: string | null | undefined, camada: CamadaKey): string | null => {
+    const c = classificar(bruto ?? null, camada);
+    if (!c) return null;
+    const sig = significado(bruto), orig = String(bruto).trim();
+    const cod = bruto === '*' ? orig : orig.toUpperCase() === c.code ? orig : `${c.code} · ${orig}`;
+    return sig && bruto !== '*' ? `${cod} (${sig})` : cod;
+  };
+  if (!lane) return [peca(r.shoulderRaw, 'rev')].filter((x): x is string => !!x);
+  const cams = r.lanes[lane - 1]?.camadas;
+  if (!cams) return [];
+  return cams.map((c, i) => peca(c.bruto, CAMADAS[i]?.key ?? 'rev')).filter((x): x is string => !!x);
+}
+
 /** Espessuras (cm) lidas do número do código. F4R10: fresagem 4 e recomposição 10. R2,5 e PMQ3,0: reforço. */
 export function espessuras(valor: string): { fresagem?: number; recomposicao?: number; reforco?: number } {
   const n = (s: string) => Number(s.replace(',', '.'));

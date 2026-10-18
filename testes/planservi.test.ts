@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { FORMATS, parseSpreadsheetAll, readWorkbook } from '../src/formats';
-import { CAMADAS, classificar, descreverCamada, espessuras, maisForte, mapearCabecalhos, qualidade } from '../src/formats/planservi';
+import { CAMADAS, classificar, codigosOriginais, descreverCamada, espessuras, maisForte, mapearCabecalhos, qualidade, significado } from '../src/formats/planservi';
 import { conhecido } from '../src/dominio/catalogo';
 import { indicadoresComDados } from '../src/dominio/indicadores';
 import { distM } from '../src/dominio/medidas';
@@ -232,5 +232,30 @@ describe('regras de camada', () => {
   });
   it('cabeçalho ausente dá erro com o que faltou', () => {
     expect(() => mapearCabecalhos([[], [], [], [], [], ['Segmento'], []])).toThrow(/não encontrados/);
+  });
+});
+
+describe('tooltip: código original e significado por camada', () => {
+  it('Reforço mostra a classe, o código da planilha e o significado; fresagem não repete o código', () => {
+    const [cres] = parseSpreadsheetAll(bytes(A));
+    const ver = new Set<string>();
+    for (const r of cres.rows) for (const lane of [0, 1, 2]) for (const l of codigosOriginais(r, lane)) ver.add(l);
+    const todas = [...ver];
+    expect(todas.some((l) => /^REF · PMQ\d/.test(l) && /\(Reforço estrutural de \d/.test(l))).toBe(true);
+    expect(todas.some((l) => /^F\dR\d/.test(l) && /\(Fresagem de \d+ cm e recomposição de \d+ cm\)/.test(l) && !/ · /.test(l))).toBe(true);
+  });
+  it('significado dos códigos conhecidos', () => {
+    expect(significado('PMQ2,5')).toBe('Reforço estrutural de 2,5 cm');
+    expect(significado('R4,0')).toBe('Reforço estrutural de 4,0 cm');
+    expect(significado('F4R8')).toBe('Fresagem de 4 cm e recomposição de 8 cm');
+    expect(significado('mf')).toBe('Microfresagem');
+    expect(significado('-')).toBe('');
+  });
+  it('mais de uma camada vira mais de uma linha; sem intervenção, nenhuma', () => {
+    const base = { camadas: [{ nome: 'Estrutural', bruto: null, texto: '' }, { nome: 'Fresagem', bruto: 'F4R4', texto: '' }, { nome: 'Funcional', bruto: 'MF', texto: '' }, { nome: 'Revestimento', bruto: 'PMQ2,5', texto: '' }] };
+    const row = { shoulderRaw: 'R4,0', lanes: [base, { camadas: [{ nome: 'Estrutural', bruto: '1', texto: '' }, { nome: 'F', bruto: '-', texto: '' }, { nome: 'Fu', bruto: null, texto: '' }, { nome: 'R', bruto: '-', texto: '' }] }] } as never;
+    expect(codigosOriginais(row, 1)).toEqual(['F4R4 (Fresagem de 4 cm e recomposição de 4 cm)', 'MF (Microfresagem)', 'REF · PMQ2,5 (Reforço estrutural de 2,5 cm)']);
+    expect(codigosOriginais(row, 2)).toEqual([]);
+    expect(codigosOriginais(row, 0)).toEqual(['REF · R4,0 (Reforço estrutural de 4,0 cm)']);
   });
 });

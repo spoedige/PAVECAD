@@ -6,6 +6,7 @@ import { ABREVIACOES_FAIXA, CLASSE_CRITICA, DESCRICAO_MODO, IND, INDICADORES_CRI
 import { trColor, trLabel, trOrder, trShort } from '../dominio/solucoes';
 import type { Nota } from './estado';
 import { parseKmTexto } from '../formats/km';
+import { codigosOriginais } from '../formats/planservi';
 import { baseSources, CHAVE_NITIDEZ, MAP_MAX_ZOOM, nitidezSalva, recarregarEsri, type Nitidez } from '../mapa/base';
 import { agendarRotulos, PRIO, prioDeEstaca, resolverRotulos } from './rotulos';
 import { E, H, NOTE_CATS, getP, kmFmt, kmReal, padraoAtivo, padraoDosPares, projName, visibleProjects, type AppProj, type FocoPred } from './estado';
@@ -495,15 +496,16 @@ function tipHtml(h: Exclude<Hit, { note: Nota }>): string {
     return `<b>Dreno tipo ${esc(t)}</b> <span>· ${(r1 - r0 + 1) * 20} m · lado ${p.opts.drainSide === 'in' ? 'interno' : 'externo'}</span><br>km ${p.kmLab[r0]} a ${kmFmt(p.kmNum[r1] + 0.02)}${multi ? ' · ' + esc(projName(p)) : ''}`;
   }
   const { p, row, lane } = h, L = lane ? p.rows[row].lanes[lane - 1] : null;
-  let l2: string;
+  let l2: string[];
   if (E.mode === 'sol') {
     const t = lane ? p.model[row].tr[lane - 1] : p.model[row].sh;
-    l2 = t?.code || 'Sem intervenção';
+    l2 = codigosOriginais(p.rows[row], lane);
+    if (!l2.length) l2 = [t?.code || 'Sem intervenção'];
   } else {
     const M = slot(E.mode)!, v = L ? M.value(L) : null;
-    l2 = v == null ? 'Sem leitura' : `${M.label} ${fmt(v * M.scale, M.dec)} ${M.unit}`;
+    l2 = [v == null ? 'Sem leitura' : `${M.label} ${fmt(v * M.scale, M.dec)} ${M.unit}`];
   }
-  return `<b>km ${p.kmLab[row]}</b> <span>· ${lane ? 'Faixa ' + lane : 'Acostamento'}${multi ? ' · ' + esc(projName(p)) : ''}</span><br>${esc(l2)}`;
+  return `<b>km ${p.kmLab[row]}</b> <span>· ${lane ? 'Faixa ' + lane : 'Acostamento'}${multi ? ' · ' + esc(projName(p)) : ''}</span>${l2.map((x) => '<br>' + esc(x)).join('')}`;
 }
 
 export function select(pid: string, row: number, lane: number, opt: { pan?: boolean; tab?: boolean } = {}) {
