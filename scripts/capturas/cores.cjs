@@ -78,8 +78,11 @@ function cenaPlanservi() {
         if (await pg.getAttribute('#legTog', 'aria-expanded') !== 'true') await pg.click('#legTog');
         await pg.waitForTimeout(500);
         const nome = `${versao}_${cena}${cena === 'A' ? k : ''}_${t}`;
-        await pg.screenshot({ path: path.join(pasta, nome + '.png') });
         await pg.locator('#legend').screenshot({ path: path.join(pasta, nome + '_leg.png') });
+        // mapa limpo: sem cartões por cima da via
+        await pg.evaluate(() => document.documentElement.classList.add('limpo')); await pg.waitForTimeout(500);
+        await pg.screenshot({ path: path.join(pasta, nome + '.png') });
+        await pg.evaluate(() => document.documentElement.classList.remove('limpo'));
       }
       await ctx.close();
       console.log(`${versao} ${cena} ${t}`);

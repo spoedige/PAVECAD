@@ -21,7 +21,7 @@ def sim(im, m):
     a = lin(np.asarray(im.convert('RGB'), dtype=float)) @ m.T
     return Image.fromarray(gam(a).round().astype('uint8'))
 
-CW, CH = 1000, 150
+CW, CH = 1000, 120
 TOMADAS = [('A1', 'Planservi sintético, trecho 1'), ('A2', 'Planservi sintético, trecho 2'), ('B', 'RoadRunner (GO anonimizado)')]
 for tema in ['claro', 'escuro', 'campo']:
     linhas = []
