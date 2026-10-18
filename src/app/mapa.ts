@@ -2,13 +2,13 @@ import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import type { GeoJSONSource, MapMouseEvent, PointLike } from 'maplibre-gl';
 import { edgesOf, offsetLL } from '../geometry/build';
-import { ABREVIACOES_FAIXA, CLASSE_CRITICA, DESCRICAO_MODO, IND, INDICADORES_CRITICOS, Q5, Q5F, SOLUCOES_CRITICAS, type IndKey } from '../dominio/indicadores';
+import { ABREVIACOES_FAIXA, CLASSE_CRITICA, DESCRICAO_MODO, IND, INDICADORES_CRITICOS, PADRAO_DE_PAR, Q5, Q5F, SOLUCOES_CRITICAS, type IndKey } from '../dominio/indicadores';
 import { trColor, trLabel, trOrder, trShort } from '../dominio/solucoes';
 import type { Nota } from './estado';
 import { parseKmTexto } from '../formats/km';
 import { baseSources, CHAVE_NITIDEZ, MAP_MAX_ZOOM, nitidezSalva, recarregarEsri, type Nitidez } from '../mapa/base';
 import { agendarRotulos, PRIO, prioDeEstaca, resolverRotulos } from './rotulos';
-import { E, H, NOTE_CATS, getP, kmFmt, kmReal, hachuraRP, padraoAtivo, projName, visibleProjects, type AppProj, type FocoPred } from './estado';
+import { E, H, NOTE_CATS, getP, kmFmt, kmReal, padraoAtivo, padraoDosPares, projName, visibleProjects, type AppProj, type FocoPred } from './estado';
 import { $, cssv, esc, fmt, syncSeg, toast } from './ui';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -55,7 +55,7 @@ export function initMap(onReady: () => void) {
   zh.appendChild(new maplibregl.ScaleControl({ unit: 'metric' }).onAdd(map));
 
   map.on('load', () => {
-    map.addImage('hachura', criarHachura(), { pixelRatio: 2 });
+    for (const [nome, tipo] of [['hachura', 'diag'], ['hpontos', 'pontos'], ['hlinhas', 'linhas']] as const) map.addImage(nome, criarHachura(tipo), { pixelRatio: 2 });
     const offs: Expr = ['interpolate', ['linear'], ['zoom'], 9, ['*', ['get', 'k'], 2.7], 15, ['*', ['get', 'k'], 0.4], 16.2, 0];
     map.addSource('sel', { type: 'geojson', data: EMPTY });
     map.addLayer({ id: 'sel-halo', type: 'line', source: 'sel', filter: ['==', ['get', 'kind'], 'poly'], paint: { 'line-color': '#07f', 'line-opacity': 0.25, 'line-width': ['interpolate', ['linear'], ['zoom'], 14, 6, 18, 10], 'line-blur': 3 } });
@@ -156,8 +156,8 @@ export function addProjectToMap(p: AppProj) {
   map.addSource('drain-' + id, { type: 'geojson', data: p.camadas.drains as Expr });
   map.addLayer({ id: 'lines-' + id, type: 'line', source: 'lines-' + id, maxzoom: 16.7, layout: { 'line-cap': 'butt' }, paint: { 'line-width': 2.4, 'line-offset': offs, 'line-color': '#888' } }, before);
   map.addLayer({ id: 'poly-' + id, type: 'fill', source: 'poly-' + id, minzoom: 14, paint: { 'fill-color': '#888', 'fill-opacity': 0.9 } }, before);
-  // hachura nas classes críticas (padrão além da cor); o filtro e a visibilidade vêm de paintProject
-  map.addLayer({ id: 'hach-' + id, type: 'fill', source: 'poly-' + id, minzoom: 15.2, filter: ['==', ['get', 'fid'], -1], layout: { visibility: 'none' }, paint: { 'fill-pattern': 'hachura', 'fill-opacity': ['interpolate', ['linear'], ['zoom'], 15.2, 0, 16.6, 0.9] } }, before);
+  // padrões além da cor: diagonal (classes críticas e RP), pontos (GAP) e linhas (Micro); o filtro e a visibilidade vêm de paintProject
+  for (const [pre, img] of PADROES_CAMADAS) map.addLayer({ id: pre + id, type: 'fill', source: 'poly-' + id, minzoom: 15.2, filter: ['==', ['get', 'fid'], -1], layout: { visibility: 'none' }, paint: { 'fill-pattern': img, 'fill-opacity': ['interpolate', ['linear'], ['zoom'], 15.2, 0, 16.6, 0.9] } }, before);
   map.addLayer({ id: 'pline-' + id, type: 'line', source: 'poly-' + id, minzoom: 16, filter: ['==', ['geometry-type'], 'Polygon'], paint: { 'line-color': '#000', 'line-width': 0.8 } }, before);
   // polígono que falhou na validação (curto, cruzado): só a linha central do segmento
   map.addLayer({ id: 'cline-' + id, type: 'line', source: 'poly-' + id, minzoom: 14, filter: ['==', ['geometry-type'], 'LineString'], layout: { 'line-cap': 'butt' }, paint: { 'line-color': '#888', 'line-width': 3 } }, before);
@@ -177,7 +177,7 @@ export function setProjectData(p: AppProj) {
 }
 
 export function removeProjectFromMap(p: AppProj) {
-  for (const l of ['lines-', 'poly-', 'hach-', 'pline-', 'cline-', 'drainR-', 'drainP-']) if (map.getLayer(l + p.id)) map.removeLayer(l + p.id);
+  for (const l of ['lines-', 'poly-', 'hach-', 'hpon-', 'hlin-', 'pline-', 'cline-', 'drainR-', 'drainP-']) if (map.getLayer(l + p.id)) map.removeLayer(l + p.id);
   for (const s of ['poly-', 'lines-', 'drain-']) if (map.getSource(s + p.id)) map.removeSource(s + p.id);
   p.markers.forEach((m) => m.remove());
   p.markers = [];
@@ -252,37 +252,56 @@ function dimCond(): Expr | null {
   return ['in', ['to-number', ['get', slot(E.mode)!.prop], -1], ['literal', [...E.dim].map(Number)]];
 }
 
-/** Hachura diagonal de duas cores (preta e branca translúcidas): aparece sobre qualquer cor de classe, no claro e no escuro. */
-function criarHachura(): ImageData {
+/** Camadas de padrão por projeto: prefixo do id e imagem usada. */
+const PADROES_CAMADAS = [['hach-', 'hachura'], ['hpon-', 'hpontos'], ['hlin-', 'hlinhas']] as const;
+
+/** Padrão de duas cores (preta e branca translúcidas): aparece sobre qualquer cor de classe, no claro e no escuro. */
+function criarHachura(tipo: 'diag' | 'pontos' | 'linhas'): ImageData {
   const n = 16, c = document.createElement('canvas');
   c.width = n; c.height = n;
   const g = c.getContext('2d')!;
   g.clearRect(0, 0, n, n);
-  g.lineWidth = 2.2;
-  for (const [cor, d] of [['rgba(0,0,0,.62)', 0], ['rgba(255,255,255,.7)', 3]] as const) {
-    g.strokeStyle = cor;
-    for (let k = -n; k <= n * 2; k += 8) { g.beginPath(); g.moveTo(k + d, n); g.lineTo(k + d + n, 0); g.stroke(); }
+  const cores = ['rgba(0,0,0,.62)', 'rgba(255,255,255,.7)'];
+  if (tipo === 'diag') {
+    g.lineWidth = 2.2;
+    cores.forEach((cor, i) => { g.strokeStyle = cor; for (let k = -n; k <= n * 2; k += 8) { g.beginPath(); g.moveTo(k + i * 3, n); g.lineTo(k + i * 3 + n, 0); g.stroke(); } });
+  } else if (tipo === 'linhas') {
+    g.lineWidth = 2;
+    cores.forEach((cor, i) => { g.strokeStyle = cor; for (let y = 1 + i * 3; y < n; y += 8) { g.beginPath(); g.moveTo(0, y); g.lineTo(n, y); g.stroke(); } });
+  } else {
+    cores.forEach((cor, i) => { g.fillStyle = cor; for (let x = 2 + i * 4; x < n; x += 8) for (let y = 2 + i * 4; y < n; y += 8) { g.beginPath(); g.arc(x, y, 1.7, 0, Math.PI * 2); g.fill(); } });
   }
   return g.getImageData(0, 0, n, n);
 }
 
-/** Classes críticas do modo atual: RE e RP em Solução; as piores classes de IGG, FC e ATR. Os demais modos não têm hachura. */
-/** Soluções com hachura agora: com "Padrão além da cor" ligado, todas as críticas; sem escolha, só o RP. */
-export const solucoesComHachura = () => (padraoAtivo() ? SOLUCOES_CRITICAS : hachuraRP() ? ['RP'] : []);
+/** Soluções com cada padrão agora. Com "Padrão além da cor" ligado, diagonal em todas as críticas; sem escolha, só o RP (e GAP e Micro
+ *  com pontos e linhas): o padrão dessas três separa as cores que o daltonismo confunde. */
+export function solucoesPorPadrao(): { diag: string[]; pontos: string[]; linhas: string[] } {
+  const pares = padraoDosPares();
+  const de = (t: 'pontos' | 'linhas') => (pares ? Object.keys(PADRAO_DE_PAR).filter((k) => PADRAO_DE_PAR[k] === t) : []);
+  return { diag: padraoAtivo() ? SOLUCOES_CRITICAS : pares ? ['RP'] : [], pontos: de('pontos'), linhas: de('linhas') };
+}
+export const solucoesComHachura = () => { const s = solucoesPorPadrao(); return [...s.diag, ...s.pontos, ...s.linhas]; };
 
-export function criticasDoModo(): Expr | null {
-  if (E.mode === 'sol') { const c = solucoesComHachura(); return c.length ? ['in', ['get', 'main'], ['literal', c]] : null; }
-  if (padraoAtivo() && INDICADORES_CRITICOS.includes(E.mode as IndKey)) return ['>=', ['to-number', ['get', IND[E.mode as IndKey].prop], -1], CLASSE_CRITICA];
-  return null;
+/** Filtros das três camadas de padrão no modo atual (nulo = camada escondida). */
+export function filtrosDoModo(): { hach: Expr | null; hpon: Expr | null; hlin: Expr | null } {
+  const lista = (c: string[]): Expr | null => (c.length ? ['in', ['get', 'main'], ['literal', c]] : null);
+  if (E.mode === 'sol') { const s = solucoesPorPadrao(); return { hach: lista(s.diag), hpon: lista(s.pontos), hlin: lista(s.linhas) }; }
+  const crit = padraoAtivo() && INDICADORES_CRITICOS.includes(E.mode as IndKey) ? (['>=', ['to-number', ['get', IND[E.mode as IndKey].prop], -1], CLASSE_CRITICA] as Expr) : null;
+  return { hach: crit, hpon: null, hlin: null };
 }
 
-/** Filtro e visibilidade da camada de hachura de uma planilha, de acordo com o modo e com "Padrão além da cor". */
+/** Filtro e visibilidade das camadas de padrão de uma planilha. */
 export function paintHachura(p: AppProj) {
-  const l = 'hach-' + p.id;
-  if (!E.mapReady || !map.getLayer(l)) return;
-  const f = criticasDoModo(), on = !!f && p.visible;
-  map.setFilter(l, f ?? ['==', ['get', 'fid'], -1]);
-  map.setLayoutProperty(l, 'visibility', on ? 'visible' : 'none');
+  if (!E.mapReady) return;
+  const f = filtrosDoModo();
+  for (const [pre, chave] of [['hach-', 'hach'], ['hpon-', 'hpon'], ['hlin-', 'hlin']] as const) {
+    const l = pre + p.id;
+    if (!map.getLayer(l)) continue;
+    const fi = f[chave];
+    map.setFilter(l, fi ?? ['==', ['get', 'fid'], -1]);
+    map.setLayoutProperty(l, 'visibility', fi && p.visible ? 'visible' : 'none');
+  }
 }
 
 export function paintProject(p: AppProj) {
@@ -394,7 +413,12 @@ export function topoDaLegenda(items: LegItem[]): { top: LegItem[]; mais: number 
 }
 
 /** Classe crítica: recebe hachura quando "Padrão além da cor" está ligado. */
-const ehCritica = (it: LegItem) => (E.mode === 'sol' ? solucoesComHachura().includes(it.key) : padraoAtivo() && INDICADORES_CRITICOS.includes(E.mode as IndKey) && +it.key >= CLASSE_CRITICA);
+/** Padrão da classe na legenda: diagonal (crítica), pontos ou linhas; nulo se a classe não tem padrão agora. */
+const padraoDe = (it: LegItem): 'crit' | 'pontos' | 'linhas' | null => {
+  if (E.mode === 'sol') { const s = solucoesPorPadrao(); return s.diag.includes(it.key) ? 'crit' : s.pontos.includes(it.key) ? 'pontos' : s.linhas.includes(it.key) ? 'linhas' : null; }
+  return padraoAtivo() && INDICADORES_CRITICOS.includes(E.mode as IndKey) && +it.key >= CLASSE_CRITICA ? 'crit' : null;
+};
+const ehCritica = (it: LegItem) => !!padraoDe(it);
 
 export function renderLegend() {
   const el = $('#legend'), items = legendItems();
@@ -405,13 +429,13 @@ export function renderLegend() {
   let h = '';
   if (!aberta) {
     const { top, mais } = topoDaLegenda(items);
-    const nomes = top.map((it) => `<span class="lt"><i class="${ehCritica(it) ? 'crit' : ''}" style="background-color:${it.c}"></i>${esc(it.s)}</span>`).join('');
+    const nomes = top.map((it) => `<span class="lt"><i class="${padraoDe(it) ?? ''}" style="background-color:${it.c}"></i>${esc(it.s)}</span>`).join('');
     h += `<div class="legrow"><button class="legtog" id="legTog" aria-expanded="false" aria-label="Expandir legenda" title="${esc(DESCRICAO_MODO[E.mode])}"><span class="legtop">${nomes || '<span class="lt">Legenda</span>'}</span>${mais ? `<span class="legmais" aria-label="mais ${mais} classes na vista">+${mais}</span>` : ''}</button>${OCULTAR_LEGENDA}</div>`;
   } else {
     h += `<div class="leghead"><h4 title="${esc(DESCRICAO_MODO[E.mode])}">${title}</h4><span class="legbtns"><button class="legtog sm" id="legTog" aria-expanded="true" aria-label="Recolher legenda" title="Recolher"><svg class="i" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>${OCULTAR_LEGENDA}</span></div>`;
     h += `<ul title="Toque em um item para ocultar. Cor mais clara = 50% da área">` +
-      items.map((it) => `<li><button type="button" data-k="${esc(it.key)}" aria-pressed="${!E.dim.has(it.key)}"><span class="sw${ehCritica(it) ? ' crit' : ''}" style="background-color:${it.c}"></span>${esc(it.s)}</button></li>`).join('') + '</ul>';
-    h += `<p class="legnote">${esc(DESCRICAO_MODO[E.mode])}<br>${ABREVIACOES_FAIXA}${items.some(ehCritica) ? '<br>Hachura: classe crítica' : ''}</p>`;
+      items.map((it) => `<li><button type="button" data-k="${esc(it.key)}" aria-pressed="${!E.dim.has(it.key)}"><span class="sw${padraoDe(it) ? ' ' + padraoDe(it) : ''}" style="background-color:${it.c}"></span>${esc(it.s)}</button></li>`).join('') + '</ul>';
+    h += `<p class="legnote">${esc(DESCRICAO_MODO[E.mode])}<br>${ABREVIACOES_FAIXA}${items.some((i) => padraoDe(i) === 'crit') ? '<br>Hachura diagonal: classe crítica' : ''}${items.some((i) => padraoDe(i) === 'pontos') ? '<br>Pontos: GAP' : ''}${items.some((i) => padraoDe(i) === 'linhas') ? '<br>Linhas: Micro' : ''}</p>`;
   }
   el.innerHTML = h;
   el.querySelectorAll<HTMLButtonElement>('li button').forEach((b) =>

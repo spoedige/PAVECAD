@@ -124,8 +124,8 @@ export const projName = (p: Pick<AppProj, 'meta'>) => {
 
 /** Hachura ativa? A escolha explícita vale; sem escolha, liga junto com o modo campo. */
 export const padraoAtivo = () => E.padrao ?? E.field;
-/** O RP (vermelho crítico) tem hachura por padrão em todos os temas: a cor dele fica a menos de 15 de ΔE00 do REF em deuteranopia. Só some se o usuário desligar "Padrão além da cor". */
-export const hachuraRP = () => E.padrao ?? true;
+/** RP (diagonal), GAP (pontos) e Micro (linhas) têm padrão por padrão em todos os temas: a cor deles fica a menos de 15 de ΔE00 de outra classe sob daltonismo. Só some se o usuário desligar "Padrão além da cor". */
+export const padraoDosPares = () => E.padrao ?? true;
 
 /** Nome da rodovia (ou do grupo) para exibir: "Rodovia A", "Rodovia B"... na ordem em que aparecem, no modo privacidade. */
 export function rodoviaNome(uf: string): string {

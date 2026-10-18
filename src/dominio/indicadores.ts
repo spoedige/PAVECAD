@@ -132,6 +132,8 @@ export const INDICADORES_CRITICOS: IndKey[] = ['igg', 'fc2', 'fc3', 'atr'];
 export const CLASSE_CRITICA = 3;
 /** Soluções críticas (hachura no modo Solução). */
 export const SOLUCOES_CRITICAS = ['RE', 'RP'];
+/** Soluções cuja cor não se separa de outra sob daltonismo (GAP, Micro e REF ficam a menos de 15 de ΔE00): GAP leva pontos e Micro linhas horizontais, por padrão. */
+export const PADRAO_DE_PAR: Record<string, 'pontos' | 'linhas'> = { GAP: 'pontos', Micro: 'linhas' };
 
 /** Classes pré-calculadas de uma faixa: troca de modo de cor só troca a expressão de pintura. */
 export function classProps(l: Lane): Record<string, number> {

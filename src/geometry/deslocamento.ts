@@ -33,3 +33,28 @@ export function deslocarLongitudinal(
   }
   return { x, y };
 }
+
+/** Direção média de uma planilha: vetor unitário (leste, norte) do sentido de percurso. */
+export interface Quadro { tE: number; tN: number }
+
+/** Azimute médio da planilha, pela soma dos passos entre pontos consecutivos do mesmo trecho. Nulo se não há passo. */
+export function quadroMedio(x0: ArrayLike<number>, y0: ArrayLike<number>, segs: Seg[], travel: 1 | -1): Quadro | null {
+  let sx = 0, sy = 0;
+  for (const sg of segs) {
+    for (let k = sg.a; k < sg.b; k++) {
+      const dx = x0[k + 1] - x0[k], dy = y0[k + 1] - y0[k], d = Math.hypot(dx, dy);
+      if (d > 0.5) { sx += dx / d; sy += dy / d; }
+    }
+  }
+  const m = Math.hypot(sx, sy);
+  return m ? { tE: (travel * sx) / m, tN: (travel * sy) / m } : null;
+}
+
+const arred = (v: number) => Math.round(v * 1000) / 1000;
+
+/** Converte um deslocamento (longitudinal e transversal de uma planilha) no mesmo vetor sobre o mapa, expresso em relação ao
+ *  sentido de outra planilha. Transversal positivo é à direita do sentido de percurso: n = (tN, -tE). */
+export function converterDesloc(d: Desloc, de: Quadro, para: Quadro): Desloc {
+  const E = d.l * de.tE + d.t * de.tN, N = d.l * de.tN - d.t * de.tE;
+  return { l: arred(E * para.tE + N * para.tN), t: arred(E * para.tN - N * para.tE) };
+}

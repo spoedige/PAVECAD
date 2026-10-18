@@ -20,10 +20,10 @@ const item = (codigo: string, nome: string, curto: string, cor: string, corCampo
 
 /** Catálogo inicial do padrão RoadRunner. */
 export const CATALOGO_PADRAO: ItemCatalogo[] = [
-  item('FS3', 'Fresagem funcional 3 cm', 'Fres. funcional 3', '#5ac8fa', '#1f6fd0', 'Fresagem'),
-  item('FS4', 'Fresagem funcional 4 cm', 'Fres. funcional 4', '#0a84ff', '#0033b3', 'Fresagem'),
-  item('FSE', 'Fresagem estrutural', 'Fres. estrutural', '#af52de', '#7b2fbe', 'Restauração'),
-  item('MFS', 'Microfresagem', 'Microfresagem', '#30b0c7', '#00788f', 'Fresagem'),
+  item('FS3', 'Fresagem funcional 3 cm', 'Fres. funcional 3', '#5ac8fa', '#4a88ed', 'Fresagem'),
+  item('FS4', 'Fresagem funcional 4 cm', 'Fres. funcional 4', '#0a84ff', '#011e74', 'Fresagem'),
+  item('FSE', 'Fresagem estrutural', 'Fres. estrutural', '#8428b4', '#7b2fbe', 'Restauração'),
+  item('MFS', 'Microfresagem', 'Microfresagem', '#0f7d8f', '#00788f', 'Fresagem'),
   item('RP', 'Reparo profundo', 'Reparo prof.', '#e42e08', '#d0021b', 'Reparo'),
   item('REC', 'Reconstrução', 'Reconstrução', '#a2231d', '#6b0f0a', 'Restauração'),
   item('Micro', 'Microrrevestimento', 'Micro', '#ffcc00', '#e6a800', 'Revestimento fino'),
@@ -31,11 +31,11 @@ export const CATALOGO_PADRAO: ItemCatalogo[] = [
   // Planservi. Onde há equivalente no RoadRunner, a cor é a mesma: RE como Reconstrução, RP já existe, MF como Microfresagem,
   // FXRX funcional (F4R4, F8R8) como Fres. funcional 4 e FXRX estrutural (F4R8, F4R10) como Fres. estrutural.
   item('RE', 'Reconstrução', 'Reconstrução', '#a2231d', '#6b0f0a', 'Restauração'),
-  item('F4R8', 'Fresagem de 4 cm e recomposição de 8 cm', 'Fres. e recomp. estrutural', '#af52de', '#7b2fbe', 'Restauração'),
-  item('F4R10', 'Fresagem de 4 cm e recomposição de 10 cm', 'Fres. e recomp. estrutural', '#af52de', '#7b2fbe', 'Restauração'),
-  item('F4R4', 'Fresagem de 4 cm e recomposição de 4 cm', 'Fres. funcional', '#0a84ff', '#0033b3', 'Fresagem'),
-  item('F8R8', 'Fresagem de 8 cm e recomposição de 8 cm', 'Fres. funcional', '#0a84ff', '#0033b3', 'Fresagem'),
-  item('MF', 'Microfresagem', 'Microfresagem', '#30b0c7', '#00788f', 'Fresagem'),
+  item('F4R8', 'Fresagem de 4 cm e recomposição de 8 cm', 'Fres. e recomp. estrutural', '#8428b4', '#7b2fbe', 'Restauração'),
+  item('F4R10', 'Fresagem de 4 cm e recomposição de 10 cm', 'Fres. e recomp. estrutural', '#8428b4', '#7b2fbe', 'Restauração'),
+  item('F4R4', 'Fresagem de 4 cm e recomposição de 4 cm', 'Fres. funcional', '#0a84ff', '#011e74', 'Fresagem'),
+  item('F8R8', 'Fresagem de 8 cm e recomposição de 8 cm', 'Fres. funcional', '#0a84ff', '#011e74', 'Fresagem'),
+  item('MF', 'Microfresagem', 'Microfresagem', '#0f7d8f', '#00788f', 'Fresagem'),
   // Entradas novas, com cores que não existiam no catálogo.
   item('ST', 'Selagem de trincas', 'Selagem de trincas', '#a2845e', '#6f5a40', 'Reparo'),
   item('REF', 'Reforço (R e PMQ)', 'Reforço', '#8bc34a', '#4e7a1d', 'Reforço'),

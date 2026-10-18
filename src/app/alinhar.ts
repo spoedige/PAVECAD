@@ -1,9 +1,10 @@
-import { DESLOC_MAX, validarDesloc, type Desloc } from '../geometry/deslocamento';
+import { converterDesloc, DESLOC_MAX, quadroMedio, validarDesloc, type Desloc } from '../geometry/deslocamento';
 import { E, getP, type AppProj } from './estado';
 import { aplicarDesloc, salvarDesloc } from './projetos';
 import { alvosAjuste, setTab } from './paineis';
 import { setPainel } from './layout';
 import { contadorSelecao, htmlSelecao, itemDe, ligarSelecao } from './selecaoPlanilhas';
+import { projName } from './estado';
 import { $, toast, toastAcao } from './ui';
 
 /** Alinhar planilhas: desloca as coordenadas das planilhas marcadas para encaixar a rodovia no eixo do mapa.
@@ -81,6 +82,10 @@ export function renderAlinhar() {
         ${campo('l', 'Longitudinal', 'ao longo da via; positivo no sentido de percurso')}
         ${campo('t', 'Transversal', 'positivo à direita do sentido de percurso, negativo à esquerda')}
         <p class="cfg-err" id="d-err" role="alert"></p>
+        <div class="al-sentidos" id="al-sentidos" hidden>
+          <p class="note" id="al-sentidos-txt"></p>
+          <button class="btn" type="button" id="d-copiar-mapa">Copiar como deslocamento no mapa</button>
+        </div>
         <div class="btns"><button class="btn" type="button" id="d-zero">Zerar</button><button class="btn p" type="button" id="d-aplicar"${pend.length ? '' : ' disabled'}>Aplicar às selecionadas</button></div>
         <p class="note" id="d-estado">${pend.length ? `${pend.length} planilha${pend.length > 1 ? 's' : ''} com alteração ainda não aplicada. Sair daqui sem aplicar volta ao valor gravado.` : 'Os passos mostram o resultado no mapa na hora. Aplique para gravar no aparelho, junto com a planilha.'}</p>
         <p class="note">Vale para o mapa, o CSV de propostas e a localização por GPS. Cada planilha é movida em relação ao seu sentido de percurso.</p>
@@ -148,6 +153,32 @@ function renderCorpo() {
   }
   $('#d-zero').onclick = () => { foco = '#d-zero'; $('#d-err').textContent = ''; mudar(alvosAjuste().map((q) => ({ q, d: { l: 0, t: 0 } }))); restaurarFoco(); };
   ap.onclick = () => void aplicarSelecionadas();
+
+  // sentidos opostos: avisa que o transversal é relativo ao sentido de cada planilha e oferece a conversão pelo mapa
+  const origem = alvos[0], opostas = alvos.filter((q) => q.meta.travel !== origem.meta.travel);
+  const caixa = $('#al-sentidos');
+  caixa.hidden = opostas.length === 0;
+  if (opostas.length) {
+    $('#al-sentidos-txt').textContent = `O deslocamento transversal será aplicado em relação ao sentido de cada planilha. Para mover as outras pelo mesmo vetor no mapa, use o botão abaixo (referência: ${projName(origem)}, a primeira marcada).`;
+    $('#d-copiar-mapa').onclick = () => copiarComoMapa(origem, alvos.filter((q) => q !== origem));
+  }
+}
+
+/** Leva o deslocamento da planilha de referência às outras marcadas como o mesmo vetor sobre o mapa, pelo azimute médio de cada uma. */
+function copiarComoMapa(origem: AppProj, destinos: AppProj[]) {
+  const qo = quadroMedio(origem.x0, origem.y0, origem.segs, origem.meta.travel);
+  if (!qo) { toast('A planilha de referência não tem trecho para medir o azimute'); return; }
+  const d = atual(origem), novos: { q: AppProj; d: Desloc }[] = [];
+  for (const q of destinos) {
+    const qd = quadroMedio(q.x0, q.y0, q.segs, q.meta.travel);
+    if (!qd) continue;
+    novos.push({ q, d: converterDesloc(d, qo, qd) });
+  }
+  if (!novos.length) { toast('Nada a converter'); return; }
+  for (const x of novos) void pedir(x.q, x.d);
+  foco = '#d-copiar-mapa';
+  renderCorpo();
+  toast(`Convertido pelo azimute médio de ${novos.length} planilha${novos.length > 1 ? 's' : ''}. Confira no mapa e aplique`);
 }
 
 function restaurarFoco() {

@@ -849,6 +849,29 @@ const TESTES = {
       await pg.click('.toast-acao button');
       await pg.waitForFunction((id) => window.__pavecad.E.P.find((p) => p.id === id).desloc.l === 6, uma, { timeout: 30000 });
     }, { exemplos: true }],
+    ['Alinhar: sentidos opostos mostram o aviso e "Copiar como deslocamento no mapa" converte o vetor pelo azimute médio de cada planilha', '1366x768', async (pg) => {
+      await pg.click('#btnAlinhar'); await pg.waitForSelector('#al-lista');
+      const info = await pg.evaluate(() => window.__pavecad.E.P.map((p) => ({ id: p.id, travel: p.meta.travel, uf: p.meta.uf })));
+      const cres = info.find((p) => p.travel === 1), decr = info.find((p) => p.travel === -1 && p.uf === cres.uf);
+      await pg.click('#t-al [data-atalho=nenhuma]'); await pg.check(`#al-lista input[data-id="${cres.id}"]`);
+      assert.equal(await pg.isVisible('#al-sentidos'), false, 'uma planilha só: sem aviso');
+      await pg.fill('#d-l', '5'); await pg.press('#d-l', 'Tab');
+      await pg.waitForFunction((id) => window.__pavecad.E.P.find((p) => p.id === id).desloc.l === 5, cres.id, { timeout: 30000 });
+      await pg.fill('#d-t', '3'); await pg.press('#d-t', 'Tab');
+      await pg.waitForFunction((id) => window.__pavecad.E.P.find((p) => p.id === id).desloc.t === 3, cres.id, { timeout: 30000 });
+      await pg.check(`#al-lista input[data-id="${decr.id}"]`);
+      await pg.waitForSelector('#al-sentidos', { state: 'visible' });
+      assert.match(await pg.innerText('#al-sentidos'), /O deslocamento transversal será aplicado em relação ao sentido de cada planilha/);
+      assert.equal(await pg.innerText('#d-copiar-mapa'), 'Copiar como deslocamento no mapa');
+      await pg.click('#d-copiar-mapa');
+      await pg.waitForFunction((id) => { const d = window.__pavecad.E.P.find((p) => p.id === id).desloc; return d.l !== 0 || d.t !== 0; }, decr.id, { timeout: 30000 });
+      await pg.waitForTimeout(500);
+      const v = await pg.evaluate(([c, d]) => { const E = window.__pavecad.E; return { c: { ...E.P.find((p) => p.id === c).desloc }, d: { ...E.P.find((p) => p.id === d).desloc } }; }, [cres.id, decr.id]);
+      assert.deepEqual(v.c, { l: 5, t: 3 }, 'a referência não muda');
+      // pistas paralelas de sentidos opostos: o mesmo vetor no mapa tem os dois sinais trocados
+      assert.ok(Math.abs(v.d.l + 5) < 1 && Math.abs(v.d.t + 3) < 1, 'convertido pelo azimute médio: ' + JSON.stringify(v.d));
+      assert.ok(await pg.evaluate(() => !document.querySelector('#d-aplicar').disabled));
+    }, { exemplos: true }],
     ['Alinhar: botão na barra de ferramentas e na gaveta, fora de Ajustes; lista fixa no topo, ±1 e ±5 m, campo, Zerar e Aplicar; alvos de 44 px (falha se sumir)', TODOS, async (pg) => {
       assert.ok(await pg.isVisible('#btnAlinhar'), 'botão na barra de ferramentas');
       await pg.click('#btnMore'); await pg.waitForSelector('#drawer', { state: 'visible' });
@@ -1107,6 +1130,9 @@ const TESTES = {
       let e = await est();
       assert.equal(e.vis, 'visible', 'claro, sem escolha: o RP já tem hachura por padrão');
       assert.match(e.filtro, /RP/); assert.ok(!/RE|REC|FS4|GAP/.test(e.filtro), 'só o RP: ' + e.filtro);
+      // GAP (pontos) e Micro (linhas) têm camada própria, só em Solução
+      const outras = await pg.evaluate(() => { const m = window.__pavecad.map(), E = window.__pavecad.E; const f = (pre) => ({ vis: m.getLayoutProperty(pre + E.P[0].id, 'visibility'), filtro: JSON.stringify(m.getFilter(pre + E.P[0].id)) }); return { pon: f('hpon-'), lin: f('hlin-'), imgs: ['hpontos', 'hlinhas'].map((n) => m.hasImage(n)) }; });
+      assert.deepEqual(outras.imgs, [true, true]); assert.equal(outras.pon.vis, 'visible'); assert.match(outras.pon.filtro, /GAP/); assert.equal(outras.lin.vis, 'visible'); assert.match(outras.lin.filtro, /Micro/);
       // liga em Ajustes: entram também RE e as piores classes dos indicadores
       await aba(pg, 'aj'); assert.equal(await pg.getAttribute('#s-pad', 'aria-checked'), 'false'); await pg.click('#s-pad'); await pg.waitForTimeout(500);
       e = await est(); assert.equal(e.vis, 'visible'); assert.equal(await pg.getAttribute('#s-pad', 'aria-checked'), 'true');

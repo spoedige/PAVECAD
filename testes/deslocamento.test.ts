@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildGeometry } from '../src/geometry/build';
-import { deslocarLongitudinal, deslocZerado, validarDesloc, DESLOC_MAX } from '../src/geometry/deslocamento';
+import { converterDesloc, deslocarLongitudinal, deslocZerado, quadroMedio, validarDesloc, DESLOC_MAX } from '../src/geometry/deslocamento';
 import { eixoDaFaixa } from '../src/geometry/eixo';
 import { prepareProject, type Project } from '../src/geometry/project';
 import { crsForZone, fromUtm } from '../src/geometry/utm';
@@ -117,5 +117,44 @@ describe('copiar larguras para outras planilhas', () => {
     expect(plano[1].ignorados).toEqual([]);
     expect(plano[0].ajustes.every((a) => a.pname === 'P2')).toBe(true);
     expect(new Set(plano.flatMap((x) => x.ajustes.map((a) => a.id))).size).toBe(5);
+  });
+});
+
+describe('copiar o deslocamento como vetor no mapa', () => {
+  it('sentido oposto: o mesmo vetor sobre o mapa vira longitudinal e transversal com o sinal trocado', () => {
+    const cres = { tE: 0, tN: 1 }, decr = { tE: 0, tN: -1 };
+    expect(converterDesloc({ l: 5, t: 3 }, cres, decr)).toEqual({ l: -5, t: -3 });
+    expect(converterDesloc({ l: -5, t: -3 }, decr, cres)).toEqual({ l: 5, t: 3 });
+  });
+
+  it('mesmo sentido: o deslocamento não muda', () => {
+    const q = { tE: 0.6, tN: 0.8 };
+    expect(converterDesloc({ l: 4, t: -2 }, q, q)).toEqual({ l: 4, t: -2 });
+  });
+
+  it('pista virada 90°: leste para a esquerda do norte vira transversal', () => {
+    const leste = { tE: 1, tN: 0 }, norte = { tE: 0, tN: 1 };
+    // 5 m ao longo de uma pista que vai para leste = 5 m para leste = 5 m à direita de quem vai para o norte
+    expect(converterDesloc({ l: 5, t: 0 }, leste, norte)).toEqual({ l: 0, t: 5 });
+    // 3 m à direita de quem vai para leste = 3 m para o sul = 3 m para trás de quem vai para o norte
+    expect(converterDesloc({ l: 0, t: 3 }, leste, norte)).toEqual({ l: -3, t: 0 });
+  });
+
+  it('o azimute médio vem dos passos e respeita o sentido de percurso', () => {
+    const p = reta(1), q = reta(-1);
+    const a = quadroMedio(p.x, p.y, p.segs, 1)!, b = quadroMedio(q.x, q.y, q.segs, -1)!;
+    expect(a.tE).toBeCloseTo(0, 6); expect(a.tN).toBeCloseTo(1, 6);
+    expect(b.tE).toBeCloseTo(0, 6); expect(b.tN).toBeCloseTo(-1, 6);
+    expect(quadroMedio([0], [0], [{ a: 0, b: 0 }], 1)).toBeNull();
+  });
+
+  it('a conversão fecha o ciclo: vetor no mapa idêntico dos dois lados', () => {
+    const p = reta(1), q = reta(-1);
+    const a = quadroMedio(p.x, p.y, p.segs, 1)!, b = quadroMedio(q.x, q.y, q.segs, -1)!;
+    const d = converterDesloc({ l: 7, t: -2 }, a, b);
+    // em coordenadas do mapa (leste, norte): origem l*a + t*n_a; destino l'*b + t'*n_b
+    const mapa = (v: { l: number; t: number }, f: { tE: number; tN: number }) => [v.l * f.tE + v.t * f.tN, v.l * f.tN - v.t * f.tE];
+    const [e1, n1] = mapa({ l: 7, t: -2 }, a), [e2, n2] = mapa(d, b);
+    expect(e2).toBeCloseTo(e1, 6); expect(n2).toBeCloseTo(n1, 6);
   });
 });
