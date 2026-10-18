@@ -138,7 +138,7 @@ describe('limiares de classe', () => {
 });
 
 describe('largura das faixas editável', () => {
-  const parsed = lerPlanilha('U_BR-050_GO_Crescente.xlsx');
+  const parsed = lerPlanilha('rr_go_crescente.xlsx');
   const proj = prepareProject(parsed);
   const aj = (o: Partial<AjusteLargura>): AjusteLargura => ({ id: 'a', pname: parsed.meta.name, lane: 1, km0: null, km1: null, largura: 3.5, ...o });
 

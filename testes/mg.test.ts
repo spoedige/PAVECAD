@@ -6,8 +6,8 @@ import { buildCamadas } from '../src/mapa/camadas';
 import { segmentsOf } from '../src/formats';
 import { projetoDeReferencia } from './helpers';
 
-// BR-050/MG cruza o meridiano de -48 (limite entre os fusos 22S e 23S).
-describe('BR-050/MG (referencia/dados)', () => {
+// BR-900/MG cruza o meridiano de -48 (limite entre os fusos 22S e 23S).
+describe('BR-900/MG (referencia/dados)', () => {
   const pc = projetoDeReferencia('mg_c.json');
 
   it('tem 5.540 linhas e 2 trechos contínuos', () => {

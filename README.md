@@ -31,7 +31,7 @@ As capturas também rodam um verificador de sobreposição e corte de texto (`sc
 | `src/mapa/` | Camadas GeoJSON (`camadas.ts`) e worker que lê a planilha e calcula a geometria fora da thread da tela. |
 | `src/app/` | Mapa MapLibre, painéis (Resumo, Segmento, Análise, Revisão, Ajustes), unifilar, GPS, modo campo, IndexedDB e estado. |
 | `src/dominio/` | Indicadores e classes, catálogo padrão de soluções, análise, propostas, localização e medidas (puros, testados). |
-| `testes/` | Testes com as planilhas BR-050/GO em `testes/fixtures/`. |
+| `testes/` | Testes com planilhas anonimizadas (BR-900, RD-001) em `testes/fixtures/`. Arquivos reais ficam em `dados-reais/` (ignorada pelo git) e passam por `scripts/anonimizar.cjs` (`scripts/gerar-fixtures.sh`); nada real entra no repositório. |
 | `referencia/` | Protótipo (`fontes/template3.html`, `index3.html`), leitor Python, handoffs e JSON das 5 planilhas de exemplo. Não é código do app. |
 
 ## Base do mapa

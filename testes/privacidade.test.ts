@@ -16,22 +16,22 @@ afterEach(() => { E.privacidade = false; E.P = []; atualizarRotulosKm(); });
 
 describe('modo privacidade', () => {
   it('desligado: nomes, rodovia e km saem como vieram', () => {
-    E.P = [proj('SP-333 · TH01 · Crescente', 'SP-333', 1, 154.7)];
+    E.P = [proj('RD-001 · TH01 · Crescente', 'RD-001', 1, 154.7)];
     atualizarRotulosKm();
-    expect(projName(E.P[0])).toBe('SP-333 · TH01 · Crescente');
-    expect(rodoviaNome('SP-333')).toBe('SP-333');
+    expect(projName(E.P[0])).toBe('RD-001 · TH01 · Crescente');
+    expect(rodoviaNome('RD-001')).toBe('RD-001');
     expect(E.P[0].kmLab[1]).toBe('154+720');
     expect(kmBase()).toBe(0);
   });
 
   it('ligado: nome genérico, rodovia por letra e km contado do início da primeira planilha', () => {
-    E.P = [proj('A', 'SP-333', 1, 154.7), proj('B', 'SP-351', -1, 190.2)];
+    E.P = [proj('A', 'RD-001', 1, 154.7), proj('B', 'RD-002', -1, 190.2)];
     E.privacidade = true;
     atualizarRotulosKm();
     expect(projName(E.P[0])).toBe('Planilha 1 · Crescente');
     expect(projName(E.P[1])).toBe('Planilha 2 · Decrescente');
-    expect(rodoviaNome('SP-333')).toBe('Rodovia A');
-    expect(rodoviaNome('SP-351')).toBe('Rodovia B');
+    expect(rodoviaNome('RD-001')).toBe('Rodovia A');
+    expect(rodoviaNome('RD-002')).toBe('Rodovia B');
     expect(kmBase()).toBe(154);
     expect(E.P[0].kmLab[0]).toBe('0+700');
     expect(E.P[1].kmLab[0]).toBe('36+200');
@@ -40,7 +40,7 @@ describe('modo privacidade', () => {
   });
 
   it('o CSV de propostas usa o km mostrado e o nome genérico', () => {
-    const p = proj('SP-333 · TH01 · Crescente', 'SP-333', 1, 154.7);
+    const p = proj('RD-001 · TH01 · Crescente', 'RD-001', 1, 154.7);
     E.P = [p];
     E.privacidade = true;
     atualizarRotulosKm();
@@ -52,12 +52,12 @@ describe('modo privacidade', () => {
     expect(cab).toBe(CSV_CABECALHO.join(';'));
     expect(linha).toContain('"Planilha 1 · Crescente"');
     expect(linha).toContain(';0+720;0+780;');
-    expect(csv).not.toMatch(/SP-333|154\+|155\+/);
+    expect(csv).not.toMatch(/RD-001|154\+|155\+/);
   });
 
   it('desligado de novo, o CSV volta ao km real', () => {
     definirFormatoKm(kmLabel);
-    const p = proj('X', 'SP-333', 1, 154.7);
+    const p = proj('X', 'RD-001', 1, 154.7);
     const pv = { ...p, id: 'p1' } as unknown as PV;
     expect(runLabel(pv, { r0: 1, r1: 3 })).toBe('km 154+720 a 154+780');
   });

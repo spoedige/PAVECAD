@@ -6,7 +6,7 @@ import { addProposta, reposicionar, type Proposta } from '../src/dominio/propost
 import type { ParsedProject } from '../src/formats/types';
 import { lerPlanilha } from './helpers';
 
-const ARQ = 'U_BR-050_GO_Crescente.xlsx';
+const ARQ = 'rr_go_crescente.xlsx';
 const comoPV = (parsed: ParsedProject, id: string): PV => {
   const p = prepareProject(parsed);
   return { ...p, id, model: modelOf(p.rows) };

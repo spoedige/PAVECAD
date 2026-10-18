@@ -5,7 +5,7 @@ import { buildCamadas, LINE_WIN } from '../src/mapa/camadas';
 import { lerPlanilha } from './helpers';
 
 describe('camadas do mapa (GO Crescente)', () => {
-  const p = prepareProject(lerPlanilha('U_BR-050_GO_Crescente.xlsx'));
+  const p = prepareProject(lerPlanilha('rr_go_crescente.xlsx'));
   const g = buildGeometry(p);
   const c = buildCamadas(p, g, 'p1');
 

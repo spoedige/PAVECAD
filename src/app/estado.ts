@@ -113,7 +113,7 @@ export const H = {
 export const visibleProjects = () => E.P.filter((p) => p.visible);
 export const getP = (id: string) => E.P.find((p) => p.id === id);
 const short = (p: Pick<AppProj, 'meta'>) => (/Marginal/i.test(p.meta.via) ? p.meta.via.replace(/\s*-\s*Crescente|\s*-\s*Decrescente/, '') : p.meta.via);
-/** O Planservi já traz o nome pronto ("SP-333 · TH36 · Crescente"). */
+/** O Planservi já traz o nome pronto ("RD-001 · TH36 · Crescente"). */
 export const projName = (p: Pick<AppProj, 'meta'>) => {
   if (E.privacidade) {
     const i = E.P.indexOf(p as AppProj);

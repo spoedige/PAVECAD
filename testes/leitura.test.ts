@@ -9,8 +9,8 @@ function igual(a: unknown, b: unknown): boolean {
   return a === b;
 }
 
-const CRESC = 'U_BR-050_GO_Crescente.xlsx';
-const DECR = 'U_BR-050_GO_Decrescente.xlsx';
+const CRESC = 'rr_go_crescente.xlsx';
+const DECR = 'rr_go_decrescente.xlsx';
 
 describe('registro FORMATS', () => {
   it('traz o RoadRunner e, depois dele, o Planservi', () => {
@@ -19,15 +19,15 @@ describe('registro FORMATS', () => {
 });
 
 describe.each([
-  [CRESC, 'BR-050/GO - Crescente', 1, 'go_c.json'],
-  [DECR, 'BR-050/GO - Decrescente', -1, 'go_d.json'],
+  [CRESC, 'BR-900/GO - Crescente', 1, 'go_c.json'],
+  [DECR, 'BR-900/GO - Decrescente', -1, 'go_d.json'],
 ] as const)('leitura %s', (arq, nome, travel, json) => {
   const p = lerPlanilha(arq);
 
   it('lê 850 linhas, 2 faixas e 1 trecho contínuo', () => {
     expect(p.meta.name).toBe(nome);
     expect(p.meta.travel).toBe(travel);
-    expect(p.meta.uf).toBe('BR-050/GO');
+    expect(p.meta.uf).toBe('BR-900/GO');
     expect(p.rows).toHaveLength(850);
     expect(p.rows.every((r) => r.lanes.length === 2 && r.widths.length === 2)).toBe(true);
     expect(segmentsOf(p.rows.map((r) => r.hod))).toEqual([{ a: 0, b: 849 }]);
@@ -36,7 +36,7 @@ describe.each([
   });
 
   it('deixa z vazio e coordenadas válidas', () => {
-    expect(p.rows.every((r) => r.z === null && r.lat < -17 && r.lat > -18 && r.lon < -47)).toBe(true);
+    expect(p.rows.every((r) => r.z === null && r.lat < -12 && r.lat > -14 && r.lon < -47)).toBe(true);
   });
 
   it('reproduz os JSON de referência do protótipo', () => {

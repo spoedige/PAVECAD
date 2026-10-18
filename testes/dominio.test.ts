@@ -16,7 +16,7 @@ function carregar(arq: string, id = 'p1') {
   const lp: LocP = { ...proj, id, opts: g.opts, normals: g.normals, visible: true };
   return { pv, lp };
 }
-const { pv, lp } = carregar('U_BR-050_GO_Crescente.xlsx');
+const { pv, lp } = carregar('rr_go_crescente.xlsx');
 
 describe('medidas', () => {
   it('distância, comprimento e área', () => {
