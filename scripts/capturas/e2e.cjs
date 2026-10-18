@@ -3,12 +3,19 @@
 // Requer o servidor de desenvolvimento em PAVECAD_URL (padrão http://localhost:5199).
 const assert = require('assert/strict');
 const { VPS, abrir, lancar, tema } = require('./lib.cjs');
+const os = require('os');
+const path = require('path');
+const { gravarConjunto } = require('../sinteticos.cjs');
 const { irParaKm, escolherBase, escolherNitidez, aba, criarProposta, pontoLivre } = require('./scenarios.cjs');
 
 const vp = (nome) => VPS.find((v) => v.nome === nome);
 /** Os quatro tamanhos de referência do layout único. */
 const TODOS = ['1568x760', '1366x768', 'tablet-h-1024x768', 'tablet-v-820x1180'];
 const estado = (pg, expr) => pg.evaluate(`(${expr})(window.__pavecad.E)`);
+
+/** As 9 planilhas sintéticas (18 projetos) do teste de carga, gravadas numa pasta temporária. */
+const NOVE = gravarConjunto(path.join(os.tmpdir(), 'pavecad-sint'));
+const OPTS_NOVE = { arquivos: NOVE, projetos: 18 };
 
 const TESTES = {
   t01: [
@@ -523,15 +530,16 @@ const TESTES = {
       assert.equal(await pg.evaluate(() => window.__pavecad.E.activeGroup), 'RD-001');
       await pg.waitForTimeout(600);
       const blocos = await pg.evaluate(() => window.__pavecad.blocosDoUnifilar());
-      assert.equal(blocos.length, 4, 'quatro projetos desenhados no unifilar: ' + blocos.join(' | '));
-      assert.deepEqual([...blocos].sort(), nomes);
-      assert.ok(blocos.indexOf('RD-001 · TH01 · Crescente') < blocos.indexOf('RD-001 · TH01 · Decrescente'), 'crescente antes do decrescente');
+      // planilhas do mesmo sentido dividem um bloco: um para o crescente e outro para o decrescente
+      assert.deepEqual(blocos, ['RD-001 · Crescente · 2 planilhas', 'RD-001 · Decrescente · 2 planilhas'], 'blocos do unifilar: ' + blocos.join(' | '));
+      assert.deepEqual(await pg.evaluate(() => window.__pavecad.planilhasDoUnifilar()), [['RD-001 · TH01 · Crescente', 'RD-001 · TH02 · Crescente'], ['RD-001 · TH01 · Decrescente', 'RD-001 · TH02 · Decrescente']]);
+      assert.equal((await pg.evaluate(() => window.__pavecad.lacunasDoUnifilar())).length, 2, 'TH01 e TH02 não são vizinhas: uma lacuna de 48,8 km em cada bloco');
       // filtro: um grupo só (mesma rodovia), então o filtro não aparece; o título do unifilar traz a rodovia
       assert.equal(await pg.evaluate(() => document.querySelectorAll('#unigroups button').length), 0);
       assert.match(await pg.textContent('#title'), /^RD-001$/);
       // sem erro de interface: unifilar legível (altura do cartão cabe na tela)
       const h = await pg.evaluate(() => ({ uni: document.querySelector('#unicard').getBoundingClientRect().height, vh: innerHeight }));
-      assert.ok(h.uni < h.vh * 0.6, 'o unifilar com 4 projetos não toma mais de 60% da tela: ' + h.uni);
+      assert.ok(h.uni <= h.vh * 0.35 + 1, 'o unifilar não passa de 35% da tela: ' + h.uni);
     }, { arquivos: ['planservi_amostra_1.xlsx', 'planservi_amostra_2.xlsx'], projetos: 4 }],
     ['Planservi: só IGG, FC-2 e FC-3 além de IRI e ATR; D0, Rc e Defeitos escondidos; limiares do IGG 20, 40, 80 e 160', ['1366x768'], async (pg) => {
       const modos = await pg.evaluate(() => [...document.querySelectorAll('#modes button')].filter((b) => !b.hidden).map((b) => b.textContent));
@@ -1166,6 +1174,98 @@ const TESTES = {
       const esc = await est(); assert.equal(esc.vis, 'visible', 'escuro: RP com hachura'); assert.ok(!/RE/.test(esc.filtro), esc.filtro);
     }, { arquivos: ['planservi_amostra_1.xlsx', 'planservi_amostra_2.xlsx'], projetos: 4 }],
   ],
+  t18: [
+    ['tooltip do mapa: classe, código da planilha e significado, uma linha por camada', ['1366x768'], async (pg) => {
+      const alvo = await pg.evaluate(() => {
+        const E = window.__pavecad.E;
+        for (const p of E.P) for (let i = 0; i < p.rows.length; i++) {
+          const L = p.rows[i].lanes[0];
+          const cs = (L.camadas || []).filter((c) => c.bruto && c.bruto !== '-' && c.bruto !== '1');
+          if (cs.some((c) => /^(PMQ|R)\d/i.test(c.bruto)) && p.model[i].tr[0].main === 'REF') {
+            const f = p.polyByFid.get(i * 8 + 1), ring = f.geometry.coordinates[0], n = ring.length - 1;
+            const lon = ring.slice(0, n).reduce((a, c) => a + c[0], 0) / n, lat = ring.slice(0, n).reduce((a, c) => a + c[1], 0) / n;
+            return { lon, lat, camadas: cs.map((c) => c.bruto), km: p.kmLab[i] };
+          }
+        }
+        return null;
+      });
+      assert.ok(alvo, 'a amostra tem faixa com reforço PMQ');
+      await pg.evaluate((a) => window.__pavecad.map().jumpTo({ center: [a.lon, a.lat], zoom: 18.5 }), alvo);
+      await pg.waitForTimeout(900);
+      const pt = await pg.evaluate((a) => { const m = window.__pavecad.map(), q = m.project([a.lon, a.lat]), r = m.getCanvas().getBoundingClientRect(); return { x: r.left + q.x, y: r.top + q.y }; }, alvo);
+      await pg.mouse.move(pt.x - 3, pt.y); await pg.mouse.move(pt.x, pt.y); await pg.waitForTimeout(400);
+      const tip = await pg.evaluate(() => ({ vis: getComputedStyle(document.querySelector('#tip')).display, linhas: document.querySelector('#tip').innerHTML.split('<br>').map((x) => x.replace(/<[^>]+>/g, '').trim()) }));
+      assert.equal(tip.vis, 'block', 'tooltip aparece sobre a faixa');
+      assert.match(tip.linhas[0], /^km /);
+      const rev = tip.linhas.find((l) => /^REF · /.test(l));
+      assert.ok(rev, 'linha do reforço com o código original: ' + tip.linhas.join(' | '));
+      assert.match(rev, /^REF · (PMQ|R)\d+,\d \(Reforço estrutural de \d+,\d cm\)$/);
+      assert.ok(tip.linhas.length - 1 === alvo.camadas.length, `uma linha por camada com intervenção (${alvo.camadas.join(', ')}): ` + tip.linhas.join(' | '));
+    }, { arquivos: ['planservi_amostra_1.xlsx', 'planservi_amostra_2.xlsx'], projetos: 4 }],
+    ['9 planilhas: carga medida, agrupamento por rodovia, trechos contíguos fundidos e a lacuna do TH46', ['1366x768'], async (pg, { log }) => {
+      console.log(`     carga de 9 planilhas (18 projetos): ${log.cargaMs} ms`);
+      assert.ok(log.cargaMs < 60000, 'carga em menos de 60 s: ' + log.cargaMs);
+      const erros = log.erros.filter((e) => !/Failed to load resource/.test(e)); // as fontes externas são bloqueadas de propósito
+      assert.deepEqual(erros, [], 'sem erro de console na carga: ' + erros.join(' | '));
+      assert.equal(await pg.evaluate(() => new Set(window.__pavecad.E.P.map((p) => p.meta.uf)).size), 2, 'duas rodovias');
+      assert.equal(await pg.evaluate(() => window.__pavecad.E.activeGroup), 'RD-001');
+      await pg.waitForTimeout(500);
+      assert.deepEqual(await pg.evaluate(() => window.__pavecad.blocosDoUnifilar()), ['RD-001 · Crescente · 6 planilhas', 'RD-001 · Decrescente · 6 planilhas']);
+      const pl = await pg.evaluate(() => window.__pavecad.planilhasDoUnifilar());
+      const ths = (l) => l.map((n) => /TH\d+/.exec(n)[0]);
+      assert.deepEqual(ths(pl[0]), ['TH41', 'TH42', 'TH43', 'TH44', 'TH45', 'TH47']);
+      assert.deepEqual(ths(pl[1]), ['TH41', 'TH42', 'TH43', 'TH44', 'TH45', 'TH47']);
+      const lac = await pg.evaluate(() => window.__pavecad.lacunasDoUnifilar());
+      assert.equal(lac.length, 2, 'uma lacuna por sentido (o TH46 não tem planilha)');
+      for (const l of lac) assert.ok(Math.abs(l.ate - l.de - 1.2) < 0.01, 'lacuna de 1,2 km: ' + (l.ate - l.de));
+      // outra rodovia: três planilhas seguidas por sentido e nenhuma lacuna
+      assert.equal(await pg.evaluate(() => document.querySelectorAll('#unigroups button').length), 2, 'filtro com as duas rodovias');
+      await pg.click('#unigroups button[data-g="RD-002"]'); await pg.waitForTimeout(500);
+      assert.deepEqual(await pg.evaluate(() => window.__pavecad.blocosDoUnifilar()), ['RD-002 · Crescente · 3 planilhas', 'RD-002 · Decrescente · 3 planilhas']);
+      assert.deepEqual(await pg.evaluate(() => window.__pavecad.lacunasDoUnifilar()), []);
+    }, OPTS_NOVE],
+    ['unifilar: no máximo 35% da altura da tela e rola por dentro quando o conteúdo não cabe', ['1366x768', '1568x760', 'tablet-h-1024x768'], async (pg) => {
+      const m = () => pg.evaluate(() => { const c = document.querySelector('#unicard').getBoundingClientRect(), w = document.querySelector('#uniwrap'); return { h: c.height, vh: innerHeight, rola: w.scrollHeight > w.clientHeight + 1, sh: w.scrollHeight, ch: w.clientHeight, ov: getComputedStyle(w).overflowY }; });
+      let r = await m();
+      assert.ok(r.h <= r.vh * 0.35 + 1, `cartão de ${r.h}px em ${r.vh}px de tela`);
+      assert.equal(r.ov, 'auto');
+      // tela baixa: o conteúdo (dois blocos de seis planilhas) não cabe nos 35% e passa a rolar
+      await pg.setViewportSize({ width: 1366, height: 420 }); await pg.waitForTimeout(900);
+      r = await m();
+      assert.ok(r.h <= r.vh * 0.35 + 1, `tela baixa: cartão de ${r.h}px em ${r.vh}px`);
+      assert.ok(r.rola, `deve rolar por dentro (${r.sh} > ${r.ch})`);
+      const topo = await pg.evaluate(() => { const w = document.querySelector('#uniwrap'); w.scrollTop = w.scrollHeight; return w.scrollTop; });
+      assert.ok(topo > 0, 'a rolagem anda');
+      // com o cartão rolado até o fim, o clique na última faixa visível cai no decrescente
+      const box = await pg.evaluate(() => { const r = document.querySelector('#uniwrap').getBoundingClientRect(); return { l: r.left, w: r.width, b: r.bottom }; });
+      await pg.mouse.click(box.l + 44 + 0.2 * (box.w - 46), box.b - 8); await pg.waitForTimeout(500);
+      assert.equal(await pg.evaluate(() => { const s = window.__pavecad.E.sel; return s ? window.__pavecad.E.P.find((p) => p.id === s.pid).meta.travel : null; }), -1, 'o clique na parte rolada seleciona o sentido decrescente');
+      const ev = await pg.evaluate(() => { const a = document.querySelector('#unicard').getBoundingClientRect(), i = document.querySelector('#inspector').getBoundingClientRect(); return { uniTopo: a.top, inspB: i.bottom }; });
+      assert.ok(ev.inspB <= ev.uniTopo + 1, 'o painel não invade o unifilar');
+    }, OPTS_NOVE],
+    ['Resumo agrupado por rodovia, com grupos recolhíveis que lembram o estado', ['1366x768'], async (pg) => {
+      await aba(pg, 'resumo');
+      const gr = () => pg.evaluate(() => [...document.querySelectorAll('#t-resumo details.rgrp')].map((d) => ({ uf: d.dataset.uf, aberto: d.open, titulo: d.querySelector('summary').innerText.replace(/\s+/g, ' ').trim(), linhas: d.querySelectorAll('.prow').length })));
+      let g = await gr();
+      assert.deepEqual(g.map((x) => x.uf), ['RD-001', 'RD-002']);
+      assert.ok(g.every((x) => x.aberto), 'começam abertos');
+      assert.deepEqual(g.map((x) => x.linhas), [12, 6], 'doze projetos em RD-001 e seis em RD-002');
+      assert.match(g[0].titulo, /^RD-001.*12 planilhas/); assert.match(g[1].titulo, /^RD-002.*6 planilhas/);
+      assert.equal(await pg.evaluate(() => document.querySelectorAll('#t-resumo details.rgrp:first-of-type .sect, #t-resumo details.rgrp .sect').length > 0), true, 'cada grupo traz suas Soluções');
+      // recolhe o primeiro; trocar de modo redesenha o painel e o estado continua
+      await pg.click('#t-resumo details.rgrp[data-uf="RD-001"] > summary'); await pg.waitForTimeout(300);
+      g = await gr(); assert.equal(g[0].aberto, false); assert.equal(g[1].aberto, true);
+      await pg.evaluate(() => document.activeElement && document.activeElement.blur());
+      await pg.click('#modes [data-m=iri]'); await pg.waitForTimeout(500);
+      g = await gr(); assert.equal(g[0].aberto, false, 'RD-001 continua recolhido depois de redesenhar'); assert.equal(g[1].aberto, true);
+      assert.ok(await pg.evaluate(() => { const d = document.querySelector('#t-resumo details.rgrp[data-uf="RD-001"]'); return d.getBoundingClientRect().height < 70; }), 'grupo recolhido ocupa só o cabeçalho');
+      await pg.click('#t-resumo details.rgrp[data-uf="RD-001"] > summary'); await pg.waitForTimeout(300);
+      assert.equal((await gr())[0].aberto, true);
+      // o botão de olho de uma planilha continua funcionando dentro do grupo
+      await pg.click('#t-resumo details.rgrp[data-uf="RD-002"] [data-eye]'); await pg.waitForTimeout(400);
+      assert.equal(await pg.evaluate(() => window.__pavecad.E.P.filter((p) => p.meta.uf === 'RD-002' && !p.visible).length), 1);
+    }, OPTS_NOVE],
+  ],
   g03: [
     ['a seção é o seletor de faixa (clique, aria-pressed, teclado)', '1366x768', async (pg) => {
       await irParaKm(pg, '170+500'); await aba(pg, 'seg');
@@ -1351,7 +1451,7 @@ const TESTES = {
       assert.equal(cab, 'planilha;faixa;km_inicial;km_final;extensao_m;largura_m;area_m2;codigo_atual;solucao_atual;codigo_proposto;solucao_proposta;observacao;lat_inicial;lon_inicial;lat_final;lon_final;utm_e_inicial;utm_n_inicial;utm_e_final;utm_n_final');
       assert.match(lin, /"obs; com ponto e vírgula"/, 'observação com ";" fica entre aspas');
       assert.match(lin, /"FSE"/);
-      assert.match(lin, /;-17,\d{7};-47,\d{7};-17,\d{7};-47,\d{7};\d{6},\d{2};\d{7},\d{2};\d{6},\d{2};\d{7},\d{2}$/, 'lat, lon e UTM com vírgula decimal ao final da linha');
+      assert.match(lin, /;-12,\d{7};-47,\d{7};-12,\d{7};-47,\d{7};\d{6},\d{2};\d{7},\d{2};\d{6},\d{2};\d{7},\d{2}$/, 'lat, lon e UTM com vírgula decimal ao final da linha');
       assert.doesNotMatch(lin.replace(/"[^"]*"/g, ''), /\d\.\d/, 'nenhum ponto decimal');
       // acentos preservados (UTF-8)
       assert.match(txt, /Fresagem estrutural/);

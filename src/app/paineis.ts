@@ -109,21 +109,24 @@ export function setField(on: boolean) {
 /* ---------------------------------------------------------------- */
 /* Resumo                                                            */
 /* ---------------------------------------------------------------- */
+/** Rodovias recolhidas no Resumo (lembradas enquanto a página estiver aberta). */
+const rodoviasFechadas = new Set<string>();
+
 export function renderResumo() {
   const el = $('#t-resumo'), V = visibleProjects();
   if (!E.P.length) { el.innerHTML = '<div class="empty"><b>Nenhuma planilha carregada</b>Toque em Planilhas e escolha um ou mais arquivos no padrão RoadRunner.</div>'; return; }
-  const R = resumo(V);
-  const rows = Object.entries(R.st).filter(([k]) => k !== '-').sort((a, b) => b[1].area - a[1].area);
-  const maxA = Math.max(1, ...rows.map((r) => r[1].area));
-  const key: IndKey = E.mode === 'sol' ? 'iri' : E.mode, M = IND[key], cr = criticos(V, key);
-  el.innerHTML = `
-    <div><div class="sect">Planilhas <button class="btn" id="addFiles" style="min-height:28px;padding:3px 10px;font-size:var(--fs-meta)">+ Adicionar</button></div>
-      <div class="list">${E.P.map((p) => `<div class="prow">
+  const key: IndKey = E.mode === 'sol' ? 'iri' : E.mode, M = IND[key];
+  const linhaPlanilha = (p: AppProj) => `<div class="prow">
         <button class="iconbtn" data-eye="${p.id}" aria-label="${p.visible ? 'Ocultar' : 'Mostrar'} ${esc(projName(p))}" style="width:30px;height:30px">${p.visible ? IC.eye : IC.eyeoff}</button>
         <button class="nm" data-fly="${p.id}"><b>${esc(projName(p))}</b><span class="num">km ${fmt(p.meta.kmi === null ? null : kmVis(p.meta.kmi), 0)} a ${fmt(p.meta.kmf === null ? null : kmVis(p.meta.kmf), 0)} · ${p.rows.length.toLocaleString('pt-BR')} seg · ${p.meta.format === 'planservi' ? 'Planservi' : 'RoadRunner'}</span>${selo(p) ? `<span>${selo(p)}</span>` : ''}</button>
         ${dirBadge(p)}
-        <button class="iconbtn" data-del="${p.id}" aria-label="Remover ${esc(projName(p))}" style="width:30px;height:30px">${IC.trash}</button></div>`).join('')}</div></div>
-    <div><h2 class="h1 num">${fmt(R.ext, 1)} km</h2><p class="lead num">${V.length} planilha${V.length !== 1 ? 's' : ''} ${V.length !== 1 ? 'visíveis' : 'visível'} · ${R.nR.toLocaleString('pt-BR')} segmentos de 20 m${R.drKm ? ` · ${fmt(R.drKm, 1)} km de dreno` : ''}</p>
+        <button class="iconbtn" data-del="${p.id}" aria-label="Remover ${esc(projName(p))}" style="width:30px;height:30px">${IC.trash}</button></div>`;
+  /** Totais, soluções e piores pontos de um conjunto de planilhas visíveis. */
+  const estatisticas = (Vg: AppProj[]) => {
+    const R = resumo(Vg), cr = criticos(Vg, key);
+    const rows = Object.entries(R.st).filter(([k]) => k !== '-').sort((a, b) => b[1].area - a[1].area);
+    const maxA = Math.max(1, ...rows.map((r) => r[1].area));
+    return `<div><h2 class="h1 num">${fmt(R.ext, 1)} km</h2><p class="lead num">${Vg.length} planilha${Vg.length !== 1 ? 's' : ''} ${Vg.length !== 1 ? 'visíveis' : 'visível'} · ${R.nR.toLocaleString('pt-BR')} segmentos de 20 m${R.drKm ? ` · ${fmt(R.drKm, 1)} km de dreno` : ''}</p>
       ${Object.keys(R.poi).length ? `<div class="chips" style="margin-top:8px">${Object.entries(R.poi).map(([t, n]) => `<span class="chip">${esc(t)} · ${n}</span>`).join('')}</div>` : ''}</div>
     <div><div class="sect">Soluções</div><div class="list">
       ${rows.map(([k, v]) => `<div class="row"><span class="sw" style="background:${tc(k)}"></span>
@@ -132,9 +135,31 @@ export function renderResumo() {
     </div><p class="note" style="margin-top:7px">Área = largura da faixa × 20 m × percentual de atuação.</p></div>
     <div><div class="sect">${M.low ? 'Menores' : 'Maiores'} ${M.label}</div><div class="list">
       ${cr.map((o) => `<button class="row" data-go="${o.p.id}:${o.i}:${o.lane}"><span class="sw" style="background:${Q()[M.cls(o.v)]}"></span>
-        <div class="grow">km ${esc(o.p.kmLab[o.i])} <span class="muted">· Fx ${o.lane}${V.length > 1 ? ' · ' + esc(projName(o.p)) : ''}</span></div>
+        <div class="grow">km ${esc(o.p.kmLab[o.i])} <span class="muted">· Fx ${o.lane}${Vg.length > 1 ? ' · ' + esc(projName(o.p)) : ''}</span></div>
         <div class="val num">${fmt(o.v * M.scale, M.dec)} <span class="muted" style="font-weight:400;font-size:var(--fs-meta)">${M.unit}</span></div></button>`).join('')}
     </div></div>`;
+  };
+  const vias = [...new Set(E.P.map((p) => p.meta.uf))];
+  const botaoAdd = '<button class="btn" id="addFiles" style="min-height:28px;padding:3px 10px;font-size:var(--fs-meta)">+ Adicionar</button>';
+  if (vias.length <= 1) {
+    el.innerHTML = `
+    <div><div class="sect">Planilhas ${botaoAdd}</div>
+      <div class="list">${E.P.map(linhaPlanilha).join('')}</div></div>
+    ${estatisticas(V)}`;
+  } else {
+    // mais de uma rodovia: um grupo recolhível por rodovia, cada um com suas planilhas, totais, soluções e piores pontos
+    const grupos = vias.map((uf) => {
+      const todas = E.P.filter((p) => p.meta.uf === uf), vis = todas.filter((p) => p.visible);
+      const ext = vis.length ? resumo(vis).ext : 0;
+      return `<details class="rgrp" data-uf="${esc(uf)}" ${rodoviasFechadas.has(uf) ? '' : 'open'}>
+        <summary><span class="rg-n"><b>${esc(rodoviaNome(uf))}</b><span class="muted num">${todas.length} planilha${todas.length !== 1 ? 's' : ''} · ${fmt(ext, 1)} km visíveis</span></span></summary>
+        <div class="rg-c"><div class="list">${todas.map(linhaPlanilha).join('')}</div>${vis.length ? estatisticas(vis) : '<p class="note">Nenhuma planilha visível nesta rodovia.</p>'}</div></details>`;
+    }).join('');
+    el.innerHTML = `<div><div class="sect">Rodovias ${botaoAdd}</div></div>${grupos}`;
+    el.querySelectorAll<HTMLDetailsElement>('details.rgrp').forEach((d) => d.addEventListener('toggle', () => {
+      if (d.open) rodoviasFechadas.delete(d.dataset.uf!); else rodoviasFechadas.add(d.dataset.uf!);
+    }));
+  }
   el.querySelectorAll<HTMLElement>('[data-eye]').forEach((b) => (b.onclick = () => {
     const p = getP(b.dataset.eye!)!;
     p.visible = !p.visible;

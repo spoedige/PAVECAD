@@ -1,3 +1,4 @@
+import { agruparBlocos, type Lacuna } from '../dominio/blocosUnifilar';
 import { IND, Q5, Q5F } from '../dominio/indicadores';
 import { trColor, trOrder } from '../dominio/solucoes';
 import { E, H, kmVis, projName, rodoviaNome, type AppProj } from './estado';
@@ -7,12 +8,18 @@ import { $, cssv, esc, fmt, gestoVertical, toast } from './ui';
 import { ehUnico } from './layout';
 
 interface Linha { y: number; h: number; lane: number }
-interface Bloco { p: AppProj; titleY: number; rows: Linha[] }
+interface Bloco { ps: AppProj[]; titulo: string; sentido: 1 | -1; lacunas: Lacuna[]; titleY: number; rows: Linha[] }
 interface Layout { x0: number; x1: number; kmi: number; kmf: number; blocks: Bloco[]; top: number }
 let lay: Layout | null = null;
+let ultimaSel = '';
 
 const Q = () => (E.field ? Q5F : Q5);
-const maxLanes = (p: AppProj) => p.rows.reduce((m, r) => Math.max(m, r.widths.length), 1);
+const maxLanes = (ps: AppProj[]) => ps.reduce((m, p) => Math.max(m, p.rows.reduce((n, r) => Math.max(n, r.widths.length), 1)), 1);
+
+/** Altura máxima do cartão do unifilar: 35% da tela. O que passar rola dentro do cartão. */
+const FRACAO_MAX = 0.35;
+/** Cabeçalho, respiros e rodapé do cartão em volta da área de desenho. */
+const MOLDURA = 22 + 6 + 10 + 12 + 8;
 
 function rr(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
   g.beginPath();
@@ -60,18 +67,26 @@ export function drawUni() {
   const rhL = 11, gap = 2, shH = 9, titleH = 18, bgap = 6, top = 18;
   let y = top;
   const blocks: Bloco[] = [];
-  for (const p of G) {
-    const b: Bloco = { p, titleY: y, rows: [] };
+  for (const gb of agruparBlocos(G)) {
+    const um = gb.ps.length === 1;
+    const sent = gb.sentido > 0 ? 'Crescente' : 'Decrescente';
+    const via = rodoviaNome(gb.ps[0].meta.uf);
+    const b: Bloco = { ps: gb.ps, sentido: gb.sentido, lacunas: gb.lacunas, titulo: um ? projName(gb.ps[0]) : `${via} · ${sent} · ${gb.ps.length} planilhas`, titleY: y, rows: [] };
     y += titleH;
-    for (let k = 0; k < maxLanes(p); k++) { b.rows.push({ y, h: rhL, lane: k + 1 }); y += rhL + gap; }
-    if (p.rows.some((r) => r.shoulder > 0)) { b.rows.push({ y, h: shH, lane: 0 }); y += shH + gap; }
+    for (let k = 0; k < maxLanes(gb.ps); k++) { b.rows.push({ y, h: rhL, lane: k + 1 }); y += rhL + gap; }
+    if (gb.ps.some((p) => p.rows.some((r) => r.shoulder > 0))) { b.rows.push({ y, h: shH, lane: 0 }); y += shH + gap; }
     y += bgap - gap;
     blocks.push(b);
   }
   const chH = Math.ceil(y);
-  wrap.style.height = chH + 'px';
-  const target = chH + 22 + 6 + 10 + 12 + 8;
+  // área visível: o que passa de 35% da tela rola dentro do cartão
+  const visH = Math.max(60, Math.min(chH, Math.floor(innerHeight * FRACAO_MAX) - MOLDURA));
+  wrap.style.height = visH + 'px';
+  cv.style.height = chH + 'px';
+  const target = visH + MOLDURA;
   if (root.style.getPropertyValue('--uni-h') !== target + 'px') root.style.setProperty('--uni-h', target + 'px');
+  const hov = document.getElementById('unihover');
+  if (hov) hov.style.height = chH + 'px';
   const dpr = devicePixelRatio || 1, W = wrap.clientWidth, H0 = chH;
   if (!W) return;
   if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H0 * dpr)) { cv.width = W * dpr; cv.height = H0 * dpr; }
@@ -99,30 +114,42 @@ export function drawUni() {
     g.textBaseline = 'alphabetic';
     g.font = `600 ${fm}px ` + sans;
     g.fillStyle = muted;
-    g.fillText(projName(b.p) + (b.p.meta.travel > 0 ? '  ↑' : '  ↓'), 0, b.titleY + 11);
+    g.fillText(b.titulo + (b.sentido > 0 ? '  ↑' : '  ↓'), 0, b.titleY + 11);
     g.font = `500 ${fm}px ` + sans;
     g.textBaseline = 'middle';
     for (const rw of b.rows) {
       g.fillStyle = muted; g.fillText(rw.lane ? 'Fx ' + rw.lane : 'Ac.', 0, rw.y + rw.h / 2);
       g.fillStyle = fill; g.globalAlpha = 0.55; rr(g, x0, rw.y, x1 - x0, rw.h, Math.min(4, rw.h / 2)); g.fill(); g.globalAlpha = 1;
     }
-    const p = b.p, nPx = Math.max(1, Math.floor(x1 - x0)), sev = b.rows.map(() => new Int8Array(nPx).fill(-2));
-    const passo = Math.max(1, Math.round((0.02 / (kmf - kmi)) * nPx));
-    for (let i = 0; i < p.rows.length; i++) {
-      const px = Math.min(nPx - 1, Math.max(0, Math.floor(((p.rows[i].hod - kmi) / (kmf - kmi)) * nPx))), md = p.model[i], r = p.rows[i];
-      b.rows.forEach((rw, ri) => {
-        let s: number;
-        if (rw.lane) {
-          if (rw.lane > r.widths.length) return;
-          if (!M) s = md.tr[rw.lane - 1].main === '-' ? -1 : Math.max(0, keys.indexOf(md.tr[rw.lane - 1].main));
-          else { const v = M.value(r.lanes[rw.lane - 1]); s = v == null ? -1 : M.cls(v); }
-        } else {
-          if (!(r.shoulder > 0)) return;
-          s = !M ? (md.sh.main === '-' ? -1 : Math.max(0, keys.indexOf(md.sh.main))) : -1;
-        }
-        // com pouco km na tela cada linha de 20 m ocupa vários pixels: preenche o passo inteiro, para não ficar pontilhado
-        for (let q = px; q < Math.min(nPx, px + passo); q++) if (s > sev[ri][q] || sev[ri][q] === -2) sev[ri][q] = s;
-      });
+    // lacuna: planilha que falta entre duas do mesmo sentido, tracejada e com o tamanho no título
+    for (const lc of b.lacunas) {
+      const xa = sx(lc.de), xb = sx(lc.ate), alto = b.rows[b.rows.length - 1].y + b.rows[b.rows.length - 1].h - b.rows[0].y;
+      g.save(); g.setLineDash([3, 3]); g.strokeStyle = muted; g.lineWidth = 1; g.globalAlpha = 0.8;
+      g.strokeRect(Math.round(xa) + 0.5, b.rows[0].y - 1.5, Math.max(1, xb - xa), alto + 3); g.restore();
+      const txt = `sem dados · ${fmt(lc.ate - lc.de, 2)} km`;
+      g.font = `500 ${fm}px ` + sans; g.textBaseline = 'alphabetic'; g.fillStyle = muted;
+      if (g.measureText(txt).width <= xb - xa - 4) g.fillText(txt, xa + 4, b.titleY + 11);
+    }
+    const nPx = Math.max(1, Math.floor(x1 - x0)), sev = b.rows.map(() => new Int8Array(nPx).fill(-2));
+
+    for (const p of b.ps) {
+      const passo = Math.max(1, Math.round((0.02 / (kmf - kmi)) * nPx));
+      for (let i = 0; i < p.rows.length; i++) {
+        const px = Math.min(nPx - 1, Math.max(0, Math.floor(((p.rows[i].hod - kmi) / (kmf - kmi)) * nPx))), md = p.model[i], r = p.rows[i];
+        b.rows.forEach((rw, ri) => {
+          let s: number;
+          if (rw.lane) {
+            if (rw.lane > r.widths.length) return;
+            if (!M) s = md.tr[rw.lane - 1].main === '-' ? -1 : Math.max(0, keys.indexOf(md.tr[rw.lane - 1].main));
+            else { const v = M.value(r.lanes[rw.lane - 1]); s = v == null ? -1 : M.cls(v); }
+          } else {
+            if (!(r.shoulder > 0)) return;
+            s = !M ? (md.sh.main === '-' ? -1 : Math.max(0, keys.indexOf(md.sh.main))) : -1;
+          }
+          // com pouco km na tela cada linha de 20 m ocupa vários pixels: preenche o passo inteiro, para não ficar pontilhado
+          for (let q = px; q < Math.min(nPx, px + passo); q++) if (s > sev[ri][q] || sev[ri][q] === -2) sev[ri][q] = s;
+        });
+      }
     }
     b.rows.forEach((rw, ri) => {
       for (let q = 0; q < nPx; q++) {
@@ -152,32 +179,51 @@ export function drawUni() {
   }
   const s = E.sel;
   if (s) {
-    const b = blocks.find((q) => q.p.id === s.pid);
-    if (b) {
-      const x = sx(b.p.rows[s.row].hod), rw = b.rows.find((q) => q.lane === s.lane) || b.rows[0];
+    const b = blocks.find((q) => q.ps.some((pp) => pp.id === s.pid));
+    const ps = b?.ps.find((pp) => pp.id === s.pid);
+    if (b && ps) {
+      const x = sx(ps.rows[s.row].hod), rw = b.rows.find((q) => q.lane === s.lane) || b.rows[0];
       g.fillStyle = cssv('--fg'); g.fillRect(x - 0.5, top - 2, 1.5, bottom - top + 4);
       g.strokeStyle = cssv('--fg'); g.lineWidth = 1.5; rr(g, x - 3, rw.y - 1, 6, rw.h + 2, 3); g.stroke();
+      // seleção fora da área visível: rola o cartão até o bloco, uma vez por seleção
+      const chave = `${s.pid}:${s.row}`;
+      if (chave !== ultimaSel) {
+        ultimaSel = chave;
+        const fimB = b.rows[b.rows.length - 1].y + b.rows[b.rows.length - 1].h + 4;
+        if (b.titleY < wrap.scrollTop) wrap.scrollTop = b.titleY - 4;
+        else if (fimB > wrap.scrollTop + wrap.clientHeight) wrap.scrollTop = fimB - wrap.clientHeight;
+      }
     }
   }
 }
 
 /** Nomes dos projetos desenhados no unifilar, na ordem de cima para baixo (para os testes de interface). */
-export const blocosDoUnifilar = () => (lay ? lay.blocks.map((b) => b.p.meta.name) : []);
+export const blocosDoUnifilar = () => (lay ? lay.blocks.map((b) => b.titulo) : []);
+/** Lacunas desenhadas (km real), por bloco, para os testes de interface. */
+export const lacunasDoUnifilar = () => (lay ? lay.blocks.flatMap((b) => b.lacunas.map((l) => ({ bloco: b.titulo, ...l }))) : []);
+/** Planilhas de cada bloco, na ordem do km (para os testes de interface). */
+export const planilhasDoUnifilar = () => (lay ? lay.blocks.map((b) => b.ps.map((p) => p.meta.name)) : []);
 
 function uniHit(e: MouseEvent, uw: HTMLElement) {
   if (!lay) return null;
-  const r = uw.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+  const r = uw.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top + uw.scrollTop;
   if (x < lay.x0 || x > lay.x1) return null;
   const km = lay.kmi + ((x - lay.x0) / (lay.x1 - lay.x0)) * (lay.kmf - lay.kmi);
   const b = lay.blocks.find((bb) => y >= bb.titleY && y <= bb.rows[bb.rows.length - 1].y + bb.rows[bb.rows.length - 1].h + 4) || lay.blocks[0];
   let rw = b.rows[0];
   for (const q of b.rows) if (y >= q.y - 1) rw = q;
-  const p = b.p;
-  let lo = 0, hi = p.rows.length - 1;
-  while (lo < hi) { const m = (lo + hi) >> 1; if (p.rows[m].hod < km) lo = m + 1; else hi = m; }
-  let i = lo;
-  if (i > 0 && Math.abs(p.rows[i - 1].hod - km) < Math.abs(p.rows[i].hod - km)) i--;
-  return { x, p, i, lane: rw.lane, near: Math.abs(p.rows[i].hod - km) < 0.3 };
+  // dentro do bloco, vale a planilha cujo ponto está mais perto do km
+  let melhor: { p: AppProj; i: number; d: number } | null = null;
+  for (const p of b.ps) {
+    let lo = 0, hi = p.rows.length - 1;
+    while (lo < hi) { const m = (lo + hi) >> 1; if (p.rows[m].hod < km) lo = m + 1; else hi = m; }
+    let i = lo;
+    if (i > 0 && Math.abs(p.rows[i - 1].hod - km) < Math.abs(p.rows[i].hod - km)) i--;
+    const d = Math.abs(p.rows[i].hod - km);
+    if (!melhor || d < melhor.d) melhor = { p, i, d };
+  }
+  const { p, i, d } = melhor!;
+  return { x, p, i, lane: rw.lane, near: d < 0.3, multi: b.ps.length > 1 };
 }
 
 export function initUnifilar() {
@@ -195,7 +241,8 @@ export function initUnifilar() {
     if (!h || !h.near) { el.style.display = 'none'; return; }
     el.style.display = 'block';
     el.style.left = h.x + 'px';
-    el.firstElementChild!.textContent = 'km ' + h.p.kmLab[h.i];
+    (el.firstElementChild as HTMLElement).style.top = uw.scrollTop + 2 + 'px';
+    el.firstElementChild!.textContent = 'km ' + h.p.kmLab[h.i] + (h.multi ? ' · ' + projName(h.p) : '');
   });
   uw.addEventListener('mouseleave', () => { $('#unihover').style.display = 'none'; });
   window.addEventListener('resize', drawUni);

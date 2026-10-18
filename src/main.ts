@@ -12,7 +12,7 @@ import { initRevisao, onToolClick, refreshNotesLayer, refreshPropLayers, resolve
 import { abrirArquivos, abrirLidas, carregarConfig, restaurarProjetos } from './app/projetos';
 import { abrirConfig, atualizarAviso, configAberta, initConfig } from './app/config';
 import { focarAjustes, modosVisiveis, renderAll, renderSeg, setField, setMode, setTab, syncBaseSeg } from './app/paineis';
-import { blocosDoUnifilar, drawUni, initUnifilar } from './app/unifilar';
+import { blocosDoUnifilar, drawUni, lacunasDoUnifilar, planilhasDoUnifilar, initUnifilar } from './app/unifilar';
 import { ehCompacto, initLayout, setPainel } from './app/layout';
 import { alternarAlinhar } from './app/alinhar';
 import { alternarLimpo, initGrupos } from './app/grupos';
@@ -128,7 +128,7 @@ if (import.meta.env.DEV) {
   (window as unknown as { __pavecad: unknown }).__pavecad = {
     E,
     setField: (on: boolean, silencioso?: boolean) => { if (E.field !== on) setField(on); if (silencioso) $('#toast').classList.remove('on'); },
-    select, setTab, map: getMap, blocosDoUnifilar,
+    select, setTab, map: getMap, blocosDoUnifilar, lacunasDoUnifilar, planilhasDoUnifilar,
   };
 }
 

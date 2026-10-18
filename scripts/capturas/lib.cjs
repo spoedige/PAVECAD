@@ -13,14 +13,14 @@ const VPS = [
   { nome: 'tablet-v-820x1180', w: 820, h: 1180, toque: true },
 ];
 const TEMAS = ['claro', 'escuro', 'campo'];
-const FIXTURES = ['U_BR-050_GO_Crescente.xlsx', 'U_BR-050_GO_Decrescente.xlsx'].map((f) => path.join(RAIZ, 'testes/fixtures', f));
+const FIXTURES = ['rr_go_crescente.xlsx', 'rr_go_decrescente.xlsx'].map((f) => path.join(RAIZ, 'testes/fixtures', f));
 const TILE = { sat: fs.readFileSync(path.join(__dirname, 'tile-sat.png')), osm: fs.readFileSync(path.join(__dirname, 'tile-osm.png')) };
 
 /** opts.exemplos: carrega os JSON de referencia/dados pelo botão de exemplo (só em desenvolvimento) em vez das 2 planilhas GO, e tira a marginal para ficar com 4 planilhas (GO e MG, crescente e decrescente). */
 async function abrir(browser, vp, opts = {}) {
   const ctx = await browser.newContext({
     viewport: { width: vp.w, height: vp.h }, hasTouch: vp.toque, isMobile: vp.toque, deviceScaleFactor: 1,
-    geolocation: { latitude: -17.291, longitude: -47.757 }, permissions: ['geolocation'],
+    geolocation: { latitude: -12.791, longitude: -47.757 }, permissions: ['geolocation'],
   });
   const pg = await ctx.newPage();
   const log = { erros: [], tiles: [] };
@@ -50,8 +50,10 @@ async function abrir(browser, vp, opts = {}) {
     await pg.waitForTimeout(500);
   } else if (opts.arquivos) {
     // opts.arquivos: nomes em testes/fixtures; opts.projetos: quantos projetos esperar (um arquivo Planservi gera dois)
+    const t0 = Date.now();
     await pg.setInputFiles('#file', opts.arquivos.map((f) => path.resolve(RAIZ, 'testes/fixtures', f)));
-    await pg.waitForFunction((n) => window.__pavecad && window.__pavecad.E.P.length === n, opts.projetos, { timeout: 90000 });
+    await pg.waitForFunction((n) => window.__pavecad && window.__pavecad.E.P.length === n, opts.projetos, { timeout: 180000 });
+    log.cargaMs = Date.now() - t0; // do envio dos arquivos até todos os projetos na lista
   } else {
     await pg.setInputFiles('#file', FIXTURES);
     await pg.waitForFunction(() => window.__pavecad && window.__pavecad.E.P.length === 2, null, { timeout: 90000 });

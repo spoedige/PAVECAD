@@ -286,10 +286,10 @@ textarea:focus{box-shadow:inset 0 0 0 2px var(--accent)}
 .uni-h b{font-weight:600}
 .uni-h .sub{color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1;text-align:right}
 .uni-h .chipbtn{height:24px;font-size:var(--fs-meta);padding:0 9px;min-height:0}
-.uni-wrap{position:relative;flex:none;cursor:crosshair}
-#uni{position:absolute;inset:0;width:100%;height:100%;display:block}
-#unihover{position:absolute;top:0;bottom:0;width:0;border-left:1px solid var(--muted);display:none;pointer-events:none}
-#unihover span{position:absolute;top:-2px;left:6px;transform:translateY(-100%);background:var(--solid);border:var(--bw) solid var(--hair);border-radius:6px;padding:1px 6px;font-size:var(--fs-meta);font-weight:600;white-space:nowrap;box-shadow:var(--shadow)}
+.uni-wrap{position:relative;flex:none;cursor:crosshair;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}
+#uni{display:block;width:100%}
+#unihover{position:absolute;top:0;width:0;border-left:1px solid var(--muted);display:none;pointer-events:none}
+#unihover span{position:absolute;top:2px;left:6px;background:var(--solid);border:var(--bw) solid var(--hair);border-radius:6px;padding:1px 6px;font-size:var(--fs-meta);font-weight:600;white-space:nowrap;box-shadow:var(--shadow)}
 .uni.collapsed .uni-wrap{display:none}
 
 @media (max-width:900px){
@@ -537,3 +537,9 @@ details.qual .list{max-height:240px;overflow-y:auto}
 .al-sentidos{display:flex;flex-direction:column;gap:8px;padding:8px 10px;border-radius:10px;background:var(--warn-bg);border:var(--bw) solid var(--warn-bd)}
 .al-sentidos[hidden]{display:none}
 .al-sentidos .note{margin:0;color:var(--fg)}
+/* Resumo agrupado por rodovia: um grupo recolhível por rodovia */
+details.rgrp{border:var(--bw) solid var(--hair);border-radius:12px;padding:0 12px;background:var(--fill)}
+details.rgrp>summary{min-height:44px;gap:10px}
+details.rgrp .rg-n{display:flex;flex-direction:column;min-width:0}
+details.rgrp .rg-n .muted{font-size:var(--fs-meta);font-weight:400}
+details.rgrp .rg-c{display:flex;flex-direction:column;gap:14px;padding:4px 0 14px}
