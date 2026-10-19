@@ -8,7 +8,7 @@ import { $, esc, toast } from './ui';
 interface Fix { lat: number; lon: number; acc: number }
 export const gps = {
   on: false, follow: true, id: null as number | null, last: null as Fix | null,
-  lock: null as WakeLockSentinel | null, loc: null as Local | null, autoSel: false,
+  lock: null as WakeLockSentinel | null, loc: null as Local | null, autoSel: false, ultima: 0,
 };
 
 /** Círculo de precisão em torno da posição, em [lon, lat]. */
@@ -24,6 +24,7 @@ export function circle(lng: number, lat: number, rm: number): number[][] {
 function onFix(pos: GeolocationPosition) {
   const { latitude: lat, longitude: lon, accuracy: acc } = pos.coords;
   gps.last = { lat, lon, acc };
+  gps.ultima = Date.now();
   const m = getMap();
   if (E.mapReady) {
     setData('gps', {

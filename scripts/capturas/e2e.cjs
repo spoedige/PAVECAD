@@ -1375,6 +1375,51 @@ const TESTES = {
       assert.ok(Math.abs(ma - 1) < 1e-6 && Math.abs(mb) < 1e-6, 'o texto do rótulo continua de pé com o mapa girado (sem rotação): ' + b.marker);
     }, OPTS_NOVE],
   ],
+  t20: [
+    ['botões Nota e Ajustes na borda direita: 56 px, com rótulo, sem ficar sob nenhum outro elemento flutuante', TODOS, async (pg) => {
+      const m = await pg.evaluate(() => {
+        const cobertos = [], lista = [];
+        for (const id of ['btnNota', 'btnAjustes', 'btnNotasLista']) {
+          const e = document.getElementById(id), r = e.getBoundingClientRect();
+          lista.push({ id, w: Math.round(r.width), h: Math.round(r.height), txt: e.innerText.trim().replace(/\s+/g, ' ') });
+          for (const [fx, fy] of [[0.5, 0.5], [0.15, 0.15], [0.85, 0.15], [0.15, 0.85], [0.85, 0.85]]) {
+            const t = document.elementFromPoint(r.left + r.width * fx, r.top + r.height * fy);
+            if (!t || !(t === e || e.contains(t))) cobertos.push(`${id}@${fx},${fy}: ${t ? (t.id || t.className || t.tagName) : 'nada'}`);
+          }
+        }
+        const sel = ['#inspector', '#toolbar', '#unicard', '#legend', '#tools', '.titlecard', '.topbar', '.topright', '#gpschip', '#propbar', '.dock > *'];
+        const alvos = ['btnNota', 'btnAjustes', 'btnNotasLista'].map((id) => [id, document.getElementById(id).getBoundingClientRect()]);
+        const sobrepoe = [];
+        for (const [id, a] of alvos) for (const q of sel) for (const el of document.querySelectorAll(q)) {
+          if (!el.checkVisibility()) continue;
+          const b = el.getBoundingClientRect();
+          if (b.width < 2 || b.height < 2) continue;
+          if (a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top) sobrepoe.push(`${id} x ${q}`);
+        }
+        const noEcra = alvos.every(([, r]) => r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight);
+        return { cobertos, lista, sobrepoe, noEcra };
+      });
+      for (const id of ['btnNota', 'btnAjustes']) { const b = m.lista.find((x) => x.id === id); assert.ok(b.w >= 56 && b.h >= 56, `${id} com 56 px: ${b.w}x${b.h}`); }
+      assert.equal(m.lista.find((x) => x.id === 'btnNota').txt, 'Nota');
+      assert.equal(m.lista.find((x) => x.id === 'btnAjustes').txt, 'Ajustes');
+      assert.match(m.lista.find((x) => x.id === 'btnNotasLista').txt, /^Notas \(\d+\)$/);
+      assert.ok(m.lista.find((x) => x.id === 'btnNotasLista').h >= 31, 'atalho das notas discreto, mas tocável');
+      assert.deepEqual(m.cobertos, [], 'nenhum botão sob outro elemento');
+      assert.deepEqual(m.sobrepoe, [], 'nenhuma sobreposição com painel, barra de ferramentas, unifilar, legenda ou controles: ' + m.sobrepoe.join(', '));
+      assert.ok(m.noEcra, 'dentro da tela');
+    }],
+    ['botões da borda direita: Ajustes abre a aba, Notas abre a lista e Nota anota no meu local; o contador acompanha', ['1366x768'], async (pg) => {
+      await pg.click('#btnAjustes'); await pg.waitForTimeout(300);
+      assert.equal(await estado(pg, 'E => E.tab'), 'aj');
+      await pg.click('#btnNotasLista'); await pg.waitForTimeout(300);
+      assert.equal(await estado(pg, 'E => E.tab'), 'notas');
+      await pg.click('#btnNota'); await pg.waitForTimeout(1500);
+      const r = await pg.evaluate(() => { const e = window.__pavecad.E.editing; return e ? { tipo: e.type, lon: e.coords[0][0], lat: e.coords[0][1], novo: e.isNew } : null; });
+      assert.ok(r && r.novo && r.tipo === 'pin', 'nota nova em edição');
+      assert.ok(Math.abs(r.lat + 12.791) < 1e-4 && Math.abs(r.lon + 47.757) < 1e-4, `na posição do GPS: ${r.lat}, ${r.lon}`);
+      assert.equal(await estado(pg, 'E => E.tab'), 'notas');
+    }],
+  ],
   g03: [
     ['a seção é o seletor de faixa (clique, aria-pressed, teclado)', '1366x768', async (pg) => {
       await irParaKm(pg, '170+500'); await aba(pg, 'seg');

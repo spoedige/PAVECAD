@@ -237,6 +237,8 @@ export function startNote(type: Nota['type'], coords: number[][]) {
 }
 
 export function refreshNotesLayer() {
+  const contador = document.getElementById('notasN');
+  if (contador) contador.textContent = String(E.notes.length);
   if (!E.mapReady) return;
   const lista = E.notes.filter((n) => !E.editing || E.editing.id !== n.id || !E.editing.isNew).concat(E.editing ? [E.editing] : []);
   setData('notes', { type: 'FeatureCollection', features: lista.map((n) => ({ type: 'Feature', properties: { id: n.id, cat: n.cat }, geometry: noteGeom(n) })) });

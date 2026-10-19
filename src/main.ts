@@ -16,6 +16,7 @@ import { blocosDoUnifilar, drawUni, lacunasDoUnifilar, planilhasDoUnifilar, init
 import { ehCompacto, initLayout, setPainel } from './app/layout';
 import { alternarAlinhar } from './app/alinhar';
 import { alternarLimpo, initGrupos } from './app/grupos';
+import { initBordaDireita } from './app/bordaDireita';
 import { clearFocus } from './app/mapa';
 import { $, observarHud, observarRolagem, observarRolagemH, syncAllSegs, syncSeg, toast } from './app/ui';
 
@@ -141,6 +142,7 @@ async function boot() {
   await carregarConfig();
   await initRevisao();
   initUnifilar();
+  initBordaDireita();
   initConfig();
   initLayout();
   syncNitidezUi();
