@@ -1,3 +1,4 @@
+import type { DadosRapida } from '../dominio/notaRapida';
 import type maplibregl from 'maplibre-gl';
 import type { Feature } from 'geojson';
 import type { GeoOptions } from '../geometry/build';
@@ -38,7 +39,7 @@ export interface AppProj extends Project {
 
 export interface Sel { pid: string; row: number; lane: number }
 export type BaseKey = 'none' | 'osm' | 'esri';
-export type Ferramenta = 'pin' | 'prop' | null;
+export type Ferramenta = 'prop' | null;
 
 export const NOTE_CATS = {
   obs: { l: 'Observação', c: '#5e5ce6' },
@@ -59,6 +60,8 @@ export interface Nota {
   t: string;
   loc: { pid: string; name: string; km: string; lane: number } | null;
   isNew?: boolean;
+  /** Nota rápida de campo (pressão no mapa, botão direito ou botão Nota). As anotações antigas não têm. */
+  rapida?: DadosRapida;
 }
 
 export type FocoPred = (L: Lane, t: SolutionCode, r: Row, p: AppProj) => boolean;
@@ -75,6 +78,8 @@ export const E = {
   layers: { drain: true, km: true, poi: true, notes: true } as Record<'drain' | 'km' | 'poi' | 'notes', boolean>,
   mapReady: false,
   tool: null as Ferramenta,
+  /** Até quando (ms) o clique que sobra de uma pressão longa no mapa deve ser ignorado. */
+  cliqueSuprimidoAte: 0,
   notes: [] as Nota[],
   editing: null as Nota | null,
   props: [] as Proposta[],

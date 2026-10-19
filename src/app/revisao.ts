@@ -10,6 +10,7 @@ import { IC } from './icones';
 import { getMap, hitAt, renderLegend, select, setData } from './mapa';
 import * as db from './persist';
 import { setTab } from './paineis';
+import { bindRapidas, rapidasHtml } from './notaRapidaLista';
 import { $, cssv, esc, fmt, syncSeg, toast } from './ui';
 
 const tc = (k: string) => trColor(k, E.field, cssv('--none'));
@@ -33,12 +34,6 @@ export function setTool(t: typeof E.tool) {
 
 /** Cliques com ferramenta ativa. */
 export function onToolClick(e: MapMouseEvent): boolean {
-  if (E.tool === 'pin') {
-    const c = [+e.lngLat.lng.toFixed(7), +e.lngLat.lat.toFixed(7)];
-    setTool(null);
-    startNote('pin', [c]);
-    return true;
-  }
   if (E.tool === 'prop') {
     const h = hitAt(e.point);
     if (h && 'p' in h) propToggle(h.p, h.row, h.lane);
@@ -237,7 +232,7 @@ export function startNote(type: Nota['type'], coords: number[][]) {
 }
 
 export function refreshNotesLayer() {
-  const contador = document.getElementById('notasN');
+  const contador = document.getElementById('ppN');
   if (contador) contador.textContent = String(E.notes.length);
   if (!E.mapReady) return;
   const lista = E.notes.filter((n) => !E.editing || E.editing.id !== n.id || !E.editing.isNew).concat(E.editing ? [E.editing] : []);
@@ -299,9 +294,9 @@ export function renderNotes() {
       <textarea id="noteText" placeholder="Descreva a ocorrência, a dúvida ou a decisão" aria-label="Texto da nota">${esc(ed.text)}</textarea>
       <div class="photos">${ed.photos.map((src, i) => `<div><img src="${src}" alt="Foto ${i + 1}"><button data-ph="${i}" aria-label="Remover foto">${IC.x}</button></div>`).join('')}</div>
       <div class="btns"><button class="btn" id="nPhoto">${IC.cam} Foto</button><button class="btn p" id="nSave">Salvar</button><button class="btn" id="nCancel">${ed.isNew ? 'Descartar' : 'Fechar'}</button>${ed.isNew ? '' : `<button class="btn d" id="nDel">${IC.trash} Excluir</button>`}</div></div></div>` : '';
-  const list = E.notes.filter((n) => !ed || n.id !== ed.id).sort((a, b) => b.t.localeCompare(a.t));
-  el.innerHTML = `${form}${propsHtml()}${qualidadeHtml()}
-    <div><div class="sect">Anotações <span style="text-transform:none;font-weight:500">${E.notes.length}</span></div>
+  const list = E.notes.filter((n) => !n.rapida && (!ed || n.id !== ed.id)).sort((a, b) => b.t.localeCompare(a.t));
+  el.innerHTML = `${form}${rapidasHtml()}${propsHtml()}${qualidadeHtml()}
+    <div><div class="sect">Anotações <span style="text-transform:none;font-weight:500">${E.notes.filter((n) => !n.rapida).length}</span></div>
       ${list.length ? `<div class="list">${list.map((n) => `<div class="note-card"><button class="note-top" data-n="${n.id}"><span class="sw" style="background:${NOTE_CATS[n.cat].c};width:12px;height:12px"></span>
         <span class="t"><b>${esc(n.text || 'Sem texto')}</b><span>${NOTE_CATS[n.cat].l} · ${noteSummary(n)}${n.loc ? ' · ' + esc(locDe(n.loc).name) + ' km ' + esc(locDe(n.loc).km) : ''} · ${new Date(n.t).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}${n.photos?.length ? ' · ' + n.photos.length + ' foto(s)' : ''}</span></span></button></div>`).join('')}</div>`
         : (ed ? '' : '<p class="vazio">Nenhuma anotação. Use o ponto no mapa (P).</p>')}</div>
@@ -333,6 +328,7 @@ export function renderNotes() {
   // as listas abertas continuam abertas quando o painel é refeito
   el.querySelectorAll<HTMLDetailsElement>('details.qual').forEach((d) => { if (qualAbertas.has(d.dataset.qp!)) d.open = true; d.addEventListener('toggle', () => { d.open ? qualAbertas.add(d.dataset.qp!) : qualAbertas.delete(d.dataset.qp!); }); });
   bindProps(el);
+  bindRapidas(el);
   $('#exCopy').onclick = () => copiar(JSON.stringify(notesGeoJSON(false), null, 1), 'GeoJSON copiado');
   $('#exDown').onclick = () => {
     try {

@@ -16,7 +16,8 @@ import { blocosDoUnifilar, drawUni, lacunasDoUnifilar, planilhasDoUnifilar, init
 import { ehCompacto, initLayout, setPainel } from './app/layout';
 import { alternarAlinhar } from './app/alinhar';
 import { alternarLimpo, initGrupos } from './app/grupos';
-import { initBordaDireita } from './app/bordaDireita';
+import { fecharPinoNotas, initPinoNotas, alternarPinoNotas } from './app/pinoNotas';
+import { fecharNotaRapida, initNotaRapida } from './app/notaRapida';
 import { clearFocus } from './app/mapa';
 import { $, observarHud, observarRolagem, observarRolagemH, syncAllSegs, syncSeg, toast } from './app/ui';
 
@@ -90,6 +91,7 @@ window.addEventListener('keydown', (e) => {
   if (k >= '1' && k <= '9') { const v = modosVisiveis(); if (+k - 1 < v.length) setMode(v[+k - 1]); return; }
   if (k === '/') { e.preventDefault(); $('#gokm').focus(); return; }
   if (k === 'Escape') {
+    if (fecharNotaRapida() || fecharPinoNotas()) return;
     if (E.tool) { setTool(null); return; }
     if (E.editing) { E.editing = null; refreshNotesLayer(); renderAll(); return; }
     if (E.focus) { clearFocus(); return; }
@@ -98,7 +100,7 @@ window.addEventListener('keydown', (e) => {
   }
   const lk = k.toLowerCase();
   if (lk === 'h') { alternarLimpo(); return; }
-  if (lk === 'p') { setTool('pin'); return; }
+  if (lk === 'p') { alternarPinoNotas(); return; }
   if (lk === 'n') { setTool('prop'); return; }
   if (lk === 'q') { rotate(-15); return; }
   if (lk === 'e') { rotate(15); return; }
@@ -142,7 +144,6 @@ async function boot() {
   await carregarConfig();
   await initRevisao();
   initUnifilar();
-  initBordaDireita();
   initConfig();
   initLayout();
   syncNitidezUi();
@@ -160,6 +161,8 @@ async function boot() {
     updateStakes();
     if (E.P.length) fitAll(true);
   });
+  initNotaRapida(); // depois do initMap: precisa da instância do mapa
+  initPinoNotas();
   syncAllSegs();
   syncSeg($('#modes'));
   const n = await restaurarProjetos();

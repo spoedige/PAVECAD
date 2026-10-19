@@ -92,7 +92,6 @@ export function initMap(onReady: () => void) {
   map.on('click', onMapClick);
   const tip = $('#tip');
   map.on('mousemove', (e) => {
-    if (E.tool === 'pin') { map.getCanvas().style.cursor = 'crosshair'; return; }
     const h = hitAt(e.point);
     map.getCanvas().style.cursor = E.tool === 'prop' ? 'crosshair' : h ? 'pointer' : '';
     if (!h) { tip.style.display = 'none'; return; }
@@ -553,6 +552,7 @@ export function stepSel(dr: number, dl: number) {
 }
 
 function onMapClick(e: MapMouseEvent) {
+  if (Date.now() < E.cliqueSuprimidoAte) return; // o clique que sobra de uma pressão longa não seleciona nada
   if (H.onClick(e)) return;
   const h = hitAt(e.point);
   if (!h) return;
