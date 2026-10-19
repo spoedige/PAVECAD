@@ -569,14 +569,6 @@ details.rgrp .rg-c{display:flex;flex-direction:column;gap:14px;padding:4px 0 14p
 html.limpo .nr-dica{display:none}
 .nr-dica button{pointer-events:auto}
 /* lista de notas de campo */
-.nrl-filtros{display:grid;grid-template-columns:1fr 1fr;gap:6px}
-.nrl-filtros select{min-height:36px;border-radius:10px;border:var(--bw) solid var(--hair);background:var(--fill);color:var(--fg);padding:0 8px;font:inherit}
-.nrl-card.resolvida .nrl-t{text-decoration:line-through;opacity:.65}
-.nrl-ic{display:inline-flex;width:22px;height:22px;flex:none}
-.nrl-ic .i{width:22px;height:22px}
-.nrl-acoes{display:flex;flex-wrap:wrap;gap:6px}
-.nrl-acoes .btn{min-height:36px;padding:3px 10px;font-size:var(--fs-meta)}
-.nrl-lembrete{margin:0;padding:6px 10px;border-radius:10px;background:var(--warn-bg);border:var(--bw) solid var(--warn-bd);font-size:var(--fs-meta)}
 /* popover do pino da barra de ferramentas */
 .topright{position:relative}
 .pinpop{position:absolute;top:calc(100% + 8px);right:0;z-index:8;min-width:236px;padding:6px;display:flex;flex-direction:column;gap:2px;border-radius:16px}
@@ -594,3 +586,17 @@ html.h-ferramentas .pinpop,html.limpo .pinpop{display:none}
 .toast-nota input{min-height:40px;min-width:200px;border-radius:10px;border:var(--bw) solid var(--hair);background:var(--fill);color:var(--fg);padding:0 10px;font:inherit}
 /* o popover nasce dentro do .hud (z 5): enquanto aberto, o .hud passa por cima do painel direito */
 .hud:has(.pinpop:not([hidden])){z-index:9}
+/* itens das notas na lista de ocorrências e backup */
+.nrl-ic{display:inline-flex;width:22px;height:22px;flex:none}
+.nrl-ic .i{width:22px;height:22px}
+.nri-l{display:flex;align-items:center;gap:4px;padding-right:4px}
+.nri-go{flex:1 1 auto;min-width:0;display:flex;align-items:center;gap:10px;border:0;background:none;color:var(--fg);font:inherit;text-align:left;padding:6px 4px;min-height:44px}
+.nri-s{display:block;font-size:var(--fs-meta)}
+.nri-obs{display:block;font-size:var(--fs-meta);color:var(--fg);white-space:normal}
+.nri .iconbtn{width:36px;height:36px;flex:none}
+.nri.resolvida .nri-go b{text-decoration:line-through;opacity:.65}
+.nri-obsrow{display:flex;gap:6px;padding:0 4px 6px 36px}
+.nri-obsrow input{flex:1;min-width:0;min-height:40px;border-radius:10px;border:var(--bw) solid var(--hair);background:var(--fill);color:var(--fg);padding:0 10px;font:inherit}
+.nrl-lembrete{margin:0;padding:6px 10px;border-radius:10px;background:var(--warn-bg);border:var(--bw) solid var(--warn-bd);font-size:var(--fs-meta)}
+details.bk{margin-top:6px;opacity:.85}
+@media (pointer: coarse){.nri .iconbtn{width:44px;height:44px}}

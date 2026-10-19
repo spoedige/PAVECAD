@@ -10,7 +10,10 @@ import { IC } from './icones';
 import { getMap, hitAt, renderLegend, select, setData } from './mapa';
 import * as db from './persist';
 import { setTab } from './paineis';
-import { bindRapidas, rapidasHtml } from './notaRapidaLista';
+import { bindItensNotas, itemNotaHtml } from './notasItens';
+import { baixarCsv, baixarXlsx, compartilharNotas } from './exportNotas';
+import { notasNovasSemExportar } from './notaRapida';
+import { precisaLembrar } from '../dominio/notaRapida';
 import { $, cssv, esc, fmt, syncSeg, toast } from './ui';
 
 const tc = (k: string) => trColor(k, E.field, cssv('--none'));
@@ -253,13 +256,22 @@ const qualAbertas = new Set<string>();
 const MAX_OC = 60;
 const ROT_TIPO: Record<string, string> = { repetido: 'ponto repetido', salto: 'salto', retrocedendo: 'retrocedendo', inicial: 'ponto inicial', final: 'ponto final' };
 const ROT_INV: Record<string, string> = { curto: 'segmento com menos de 1 m', cruzado: 'polígono cruzado', 'sem-area': 'polígono sem área' };
-function qualidadeHtml(): string {
-  const com = E.P.filter((p) => p.qualidade || p.camadas.invalidos?.length);
-  if (!com.length) return '';
-  const linhas = com.map((p) => {
-    const q = p.qualidade, inv = p.camadas.invalidos ?? [];
+/** Planilhas sem ocorrência ficam escondidas quando há ocorrências em outras (menos que o usuário peça para mostrar). */
+let mostrarVazias = false;
+function ocorrenciasHtml(): string {
+  const rapidas = E.notes.filter((n) => n.rapida) as Nota[];
+  const doProjeto = (id: string) => rapidas.filter((n) => n.loc?.pid === id && getP(id));
+  const com = E.P.filter((p) => p.qualidade || p.camadas.invalidos?.length || doProjeto(p.id).length);
+  // notas fora do trecho, sem planilha ou de planilha que já saiu da lista: um grupo por nome
+  const orfas = new Map<string, Nota[]>();
+  for (const n of rapidas) if (!(n.loc && getP(n.loc.pid))) { const k = n.rapida!.planilha ?? ''; (orfas.get(k) ?? orfas.set(k, []).get(k)!).push(n); }
+  if (!com.length && !orfas.size) return '';
+  const grupos: { n: number; html: string }[] = [];
+  const notasHtml = (ns: Nota[]) => ns.slice().sort((a, b) => b.t.localeCompare(a.t)).map(itemNotaHtml).join('');
+  for (const p of com) {
+    const q = p.qualidade, inv = p.camadas.invalidos ?? [], notas = doProjeto(p.id) as Nota[];
     const corr = q?.corrigidos ?? [], cortes = q?.cortes ?? [], saltos = q?.saltos ?? [], sentidos = q?.sentidos ?? [];
-    const n = corr.length + cortes.length + saltos.length + sentidos.length + inv.length;
+    const nq = corr.length + cortes.length + saltos.length + sentidos.length + inv.length, n = nq + notas.length;
     const oc = (i: number, km: string, rot: string) => `<button class="row" data-q="${p.id}:${i}" aria-label="Ir ao km ${esc(km)}"><div class="grow"><b class="num">km ${esc(km)}</b> <span class="muted">${esc(rot)}</span></div>${IC.next}</button>`;
     const nbr = (v: number) => v.toLocaleString('pt-BR');
     const K = (i: number, real: string) => (E.privacidade ? p.kmLab[Math.max(0, Math.min(i, p.kmLab.length - 1))] : real);
@@ -271,16 +283,33 @@ function qualidadeHtml(): string {
       ...inv.map((x) => oc(x.row, p.kmLab[x.row], `${ROT_INV[x.motivo] ?? x.motivo}${x.lane ? ' na Fx ' + x.lane : ' no acostamento'}: só a linha central`)),
     ];
     const resumo = [
+      notas.length ? `${notas.length} nota${notas.length === 1 ? '' : 's'}` : '',
       corr.length ? `${corr.length} corrigida${corr.length === 1 ? '' : 's'}` : '',
       cortes.length ? `${cortes.length} corte${cortes.length === 1 ? '' : 's'}` : '',
       saltos.length ? `${saltos.length} salto${saltos.length === 1 ? '' : 's'} fora de ${q!.faixaSalto[0]} a ${q!.faixaSalto[1]} m` : '',
       sentidos.length ? `${sentidos.length} acima de ${q!.maxSentidos} m entre os sentidos` : '',
       inv.length ? `${inv.length} polígono${inv.length === 1 ? '' : 's'} só em linha` : '',
     ].filter(Boolean).join(' · ') || 'Nenhuma ocorrência';
-    return `<details class="qual" data-qp="${p.id}"><summary><span><b>${esc(projName(p))}</b><span class="muted num" style="display:block;font-size:var(--fs-meta);font-weight:400">${esc(resumo)}</span></span><span class="num ${n ? '' : 'muted'}">${n}</span></summary>
-      ${n ? `<div class="list" style="margin-top:8px">${itens.slice(0, MAX_OC).join('')}${itens.length > MAX_OC ? `<p class="note" style="padding:8px 10px;margin:0">e mais ${itens.length - MAX_OC} ocorrências, no log da aba Ajustes.</p>` : ''}</div>` : '<p class="vazio" style="margin-top:8px">Nenhuma ocorrência.</p>'}</details>`;
-  }).join('');
-  return `<div><div class="sect">Qualidade das coordenadas</div>${linhas}<p class="note" style="margin-top:7px">Pontos reconstruídos pelo km quando a coordenada da planilha estava repetida, saltando ou retrocedendo. A planilha original não muda. O mesmo resumo está no log da aba Ajustes.</p></div>`;
+    const corpo = n ? `<div class="list" style="margin-top:8px">${notasHtml(notas)}${itens.slice(0, MAX_OC).join('')}${itens.length > MAX_OC ? `<p class="note" style="padding:8px 10px;margin:0">e mais ${itens.length - MAX_OC} ocorrências, no log da aba Ajustes.</p>` : ''}</div>` : '<p class="vazio" style="margin-top:8px">Nenhuma ocorrência.</p>';
+    grupos.push({ n, html: `<details class="qual" data-qp="${p.id}"><summary><span><b>${esc(projName(p))}</b><span class="muted num" style="display:block;font-size:var(--fs-meta);font-weight:400">${esc(resumo)}</span></span><span class="num ${n ? '' : 'muted'}">${n}</span></summary>${corpo}</details>` });
+  }
+  for (const [nome, ns] of orfas) {
+    const titulo = E.privacidade || !nome ? 'Fora do trecho ou sem planilha' : nome;
+    grupos.push({ n: ns.length, html: `<details class="qual" data-qp="orf:${esc(nome)}"><summary><span><b>${esc(titulo)}</b><span class="muted num" style="display:block;font-size:var(--fs-meta);font-weight:400">${ns.length} nota${ns.length === 1 ? '' : 's'}</span></span><span class="num">${ns.length}</span></summary><div class="list" style="margin-top:8px">${notasHtml(ns)}</div></details>` });
+  }
+  const algumaComOcorrencia = grupos.some((g) => g.n > 0), vazias = grupos.filter((g) => g.n === 0).length;
+  const visiveis = algumaComOcorrencia && !mostrarVazias ? grupos.filter((g) => g.n > 0) : grupos;
+  const alternar = algumaComOcorrencia && vazias ? `<button type="button" class="btn" id="qVazias" style="margin-top:6px">${mostrarVazias ? 'Esconder' : 'Mostrar'} planilhas sem ocorrências (${vazias})</button>` : '';
+  return `<div><div class="sect">Ocorrências</div>${visiveis.map((g) => g.html).join('')}${alternar}<p class="note" style="margin-top:7px">Notas de campo e pontos reconstruídos pelo km quando a coordenada da planilha estava repetida, saltando ou retrocedendo. A planilha original não muda. O mesmo resumo está no log da aba Ajustes.</p></div>`;
+}
+
+/** Exportar as notas: planilha (principal), CSV e compartilhar. */
+function exportarHtml(): string {
+  const n = E.notes.length, novas = notasNovasSemExportar();
+  const lembrete = precisaLembrar(novas) ? `<p class="nrl-lembrete" style="margin-bottom:8px">${novas} notas novas sem exportar. Baixe a planilha para guardar uma cópia.</p>` : '';
+  return `<div><div class="sect">Exportar notas <span style="text-transform:none;font-weight:500">${n}</span></div>${lembrete}
+    <div class="btns"><button class="btn p" id="exXlsx" ${n ? '' : 'disabled'}>Baixar planilha (.xlsx)</button><button class="btn" id="exCsv" ${n ? '' : 'disabled'}>Baixar CSV</button><button class="btn" id="exShare" ${n ? '' : 'disabled'}>Compartilhar</button></div>
+    <p class="note" style="margin-top:7px">As notas ficam neste aparelho e funcionam sem internet. A planilha traz data, hora, local, coordenadas em graus e UTM.</p></div>`;
 }
 
 export function renderNotes() {
@@ -295,13 +324,12 @@ export function renderNotes() {
       <div class="photos">${ed.photos.map((src, i) => `<div><img src="${src}" alt="Foto ${i + 1}"><button data-ph="${i}" aria-label="Remover foto">${IC.x}</button></div>`).join('')}</div>
       <div class="btns"><button class="btn" id="nPhoto">${IC.cam} Foto</button><button class="btn p" id="nSave">Salvar</button><button class="btn" id="nCancel">${ed.isNew ? 'Descartar' : 'Fechar'}</button>${ed.isNew ? '' : `<button class="btn d" id="nDel">${IC.trash} Excluir</button>`}</div></div></div>` : '';
   const list = E.notes.filter((n) => !n.rapida && (!ed || n.id !== ed.id)).sort((a, b) => b.t.localeCompare(a.t));
-  el.innerHTML = `${form}${rapidasHtml()}${propsHtml()}${qualidadeHtml()}
+  el.innerHTML = `${form}${propsHtml()}${ocorrenciasHtml()}
     <div><div class="sect">Anotações <span style="text-transform:none;font-weight:500">${E.notes.filter((n) => !n.rapida).length}</span></div>
       ${list.length ? `<div class="list">${list.map((n) => `<div class="note-card"><button class="note-top" data-n="${n.id}"><span class="sw" style="background:${NOTE_CATS[n.cat].c};width:12px;height:12px"></span>
         <span class="t"><b>${esc(n.text || 'Sem texto')}</b><span>${NOTE_CATS[n.cat].l} · ${noteSummary(n)}${n.loc ? ' · ' + esc(locDe(n.loc).name) + ' km ' + esc(locDe(n.loc).km) : ''} · ${new Date(n.t).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}${n.photos?.length ? ' · ' + n.photos.length + ' foto(s)' : ''}</span></span></button></div>`).join('')}</div>`
         : (ed ? '' : '<p class="vazio">Nenhuma anotação. Use o ponto no mapa (P).</p>')}</div>
-    <div><div class="sect">Exportar e importar</div><div class="btns"><button class="btn" id="exCopy" ${E.notes.length ? '' : 'disabled'}>Copiar GeoJSON</button><button class="btn" id="exDown" ${E.notes.length ? '' : 'disabled'}>Baixar GeoJSON</button><button class="btn" id="exImp">Importar</button></div>
-      <p class="note" style="margin-top:7px">As anotações ficam no armazenamento deste navegador. Exporte para levar a outro aparelho ou compartilhar.</p></div>`;
+    ${exportarHtml()}`;
 
   if (ed) {
     const txt = () => { ed.text = $<HTMLTextAreaElement>('#noteText').value; };
@@ -328,18 +356,12 @@ export function renderNotes() {
   // as listas abertas continuam abertas quando o painel é refeito
   el.querySelectorAll<HTMLDetailsElement>('details.qual').forEach((d) => { if (qualAbertas.has(d.dataset.qp!)) d.open = true; d.addEventListener('toggle', () => { d.open ? qualAbertas.add(d.dataset.qp!) : qualAbertas.delete(d.dataset.qp!); }); });
   bindProps(el);
-  bindRapidas(el);
-  $('#exCopy').onclick = () => copiar(JSON.stringify(notesGeoJSON(false), null, 1), 'GeoJSON copiado');
-  $('#exDown').onclick = () => {
-    try {
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(new Blob([JSON.stringify(notesGeoJSON(true))], { type: 'application/geo+json' }));
-      a.download = 'anotacoes-pavecad.geojson';
-      document.body.appendChild(a); a.click(); a.remove();
-      toast('Arquivo gerado');
-    } catch { toast('Download indisponível aqui. Use Copiar GeoJSON.'); }
-  };
-  $('#exImp').onclick = () => $('#importIn').click();
+  bindItensNotas(el);
+  const vz = document.getElementById('qVazias');
+  if (vz) vz.onclick = () => { mostrarVazias = !mostrarVazias; renderNotes(); };
+  $('#exXlsx').onclick = () => void baixarXlsx();
+  $('#exCsv').onclick = () => baixarCsv();
+  $('#exShare').onclick = () => void compartilharNotas();
 }
 
 export function openNote(id: string) {
@@ -352,12 +374,25 @@ export function openNote(id: string) {
   getMap().flyTo({ center: n.coords[0] as [number, number], zoom: Math.max(getMap().getZoom(), 17), duration: 700 });
 }
 
+/** "Backup (.json)": as notas deste aparelho em GeoJSON, com fotos e os campos das notas rápidas, para restaurar depois. */
+export function baixarBackup() {
+  if (!E.notes.length) { toast('Nenhuma nota para fazer backup'); return; }
+  try {
+    const d = new Date(), z = (v: number) => String(v).padStart(2, '0');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(notesGeoJSON(true))], { type: 'application/json' }));
+    a.download = `pavecad-backup-${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    toast('Backup gerado');
+  } catch { toast('Download indisponível aqui'); }
+}
+
 export function notesGeoJSON(withPhotos: boolean) {
   return {
     type: 'FeatureCollection',
     features: E.notes.map((n) => ({
       type: 'Feature',
-      properties: { id: n.id, categoria: NOTE_CATS[n.cat].l, texto: n.text, criado: n.t, planilha: n.loc ? locDe(n.loc).name : null, km: n.loc ? locDe(n.loc).km : null, faixa: n.loc?.lane ?? null, ...(withPhotos ? { fotos: n.photos } : { fotos_qtd: (n.photos || []).length }) },
+      properties: { id: n.id, categoria: NOTE_CATS[n.cat].l, texto: n.text, criado: n.t, planilha: n.loc ? locDe(n.loc).name : null, km: n.loc ? locDe(n.loc).km : null, faixa: n.loc?.lane ?? null, ...(withPhotos ? { fotos: n.photos } : { fotos_qtd: (n.photos || []).length }), ...(n.rapida ? { rapida: n.rapida, local: n.loc } : {}) },
       geometry: noteGeom(n),
     })),
   };
@@ -372,7 +407,7 @@ export function importarNotas(gj: { features?: { geometry?: GeoJSON.Geometry; pr
     if (!type) continue;
     const coords = type === 'pin' ? [(g as GeoJSON.Point).coordinates] : type === 'line' ? (g as GeoJSON.LineString).coordinates : (g as GeoJSON.Polygon).coordinates[0].slice(0, -1);
     const cat = (Object.keys(NOTE_CATS) as NoteCat[]).find((k) => NOTE_CATS[k].l === pr.categoria) ?? 'obs';
-    const n: Nota = { id: 'n' + Date.now().toString(36) + c, type, coords, cat, text: String(pr.texto ?? ''), photos: (pr.fotos as string[]) ?? [], t: String(pr.criado ?? new Date().toISOString()), loc: null };
+    const n: Nota = { id: 'n' + Date.now().toString(36) + c, type, coords, cat, text: String(pr.texto ?? ''), photos: (pr.fotos as string[]) ?? [], t: String(pr.criado ?? new Date().toISOString()), loc: (pr.local as Nota['loc']) ?? null, ...(pr.rapida ? { rapida: pr.rapida as Nota['rapida'] } : {}) };
     E.notes.push(n);
     db.gravar('notes', n);
     c++;

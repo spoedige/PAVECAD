@@ -5,9 +5,7 @@ import { prepareProject } from '../src/geometry/project';
 import { fromUtm } from '../src/geometry/utm';
 import { parseSpreadsheetAll } from '../src/formats';
 import { type LocP } from '../src/dominio/localizar';
-import {
-  FILTRO_VAZIO, LIMITE_PROXIMO_M, TIPOS_RAPIDOS, dadosDeLocal, filtrarRapidas, notasCsv, posicionarMenu, precisaLembrar, resolverLocal, type NotaRap,
-} from '../src/dominio/notaRapida';
+import { LIMITE_PROXIMO_M, dadosDeLocal, posicionarMenu, precisaLembrar, resolverLocal } from '../src/dominio/notaRapida';
 
 const { gerarPlanservi } = createRequire(import.meta.url)('../scripts/sinteticos.cjs') as { gerarPlanservi: (o: Record<string, unknown>) => Buffer };
 
@@ -131,57 +129,8 @@ describe('menu circular', () => {
   });
 });
 
-describe('lista, filtros, CSV e lembrete', () => {
-  const nota = (id: string, tipo: keyof typeof TIPOS_RAPIDOS, extra: Partial<NonNullable<NotaRap['rapida']>> = {}, t = '2026-10-19T12:00:00.000Z', text = ''): NotaRap => ({
-    id, t, text, coords: [[-47.9, -15.2]],
-    rapida: { tipo, origem: 'pressao', precisao: null, rodovia: 'RD-001', sentido: 'Crescente', planilha: 'RD-001 · TH01 · Crescente', km: '10+400', faixa: 1, estado: 'dentro', resolvida: false, ...extra },
-  });
-  const lista = [
-    nota('a', 'melhorar', {}, '2026-10-19T10:00:00.000Z'),
-    nota('b', 'retirar', { sentido: 'Decrescente', origem: 'gps', precisao: 8 }, '2026-10-19T11:00:00.000Z'),
-    nota('c', 'dreno_mais', { rodovia: 'RD-002' }, '2026-10-19T12:00:00.000Z'),
-    { id: 'x', t: '2026-10-19T13:00:00.000Z', text: 'anotação antiga', coords: [[-47, -15]] } as NotaRap,
-  ];
-
-  it('só as notas rápidas entram, da mais nova para a mais antiga', () => {
-    expect(filtrarRapidas(lista, FILTRO_VAZIO).map((n) => n.id)).toEqual(['c', 'b', 'a']);
-  });
-
-  it('filtra por tipo, rodovia, sentido e origem', () => {
-    expect(filtrarRapidas(lista, { ...FILTRO_VAZIO, tipo: 'retirar' }).map((n) => n.id)).toEqual(['b']);
-    expect(filtrarRapidas(lista, { ...FILTRO_VAZIO, rodovia: 'RD-002' }).map((n) => n.id)).toEqual(['c']);
-    expect(filtrarRapidas(lista, { ...FILTRO_VAZIO, sentido: 'Decrescente' }).map((n) => n.id)).toEqual(['b']);
-    expect(filtrarRapidas(lista, { ...FILTRO_VAZIO, origem: 'gps' }).map((n) => n.id)).toEqual(['b']);
-    expect(filtrarRapidas(lista, { ...FILTRO_VAZIO, origem: 'gps', tipo: 'melhorar' })).toEqual([]);
-  });
-
-  it('CSV com ";", vírgula decimal, UTM e aspas escapadas', () => {
-    const csv = notasCsv([nota('a', 'melhorar', { precisao: 7.4, origem: 'gps' }, '2026-10-19T12:00:00.000Z', 'trinca; "grave"'), lista[3]], { eol: '\r\n' });
-    const [cab, lin, resto] = csv.split('\r\n');
-    expect(resto).toBeUndefined(); // a anotação antiga não é nota rápida
-    expect(cab).toBe('id;tipo;data_hora;latitude;longitude;fuso_utm;utm_e;utm_n;origem;precisao_m;planilha;rodovia;sentido;faixa;km;situacao_local;observacao;resolvida');
-    expect(lin).toContain('"Melhorar solução"');
-    expect(lin).toContain('-15,2000000;-47,9000000');
-    expect(lin).toMatch(/;\d{2}S;\d{6},\d{2};\d{7},\d{2};gps;7;/);
-    expect(lin).toContain('"trinca; ""grave"""');
-    expect(lin.replace(/"[^"]*(""[^"]*)*"/g, '')).not.toMatch(/\d\.\d/); // nenhum ponto decimal fora das aspas
-  });
-
-  it('nota sem planilha sai com trecho não definido e colunas vazias', () => {
-    const n = nota('s', 'dreno_menos', { rodovia: null, sentido: null, planilha: null, km: null, faixa: null, estado: 'sem-planilha' });
-    const linha = notasCsv([n]).split('\n')[1];
-    expect(linha).toContain('"trecho não definido"');
-    expect(linha).toContain('"";"";;;;');
-  });
-
-  it('o privacidade troca nome e km pelo que o app mostra', () => {
-    const linha = notasCsv([nota('a', 'melhorar')], { planilha: () => 'Planilha 1 · Crescente', km: () => '0+400' }).split('\n')[1];
-    expect(linha).toContain('"Planilha 1 · Crescente"');
-    expect(linha).toContain(';0+400;');
-    expect(linha).not.toContain('10+400');
-  });
-
-  it('lembrete de exportar depois de 10 notas novas', () => {
+describe('lembrete de exportar', () => {
+  it('depois de 10 notas novas sem exportar', () => {
     expect(precisaLembrar(9)).toBe(false);
     expect(precisaLembrar(10)).toBe(true);
   });

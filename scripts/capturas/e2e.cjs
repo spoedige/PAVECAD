@@ -20,7 +20,7 @@ const OPTS_NOVE = { arquivos: NOVE, projetos: 18 };
 /** Centra o mapa no polígono da faixa e devolve onde ele está na página (e a posição em graus). */
 async function centrarNaFaixa(pg, iProj, row, lane, zoom = 18.5) {
   const r = await pg.evaluate(({ iProj, row, lane, zoom }) => {
-    const E = window.__pavecad.E, m = window.__pavecad.map(), p = E.P[iProj], f = p.polyByFid.get(row * 8 + lane), ring = f.geometry.coordinates[0], n = ring.length - 1;
+    const E = window.__pavecad.E, m = window.__pavecad.map(), p = typeof iProj === 'string' ? E.P.find((q) => new RegExp(iProj).test(q.meta.name)) : E.P[iProj], f = p.polyByFid.get(row * 8 + lane), ring = f.geometry.coordinates[0], n = ring.length - 1;
     const lon = ring.slice(0, n).reduce((a, c) => a + c[0], 0) / n, lat = ring.slice(0, n).reduce((a, c) => a + c[1], 0) / n;
     m.jumpTo({ center: [lon, lat], zoom, bearing: 0 });
     return { lon, lat };
@@ -609,8 +609,11 @@ const TESTES = {
     ['Planservi: a aba Revisão mostra a qualidade da importação, com o km de cada ocorrência, e o log traz o mesmo', ['1366x768'], async (pg) => {
       await aba(pg, 'notas');
       const sec = await pg.evaluate(() => ({ titulo: [...document.querySelectorAll('#t-notas .sect')].map((e) => e.textContent.trim()), itens: [...document.querySelectorAll('#t-notas details.qual')].map((d) => d.querySelector('summary b').textContent) }));
-      assert.ok(sec.titulo.some((t) => /Qualidade das coordenadas/.test(t)));
-      assert.equal(sec.itens.length, 4, 'um item por projeto: ' + sec.itens.join(' | '));
+      assert.ok(sec.titulo.some((t) => /Ocorrências/.test(t)));
+      // planilhas sem ocorrência ficam atrás de "mostrar vazias" quando há ocorrências em outras
+      const escondidas = await pg.evaluate(() => { const b = document.querySelector('#qVazias'); return b ? +/\((\d+)\)/.exec(b.textContent)[1] : 0; });
+      assert.equal(sec.itens.length + escondidas, 4, 'um item por projeto, visível ou atrás de "mostrar vazias": ' + sec.itens.join(' | '));
+      assert.ok(sec.itens.length >= 1);
       // o resumo bate com o que o leitor calculou, e cada ocorrência traz o km
       const q = await pg.evaluate(() => window.__pavecad.E.P.map((p) => ({ nome: p.meta.name, corr: (p.qualidade.corrigidos || []).length, saltos: p.qualidade.saltos.length, sent: p.qualidade.sentidos.length })));
       const crescA = q.find((x) => x.nome === 'RD-001 · TH01 · Crescente');
@@ -941,7 +944,7 @@ const TESTES = {
       // relatório na aba Revisão
       await aba(pg, 'notas');
       const rel = await pg.innerText('#t-notas');
-      assert.match(rel, /qualidade das coordenadas/i);
+      assert.match(rel, /ocorrências/i);
       assert.match(rel, /corrigidas?/);
       // abre a primeira planilha com correção e confere as linhas do relatório
       const alvo = com[0];
@@ -1405,7 +1408,8 @@ const TESTES = {
       await pg.click('#btnNotas'); await pg.waitForTimeout(200);
       assert.equal(await pg.isVisible('#pinpop'), true);
       const itens = await pg.evaluate(() => [...document.querySelectorAll('#pinpop [role=menuitem]')].map((e) => e.innerText.replace(/\s+/g, ' ').trim()));
-      assert.deepEqual(itens, ['Nota no meu local', 'Ver notas (0)']);
+      assert.deepEqual(itens, ['Nota no meu local', 'Ver notas (0)', 'Baixar planilha']);
+      assert.deepEqual(await pg.evaluate(() => [...document.querySelectorAll('#pinpop .pp-sec')].map((e) => e.textContent)), ['CSV', 'Compartilhar'], 'CSV e Compartilhar como secundários');
       const m = await pg.evaluate(() => {
         const pp = document.querySelector('#pinpop').getBoundingClientRect();
         const sel = ['#toolbar', '#unicard', '#legend', '#tools', '.titlecard', '.topbar > .modes', '.topright > .trrow']; // o painel direito pode ficar por baixo do popover aberto (menu transitório); o que importa é nenhum item ficar coberto
@@ -1617,6 +1621,126 @@ const TESTES = {
       assert.equal(await pg.locator('.nr-dica').count(), 0, 'a dica não volta');
     }],
   ],
+  t22: [
+    ['Revisão: as notas rápidas entram na lista de ocorrências, por planilha, com ir ao local, observação e excluir com Desfazer; planilhas vazias atrás de "mostrar vazias"', ['1366x768'], async (pg) => {
+      const criar = async (re, row, tipo) => {
+        const p = await centrarNaFaixa(pg, re, row, 1);
+        await pg.mouse.click(p.x, p.y, { button: 'right' }); await pg.waitForTimeout(300);
+        await pg.click(`#nr .nr-op[data-t=${tipo}]`); await pg.waitForTimeout(350);
+        await pg.evaluate(() => document.querySelector('.toast-acao')?.remove());
+        return p;
+      };
+      const p1 = await criar('TH45 · Crescente', 30, 'melhorar');
+      await criar('TH42 · Decrescente', 25, 'dreno_mais');
+      const notas = await pg.evaluate(() => window.__pavecad.E.notes.filter((n) => n.rapida).map((n) => ({ id: n.id, pid: n.loc && n.loc.pid, planilha: n.rapida.planilha, tipo: n.rapida.tipo })));
+      assert.equal(notas.length, 2); assert.ok(notas.every((n) => n.pid), 'as duas caíram em planilhas');
+      await aba(pg, 'notas'); await pg.waitForTimeout(300);
+      const g = await pg.evaluate(() => [...document.querySelectorAll('#t-notas details.qual')].map((d) => ({ pid: d.dataset.qp, nome: d.querySelector('summary b').textContent, n: +d.querySelector('summary > .num').textContent, itens: [...d.querySelectorAll('[data-nri]')].map((e) => e.dataset.nri) })));
+      assert.ok(g.every((x) => x.n > 0), 'só planilhas com ocorrências: ' + g.map((x) => `${x.nome}=${x.n}`).join(' | '));
+      for (const n of notas) assert.ok(g.find((x) => x.pid === n.pid && x.itens.includes(n.id)), 'cada nota aparece no grupo da planilha dela');
+      assert.match(g.find((x) => x.pid === notas[0].pid).nome, /TH\d+ · (Crescente|Decrescente)/, 'grupo por planilha e sentido');
+      // vazias atrás de "mostrar vazias"
+      const antes = g.length, K = await pg.evaluate(() => +/\((\d+)\)/.exec(document.querySelector('#qVazias').textContent)[1]);
+      assert.ok(K > 0 && antes + K === 18, `${antes} com ocorrência + ${K} vazias = 18 planilhas`);
+      await pg.click('#qVazias'); await pg.waitForTimeout(250);
+      assert.equal(await pg.locator('#t-notas details.qual').count(), 18, 'mostrar vazias');
+      assert.match(await pg.textContent('#qVazias'), /^Esconder planilhas sem ocorrências/);
+      await pg.click('#qVazias'); await pg.waitForTimeout(250);
+      assert.equal(await pg.locator('#t-notas details.qual').count(), antes, 'esconder de novo');
+      // o item: ícone do tipo, km, hora; abre o grupo e vai ao local
+      await pg.click(`#t-notas details.qual[data-qp="${notas[0].pid}"] summary`); await pg.waitForTimeout(250);
+      const item = await pg.evaluate((id) => { const e = document.querySelector(`[data-nri="${id}"]`); return { svg: !!e.querySelector('.nrl-ic svg'), txt: e.innerText.replace(/\s+/g, ' ').trim() }; }, notas[0].id);
+      assert.ok(item.svg, 'ícone do tipo');
+      assert.match(item.txt, /km \d+\+\d{3}/); assert.match(item.txt, /\d{2}\/\d{2}[ ,]+\d{2}:\d{2}/, 'hora: ' + item.txt); assert.match(item.txt, /Melhorar solução/);
+      await pg.evaluate(() => window.__pavecad.map().jumpTo({ center: [-48.5, -14.5], zoom: 12 })); await pg.waitForTimeout(500);
+      await pg.click(`[data-nri="${notas[0].id}"] .nri-go`); await pg.waitForTimeout(1100);
+      const c = await pg.evaluate(() => { const m = window.__pavecad.map().getCenter(); return [m.lng, m.lat]; });
+      assert.ok(Math.abs(c[0] - p1.lon) < 2e-4 && Math.abs(c[1] - p1.lat) < 2e-4, `tocar no item vai ao local (${c})`);
+      // observação opcional, com o teclado do aparelho
+      await pg.click(`[data-nobs="${notas[0].id}"]`); await pg.waitForTimeout(200);
+      assert.equal(await pg.evaluate(() => document.activeElement.dataset.nobsin), notas[0].id, 'o campo abre com o foco');
+      await pg.keyboard.type('base trincada'); await pg.keyboard.press('Enter'); await pg.waitForTimeout(300);
+      assert.equal(await pg.evaluate((id) => window.__pavecad.E.notes.find((n) => n.id === id).text, notas[0].id), 'base trincada');
+      assert.match(await pg.textContent(`[data-nri="${notas[0].id}"]`), /base trincada/);
+      // excluir com Desfazer
+      await pg.click(`[data-nx="${notas[0].id}"]`); await pg.waitForTimeout(300);
+      assert.equal(await pg.locator(`[data-nri="${notas[0].id}"]`).count(), 0, 'excluída');
+      await pg.click('.toast-acao button'); await pg.waitForTimeout(300);
+      assert.equal(await pg.evaluate((id) => window.__pavecad.E.notes.some((n) => n.id === id), notas[0].id), true, 'Desfazer devolve a nota');
+      assert.equal(await pg.locator(`[data-nri="${notas[0].id}"]`).count(), 1);
+    }, OPTS_NOVE],
+    ['exportação: planilha .xlsx (aba Notas e aba Resumo), CSV com BOM e Compartilhar, pela Revisão e pelo pino; vale também para as anotações antigas', ['1366x768'], async (pg) => {
+      const XLSX = require('xlsx');
+      const criar = async (row, tipo) => {
+        const p = await centrarNaFaixa(pg, 0, row, 1);
+        await pg.mouse.click(p.x, p.y, { button: 'right' }); await pg.waitForTimeout(300);
+        await pg.click(`#nr .nr-op[data-t=${tipo}]`); await pg.waitForTimeout(350);
+        await pg.evaluate(() => document.querySelector('.toast-acao')?.remove());
+      };
+      await criar(300, 'melhorar'); await criar(320, 'retirar'); await criar(340, 'dreno_menos');
+      await pg.evaluate(() => { const E = window.__pavecad.E; E.notes.push({ id: 'velha', type: 'pin', coords: [[-47.75, -12.79]], cat: 'def', text: 'buraco', photos: [], t: '2026-01-01T10:00:00.000Z', loc: null }); });
+      await aba(pg, 'notas'); await pg.waitForTimeout(300);
+      assert.equal(await pg.locator('#t-notas :text("GeoJSON")').count(), 0, 'sem GeoJSON na Revisão');
+      // .xlsx
+      const [dx] = await Promise.all([pg.waitForEvent('download'), pg.click('#exXlsx')]);
+      assert.match(dx.suggestedFilename(), /^notas_PAVECAD_\d{4}-\d{2}-\d{2}_\d{4}\.xlsx$/);
+      const wb = XLSX.readFile(await dx.path(), { cellDates: true, cellStyles: true });
+      assert.deepEqual(wb.SheetNames, ['Notas', 'Resumo']);
+      const ws = wb.Sheets.Notas, linhas = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true });
+      assert.deepEqual(linhas[0], ['Data', 'Hora', 'Tipo', 'Rodovia', 'Planilha', 'Sentido', 'Faixa', 'Km', 'Latitude', 'Longitude', 'UTM Leste', 'UTM Norte', 'Origem', 'Precisão (m)', 'Observação', 'Status']);
+      assert.equal(linhas.length, 5, 'cabeçalho, três notas rápidas e a anotação antiga');
+      assert.equal(ws.A2.t, 'd', 'a data é uma data de verdade'); assert.equal(typeof ws.I3.v, 'number', 'latitude numérica');
+      assert.equal(ws.A2.v.getFullYear(), 2026, 'a anotação antiga (2026-01-01) é a primeira por data');
+      assert.equal(ws.C2.v, 'Defeito'); assert.equal(ws.M2.v, 'Manual'); assert.equal(ws.O2.v, 'buraco');
+      const tipos = linhas.slice(2).map((l) => l[2]); assert.deepEqual(tipos, ['Melhorar solução', 'Retirar solução', 'Retirar dreno'].map((t) => t).sort((a, b) => tipos.indexOf(a) - tipos.indexOf(b)));
+      assert.ok(ws['!autofilter'], 'filtro automático'); assert.ok(ws['!cols'].length === 16, 'larguras');
+      assert.equal(linhas[2][3], 'BR-900/GO'); assert.match(linhas[2][7], /^\d+\+\d{3}$/); assert.equal(linhas[2][12], 'Pressão');
+      const resumo = XLSX.utils.sheet_to_json(wb.Sheets.Resumo, { header: 1 });
+      assert.equal(resumo.find((r) => r[0] === 'Total')[1], 4);
+      // .csv
+      const [dc] = await Promise.all([pg.waitForEvent('download'), pg.click('#exCsv')]);
+      assert.match(dc.suggestedFilename(), /^notas_PAVECAD_\d{4}-\d{2}-\d{2}_\d{4}\.csv$/);
+      const buf = require('fs').readFileSync(await dc.path());
+      assert.deepEqual([...buf.slice(0, 3)], [0xef, 0xbb, 0xbf], 'BOM UTF-8');
+      const csv = buf.slice(3).toString('utf8').split('\r\n');
+      assert.equal(csv[0], 'Data;Hora;Tipo;Rodovia;Planilha;Sentido;Faixa;Km;Latitude;Longitude;UTM Leste;UTM Norte;Origem;Precisão (m);Observação;Status');
+      assert.equal(csv.length, 5); assert.match(csv[2], /;-12,\d{6};-47,\d{6};\d{6},\d{2};\d{7},\d{2};Pressão;;;Aberta$/);
+      // compartilhar: com Web Share, entrega o arquivo; sem, baixa
+      await pg.evaluate(() => { window.__shared = null; navigator.canShare = (d) => !!(d && d.files && d.files.length); navigator.share = async (d) => { window.__shared = { nome: d.files[0].name, tipo: d.files[0].type, tam: d.files[0].size }; }; });
+      await pg.click('#exShare'); await pg.waitForTimeout(800);
+      const sh = await pg.evaluate(() => window.__shared);
+      assert.ok(sh && /^notas_PAVECAD_.*\.xlsx$/.test(sh.nome) && /spreadsheetml/.test(sh.tipo) && sh.tam > 1000, 'Web Share recebeu a planilha: ' + JSON.stringify(sh));
+      await pg.evaluate(() => { navigator.canShare = undefined; });
+      const [dsh] = await Promise.all([pg.waitForEvent('download'), pg.click('#exShare')]);
+      assert.match(dsh.suggestedFilename(), /\.xlsx$/, 'sem Web Share, baixa');
+      // pelo pino da barra de ferramentas
+      await pg.click('#btnNotas');
+      const [dp] = await Promise.all([pg.waitForEvent('download'), pg.click('#ppXlsx')]);
+      assert.match(dp.suggestedFilename(), /\.xlsx$/);
+      await pg.click('#btnNotas');
+      const [dp2] = await Promise.all([pg.waitForEvent('download'), pg.click('#ppCsv')]);
+      assert.match(dp2.suggestedFilename(), /\.csv$/);
+      const nPino = await pg.textContent('#ppN'); assert.match(nPino, /^\d+$/, 'Ver notas (N): ' + nPino);
+    }],
+    ['Backup (.json) discreto em Ajustes: baixa as notas com os campos das rápidas e restaura', ['1366x768'], async (pg) => {
+      const p = await centrarNaFaixa(pg, 0, 300, 1);
+      await pg.mouse.click(p.x, p.y, { button: 'right' }); await pg.waitForTimeout(300);
+      await pg.click('#nr .nr-op[data-t=retirar]'); await pg.waitForTimeout(350);
+      await aba(pg, 'aj'); await pg.waitForTimeout(200);
+      assert.match(await pg.textContent('details.bk summary'), /^Backup \(\.json\)$/);
+      assert.equal(await pg.evaluate(() => document.querySelector('details.bk').open), false, 'discreto: recolhido');
+      await pg.click('details.bk summary');
+      const [d] = await Promise.all([pg.waitForEvent('download'), pg.click('#bkDown')]);
+      assert.match(d.suggestedFilename(), /^pavecad-backup-\d{4}-\d{2}-\d{2}\.json$/);
+      const gj = JSON.parse(require('fs').readFileSync(await d.path(), 'utf8'));
+      assert.equal(gj.features.length, 1); assert.equal(gj.features[0].properties.rapida.tipo, 'retirar');
+      // apaga e restaura
+      await pg.evaluate(() => { const E = window.__pavecad.E; E.notes.length = 0; });
+      await pg.setInputFiles('#importIn', await d.path()); await pg.waitForTimeout(500);
+      const n = await pg.evaluate(() => window.__pavecad.E.notes.map((x) => x.rapida && x.rapida.tipo));
+      assert.deepEqual(n, ['retirar'], 'a nota rápida volta com os campos');
+    }],
+  ],
   g03: [
     ['a seção é o seletor de faixa (clique, aria-pressed, teclado)', '1366x768', async (pg) => {
       await irParaKm(pg, '170+500'); await aba(pg, 'seg');
@@ -1701,14 +1825,16 @@ const TESTES = {
     }],
   ],
   g14: [
-    ['Revisão: estados vazios em uma linha e botão "Baixar GeoJSON"', '1366x768', async (pg) => {
+    ['Revisão: estados vazios em uma linha e exportação das notas desligada sem notas', '1366x768', async (pg) => {
       await aba(pg, 'notas');
       assert.equal(await pg.locator('#t-notas .empty').count(), 0, 'sem cartão grande de estado vazio');
       const vazios = await pg.evaluate(() => [...document.querySelectorAll('#t-notas .vazio')].map((e) => ({ t: e.textContent.trim(), h: Math.round(e.getBoundingClientRect().height) })));
-      assert.equal(vazios.length, 3, 'um estado vazio para notas de campo, um para propostas e outro para anotações');
+      assert.equal(vazios.length, 2, 'um estado vazio para propostas e outro para anotações');
       for (const v of vazios) assert.ok(v.h <= 20, `"${v.t}" ocupa ${v.h}px (mais de uma linha)`);
-      assert.ok(vazios.some((v) => /Nenhuma proposta/.test(v.t)) && vazios.some((v) => /Nenhuma anotação/.test(v.t)) && vazios.some((v) => /Nenhuma nota de campo/.test(v.t)));
-      assert.equal((await pg.textContent('#exDown')).trim(), 'Baixar GeoJSON');
+      assert.ok(vazios.some((v) => /Nenhuma proposta/.test(v.t)) && vazios.some((v) => /Nenhuma anotação/.test(v.t)));
+      assert.equal((await pg.textContent('#exXlsx')).trim(), 'Baixar planilha (.xlsx)');
+      assert.equal(await pg.isDisabled('#exXlsx'), true, 'sem notas não há o que exportar');
+      assert.equal(await pg.locator('#exDown, #exCopy, #exImp').count(), 0, 'o GeoJSON saiu da Revisão (agora é o Backup, em Ajustes)');
       // o atalho do estado vazio continua abrindo a ferramenta
       await pg.click('#pStart');
       assert.equal(await pg.isVisible('#propbar'), true);

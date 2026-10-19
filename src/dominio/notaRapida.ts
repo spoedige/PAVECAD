@@ -1,6 +1,5 @@
-/** Nota rápida de campo: tipos, resolução do local pelos polígonos (em metros), posição do menu circular, filtros e CSV.
+/** Nota rápida de campo: tipos, resolução do local pelos polígonos (em metros) e posição do menu circular.
  *  Funções puras, sem DOM. A interface está em app/notaRapida.ts. */
-import { crsForZone, toUtm, zoneOf } from '../geometry/utm';
 import { localizar, type Local, type LocP } from './localizar';
 
 export const TIPOS_RAPIDOS = {
@@ -97,55 +96,8 @@ export function posicionarMenu(pt: Ponto, area: { w: number; h: number }, tam = 
 }
 
 /* ---------------------------------------------------------------- */
-/* Filtros, CSV e lembrete                                           */
+/* Lembrete de exportar                                              */
 /* ---------------------------------------------------------------- */
-export interface NotaRap { id: string; t: string; coords: number[][]; text: string; rapida?: DadosRapida }
-export interface Filtro { tipo: TipoRapido | ''; rodovia: string; sentido: SentidoNota | ''; origem: OrigemNota | ''; }
-export const FILTRO_VAZIO: Filtro = { tipo: '', rodovia: '', sentido: '', origem: '' };
-
-export function filtrarRapidas<T extends NotaRap>(list: T[], f: Filtro): T[] {
-  return list
-    .filter((n) => n.rapida)
-    .filter((n) => (!f.tipo || n.rapida!.tipo === f.tipo) && (!f.rodovia || n.rapida!.rodovia === f.rodovia) && (!f.sentido || n.rapida!.sentido === f.sentido) && (!f.origem || n.rapida!.origem === f.origem))
-    .sort((a, b) => b.t.localeCompare(a.t));
-}
-
 export const NOTAS_ENTRE_EXPORTACOES = 10;
 /** Já passou da hora de lembrar de exportar? */
 export const precisaLembrar = (novasDesdeExportar: number) => novasDesdeExportar >= NOTAS_ENTRE_EXPORTACOES;
-
-export const CSV_NOTAS_CABECALHO = [
-  'id', 'tipo', 'data_hora', 'latitude', 'longitude', 'fuso_utm', 'utm_e', 'utm_n', 'origem', 'precisao_m', 'planilha', 'rodovia', 'sentido', 'faixa', 'km', 'situacao_local', 'observacao', 'resolvida',
-];
-
-export interface OpcoesCsv {
-  /** Nome da planilha e km como o app mostra (o modo privacidade esconde os reais). */
-  planilha?: (n: NotaRap) => string;
-  km?: (n: NotaRap) => string;
-  eol?: string;
-}
-
-/** CSV com ";" e vírgula decimal (Excel em português), com coordenadas em graus e UTM do fuso da longitude da nota. */
-export function notasCsv(list: NotaRap[], o: OpcoesCsv = {}): string {
-  const q = (s: unknown) => '"' + String(s ?? '').replace(/"/g, '""') + '"';
-  const dec = (v: number, d: number) => v.toFixed(d).replace('.', ',');
-  const rows = [CSV_NOTAS_CABECALHO.join(';')];
-  for (const n of list) {
-    const r = n.rapida;
-    if (!r) continue;
-    const [lon, lat] = n.coords[0], zone = zoneOf(lon), [e, nn] = toUtm(crsForZone(zone), lat, lon);
-    const t = new Date(n.t), z = (v: number) => String(v).padStart(2, '0');
-    const data = `${t.getFullYear()}-${z(t.getMonth() + 1)}-${z(t.getDate())} ${z(t.getHours())}:${z(t.getMinutes())}:${z(t.getSeconds())}`;
-    const situ = r.estado === 'dentro' ? 'no trecho' : r.estado === 'proximo' ? 'segmento mais próximo' : r.estado === 'fora' ? 'fora do trecho' : 'trecho não definido';
-    rows.push([
-      q(n.id), q(TIPOS_RAPIDOS[r.tipo].rotulo), data, dec(lat, 7), dec(lon, 7), `${zone}S`, dec(e, 2), dec(nn, 2), r.origem === 'gps' ? 'gps' : 'pressao', r.precisao === null ? '' : dec(r.precisao, 0),
-      q(o.planilha ? o.planilha(n) : r.planilha), q(r.rodovia), r.sentido ?? '', r.faixa === null ? '' : r.faixa === 0 ? 'Acost' : r.faixa, o.km ? o.km(n) : r.km ?? '', q(situ), q(n.text), r.resolvida ? 'sim' : 'nao',
-    ].join(';'));
-  }
-  return rows.join(o.eol ?? '\n');
-}
-
-export const nomeCsvNotas = (d: Date = new Date()) => {
-  const z = (v: number) => String(v).padStart(2, '0');
-  return `notas_${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}.csv`;
-};

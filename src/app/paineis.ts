@@ -11,7 +11,7 @@ import { contadorSelecao, htmlSelecao, itemDe, ligarSelecao } from './selecaoPla
 import { IC } from './icones';
 import { applyLayers, applyPaint, clearFocus, clearSel, fitAll, fitFocus, fitList, getMap, renderLegend, select, setBase, setFocus, setProjectData, stepSel, updateSelLayer, updateStakes, applyVisibility, temMapTiler } from './mapa';
 import { drawUni, renderGroups } from './unifilar';
-import { refreshProp, refreshPropLayers, renderNotes, resolveProps, startNote } from './revisao';
+import { baixarBackup, refreshProp, refreshPropLayers, renderNotes, resolveProps, startNote } from './revisao';
 import { $, cssv, esc, fmt, syncAllSegs, syncSeg, toast, toastAcao } from './ui';
 
 const Q = () => (E.field ? Q5F : Q5);
@@ -384,7 +384,7 @@ export function renderAj() {
         <div class="field"><label for="a-dr">Lado dos drenos</label><select id="a-dr"><option value="out">Externo</option><option value="in">Interno</option></select></div>
       </div>
       <p class="note" style="margin-top:7px">Sentido e coordenada seguem a regra confirmada: coordenada na borda esquerda da Fx 1, no sentido do tráfego. A Marginal Sul usa as mesmas coordenadas da pista principal, por isso entra com 12 m de deslocamento transversal à direita.</p>
-      ${selo(p) ? `<p class="note" style="margin-top:7px">${selo(p)}. Veja o detalhe em Revisão, em Qualidade das coordenadas.</p>` : ''}
+      ${selo(p) ? `<p class="note" style="margin-top:7px">${selo(p)}. Veja o detalhe em Revisão, em Ocorrências.</p>` : ''}
       <p class="note num" style="margin-top:7px">Sistema de coordenadas: SIRGAS 2000 UTM ${p.crs.zone}S${p.crs.epsg ? ` (EPSG ${p.crs.epsg})` : ''}, ${p.crs.source === 'fixo' ? 'fixado' : 'pela mediana das longitudes'}.</p>
       ${p.log.length && E.privacidade ? '<p class="note" style="margin-top:8px">Log de importação oculto no modo privacidade: traz km e nomes.</p>' : p.log.length ? `<details style="margin-top:8px"><summary>Log de importação (${p.log.length})</summary><div class="formula">${p.log.map((l) => `${l.level === 'warn' ? '! ' : '· '}${esc(l.msg)}`).join('\n')}</div></details>` : ''}</div>` : '';
   el.innerHTML = `
@@ -402,7 +402,10 @@ export function renderAj() {
 nE = cos θ , nN = −sin θ   (invertido no sentido decrescente)
 e(n) = e0 + dir · Σ largura(1..n)
 P(n) = P + e(n) · (nE , nN)</div>
-      <p class="note" style="margin-top:8px">O sentido decrescente usa o mesmo cálculo com a normal invertida, porque as linhas da planilha seguem a quilometragem crescente.</p></details>`;
+      <p class="note" style="margin-top:8px">O sentido decrescente usa o mesmo cálculo com a normal invertida, porque as linhas da planilha seguem a quilometragem crescente.</p></details>
+    <details class="bk"><summary>Backup (.json)</summary>
+      <p class="note" style="margin:6px 0">Cópia das notas deste aparelho (inclui fotos) para guardar ou levar a outro. Para a planilha das notas, use o pino da barra de ferramentas.</p>
+      <div class="btns"><button class="btn" id="bkDown">Baixar backup</button><button class="btn" id="bkImp">Restaurar backup</button></div></details>`;
   ligarSelecao(el, { itens: lista, marcadas: E.settingsSel, origem: p ? itemDe(p) : undefined, aoMudar: () => renderAj() });
   document.getElementById('irAlinhar')?.addEventListener('click', () => abrirAlinhar());
   if (p) {
@@ -434,6 +437,8 @@ P(n) = P + e(n) · (nE , nN)</div>
   const bs = $<HTMLSelectElement>('#a-base');
   bs.value = E.base;
   bs.onchange = () => { setBase(bs.value as typeof E.base); syncBaseSeg(); };
+  $('#bkDown').onclick = () => baixarBackup();
+  $('#bkImp').onclick = () => $('#importIn').click();
   $('#s-field').onclick = () => setField(!E.field);
   $('#s-priv').onclick = () => setPrivacidade(!E.privacidade);
   $('#s-pad').onclick = () => {

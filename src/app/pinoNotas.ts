@@ -1,3 +1,4 @@
+import { baixarCsv, baixarXlsx, compartilharNotas } from './exportNotas';
 import { setPainel } from './layout';
 import { notaNoMeuLocal } from './notaRapida';
 import { setTab } from './paineis';
@@ -28,4 +29,7 @@ export function initPinoNotas() {
   });
   $('#ppLocal').addEventListener('click', () => { abrir(false); void notaNoMeuLocal(); });
   $('#ppVer').addEventListener('click', () => { abrir(false); setPainel(false); setTab('notas'); });
+  $('#ppXlsx').addEventListener('click', () => { abrir(false); void baixarXlsx(); });
+  $('#ppCsv').addEventListener('click', () => { abrir(false); baixarCsv(); });
+  $('#ppShare').addEventListener('click', () => { abrir(false); void compartilharNotas(); });
 }
