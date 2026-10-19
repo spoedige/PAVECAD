@@ -9,6 +9,7 @@ import { parseKmTexto } from '../formats/km';
 import { codigosOriginais } from '../formats/planservi';
 import { baseSources, CHAVE_NITIDEZ, MAP_MAX_ZOOM, nitidezSalva, recarregarEsri, type Nitidez } from '../mapa/base';
 import { agendarRotulos, PRIO, prioDeEstaca, resolverRotulos } from './rotulos';
+import { alinhado, cabeRotuloInterno, dentroDoOrcamento, direcaoNaTela, deslocamentoParaFora, metrosPorPixel, passoComOrcamento, PISTAS_JUNTAS_M, prioDoMarco, rotuloInterno, rumoDe } from '../mapa/marcos';
 import { E, H, NOTE_CATS, getP, kmFmt, kmReal, padraoAtivo, padraoDosPares, projName, visibleProjects, type AppProj, type FocoPred } from './estado';
 import { $, cssv, esc, fmt, syncSeg, toast } from './ui';
 
@@ -114,6 +115,7 @@ export function initMap(onReady: () => void) {
   map.on('zoom', onZ);
   onZ();
   map.on('rotate', () => { $('#compass').style.transform = `rotate(${-map.getBearing()}deg)`; });
+  map.on('rotate', () => map.getContainer().style.setProperty('--mb', map.getBearing().toFixed(1)));
   map.on('moveend', () => { updateStakes(); if (!legendAberta()) renderLegend(); });
   map.on('move', () => H.onView());
   new MutationObserver(() => setTimeout(applyPaint, 20)).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
@@ -594,8 +596,7 @@ export function fitList(list: AppProj[], instant = false) {
 export const fitAll = (instant = false) => fitList(visibleProjects(), instant);
 
 let stakeMk: maplibregl.Marker[] = [];
-/** Estacas por zoom: 500 m a partir do zoom 14, 100 m a partir de 15,8 e 20 m a partir de 18,2. */
-/** Planilha de referência dos rótulos de texto: a selecionada; senão, a primeira do grupo ativo. */
+/** Planilha de referência dos rótulos de texto: a selecionada; senão, a primeira do grupo ativo. Só desempata colisões. */
 export function refProjeto(): AppProj | undefined {
   const sel = E.sel ? getP(E.sel.pid) : undefined;
   if (sel?.visible) return sel;
@@ -611,38 +612,122 @@ export function reaplicarRotulos() {
 }
 export const agendarReaplicar = () => agendarRotulos(reaplicarRotulos);
 
-/** Estacas por zoom: 500 m a partir do zoom 14, 100 m a partir de 15,8 e 20 m a partir de 18,2.
- *  O traço aparece em todas as planilhas; o rótulo de texto só na de referência, sem colisão. */
+/** Resumo da última atualização dos marcos, para os testes e a medição de desempenho. */
+export interface InfoMarcos { passo: number; rotulos: number; internos: number; pares: number; ms: number; pxPorMetro: number; candidatos: number }
+let infoMarcos: InfoMarcos = { passo: 0, rotulos: 0, internos: 0, pares: 0, ms: 0, pxPorMetro: 0, candidatos: 0 };
+export const marcosInfo = () => infoMarcos;
+
+const mDe = (p: AppProj, i: number) => Math.round(p.kmNum[i] * 1000);
+/** Rumo (graus) do sentido de tráfego da planilha na linha i. */
+function rumoDoTrafego(p: AppProj, i: number): number {
+  const a = p.rows[Math.max(0, i - 1)], b = p.rows[Math.min(p.rows.length - 1, i + 1)];
+  const r = rumoDe((b.lon - a.lon) * Math.cos((a.lat * Math.PI) / 180), b.lat - a.lat);
+  return p.opts.travel > 0 ? r : (r + 180) % 360;
+}
+/** Linha da planilha q mais perto do km (só se estiver a menos de um passo de distância), por busca binária. */
+function linhaNoKm(q: AppProj, km: number): number {
+  let lo = 0, hi = q.kmNum.length - 1;
+  while (lo < hi) { const mid = (lo + hi) >> 1; if (q.kmNum[mid] < km) lo = mid + 1; else hi = mid; }
+  if (lo > 0 && Math.abs(q.kmNum[lo - 1] - km) < Math.abs(q.kmNum[lo] - km)) lo--;
+  return Math.abs(q.kmNum[lo] - km) <= 0.011 && q.normals[lo] ? lo : -1;
+}
+const metrosEntre = (a: { lat: number; lon: number }, b: { lat: number; lon: number }) =>
+  Math.hypot((a.lat - b.lat) * 111320, (a.lon - b.lon) * 111320 * Math.cos((a.lat * Math.PI) / 180));
+
+/** Marcos de km da escala atual, para todas as planilhas visíveis.
+ *  Passo: o menor de PASSOS com pelo menos 64 px entre rótulos; se passar de 400 rótulos na vista, sobe o passo (nunca desliga tudo).
+ *  Cada sentido leva o rótulo no lado externo da sua pista (o do acostamento); pistas a menos de 20 m dividem um rótulo só, no eixo,
+ *  com uma seta por sentido. Com quadradinho de 100 px ou mais, o rótulo também vai dentro, só com o marco da solução ("209+440"). */
 export function updateStakes() {
+  const t0 = performance.now();
   stakeMk.forEach((m) => m.remove());
   stakeMk = [];
   if (!E.mapReady) return;
-  const z = map.getZoom(), step = z >= 18.2 ? 20 : z >= 15.8 ? 100 : z >= 14 ? 500 : 0, tk = src('ticks')!;
-  if (!step || !E.layers.km) { tk.setData(EMPTY as Expr); reaplicarRotulos(); return; }
-  const bb = map.getBounds(), feats: Expr[] = [], ref = refProjeto();
-  for (const p of visibleProjects()) {
-    const vistos = new Set<number>(); // 9+1000 e 10+000 são o mesmo km: um rótulo só
-    let n = 0;
-    for (let i = 0; i < p.rows.length && n < 200; i++) {
-      if (!p.normals[i]) continue;
-      const m = Math.round(p.kmNum[i] * 1000);
-      if (m % step || vistos.has(m)) continue;
+  const z = map.getZoom(), tk = src('ticks')!;
+  infoMarcos = { passo: 0, rotulos: 0, internos: 0, pares: 0, ms: 0, pxPorMetro: 0, candidatos: 0 };
+  if (z < 14 || !E.layers.km) { tk.setData(EMPTY as Expr); reaplicarRotulos(); return; }
+  const c = map.getCenter(), bb = map.getBounds(), bearing = map.getBearing();
+  const ppm = 1 / metrosPorPixel(z, c.lat), M = 0.002;
+  const vis = visibleProjects(), ref = refProjeto();
+  const emVista = vis.map((p) => {
+    const idx: number[] = [];
+    for (let i = 0; i < p.rows.length; i++) {
       const r = p.rows[i];
-      if (r.lon < bb.getWest() - 0.002 || r.lon > bb.getEast() + 0.002 || r.lat < bb.getSouth() - 0.002 || r.lat > bb.getNorth() + 0.002) continue;
+      if (p.normals[i] && r.lon >= bb.getWest() - M && r.lon <= bb.getEast() + M && r.lat >= bb.getSouth() - M && r.lat <= bb.getNorth() + M) idx.push(i);
+    }
+    return { p, idx };
+  });
+  const contar = (passo: number) => { let n = 0; for (const { p, idx } of emVista) for (const i of idx) if (alinhado(mDe(p, i), passo)) n++; return n; };
+  const passo = passoComOrcamento(ppm, contar);
+  let cand: { p: AppProj; i: number; m: number; d: number }[] = [];
+  for (const { p, idx } of emVista) {
+    const vistos = new Set<number>(); // 9+1000 e 10+000 são o mesmo km: um rótulo só
+    for (const i of idx) {
+      const m = mDe(p, i);
+      if (!alinhado(m, passo) || vistos.has(m)) continue;
       vistos.add(m);
-      n++;
-      const e = edgesOf(r, p.opts).e, lo = Math.min(...e), hi = Math.max(...e), left = p.opts.travel > 0;
-      feats.push({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [offsetLL(p, p, i, lo - 0.6), offsetLL(p, p, i, hi + 0.6)] } });
-      if (p !== ref) continue;
+      cand.push({ p, i, m, d: (p.rows[i].lat - c.lat) ** 2 + (p.rows[i].lon - c.lng) ** 2 });
+    }
+  }
+  infoMarcos.candidatos = cand.length;
+  cand = dentroDoOrcamento(cand);
+  const feats: Expr[] = [];
+  const comInterno = cabeRotuloInterno(ppm); // o marco de 20 m já aparece dentro do quadradinho: na borda ficam só km, 500 m e 100 m
+  const novoMarker = (el: HTMLElement, lngLat: [number, number], offset: [number, number] = [0, 0]) => stakeMk.push(new maplibregl.Marker({ element: el, anchor: 'center', offset }).setLngLat(lngLat).addTo(map));
+  for (const { p, i, m } of cand) {
+    const e = edgesOf(p.rows[i], p.opts).e, lo = Math.min(...e), hi = Math.max(...e);
+    feats.push({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [offsetLL(p, p, i, lo - 0.6), offsetLL(p, p, i, hi + 0.6)] } });
+    if (comInterno && prioDoMarco(m) === 3) continue;
+    const el = document.createElement('div');
+    el.className = 'stake' + (m % 1000 === 0 ? ' km' : '');
+    const txt = kmFmt(m / 1000);
+    Object.assign(el.dataset, { rot: 'estaca', pid: p.id, prio: String(prioDeEstaca(m)) });
+    // sentido oposto na mesma rodovia, com linha no mesmo km a menos de 20 m: um rótulo só, no eixo (o da planilha crescente)
+    let par: { q: AppProj; j: number } | null = null;
+    for (const q of vis) {
+      if (q === p || q.meta.uf !== p.meta.uf || q.meta.travel === p.meta.travel) continue;
+      const j = linhaNoKm(q, p.kmNum[i]);
+      if (j >= 0 && metrosEntre(p.rows[i], q.rows[j]) < PISTAS_JUNTAS_M && (!par || metrosEntre(p.rows[i], q.rows[j]) < metrosEntre(p.rows[i], par.q.rows[par.j]))) par = { q, j };
+    }
+    if (par) {
+      if (p.meta.travel < 0) continue; // o rótulo do par sai pela planilha crescente
+      const ra = p.rows[i], rb = par.q.rows[par.j];
+      el.classList.add('par');
+      el.innerHTML = `<i class="seta" style="--b:${rumoDoTrafego(p, i).toFixed(1)}">↑</i>${esc(txt)}<i class="seta" style="--b:${rumoDoTrafego(par.q, par.j).toFixed(1)}">↑</i>`;
+      novoMarker(el, [(ra.lon + rb.lon) / 2, (ra.lat + rb.lat) / 2]);
+      infoMarcos.pares++;
+      continue;
+    }
+    // lado externo: o do acostamento, para onde a borda aponta (dir × normal), na direção em que o mapa está girado
+    el.textContent = txt;
+    const nm = p.normals[i]!, o = p.opts;
+    const u = direcaoNaTela(nm.e * o.dir, nm.n * o.dir, bearing);
+    const w = txt.length * 7.2 + 12, h = 18;
+    novoMarker(el, offsetLL(p, p, i, e[e.length - 1] + o.dir * 0.3) as [number, number], deslocamentoParaFora(u, w, h));
+  }
+  infoMarcos.rotulos = stakeMk.length;
+  // rótulo por dentro do quadradinho (20 m) quando ele tem 100 px ou mais: o marco da solução, com contorno
+  if (comInterno) {
+    const internos: { p: AppProj; i: number; d: number }[] = [];
+    for (const { p, idx } of emVista) for (const i of idx) {
+      if (i + 1 >= p.rows.length || p.kmNum[i + 1] - p.kmNum[i] > 0.0215 || !p.normals[i + 1]) continue;
+      internos.push({ p, i, d: (p.rows[i].lat - c.lat) ** 2 + (p.rows[i].lon - c.lng) ** 2 });
+    }
+    internos.sort((a, b) => a.d - b.d);
+    for (const { p, i } of internos.slice(0, 150)) {
+      const ed = edgesOf(p.rows[i], p.opts), mid = (ed.e[0] + ed.e[ed.nLanes]) / 2;
+      const a = offsetLL(p, p, i, mid), b = offsetLL(p, p, i + 1, mid);
       const el = document.createElement('div');
-      el.className = 'stake' + (m % 1000 === 0 ? ' km' : '');
-      el.textContent = kmFmt(m / 1000);
-      Object.assign(el.dataset, { rot: 'estaca', pid: p.id, prio: String(prioDeEstaca(m)) });
-      stakeMk.push(new maplibregl.Marker({ element: el, anchor: left ? 'right' : 'left', offset: [left ? -3 : 3, 0] }).setLngLat(offsetLL(p, p, i, left ? lo - 1 : hi + 1)).addTo(map));
+      el.className = 'stake interno';
+      el.textContent = rotuloInterno(p.kmLab[i]);
+      Object.assign(el.dataset, { rot: 'interno', pid: p.id, prio: String(PRIO.interno) });
+      novoMarker(el, [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]);
+      infoMarcos.internos++;
     }
   }
   tk.setData({ type: 'FeatureCollection', features: feats } as Expr);
   reaplicarRotulos();
+  infoMarcos.passo = passo; infoMarcos.pxPorMetro = ppm; infoMarcos.ms = performance.now() - t0;
 }
 
 export const rotate = (graus: number) => map.easeTo({ bearing: map.getBearing() + graus, duration: 250 });

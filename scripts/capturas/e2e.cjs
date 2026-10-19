@@ -1277,6 +1277,104 @@ const TESTES = {
       assert.equal(await pg.evaluate(() => window.__pavecad.E.P.filter((p) => p.meta.uf === 'RD-002' && !p.visible).length), 1);
     }, OPTS_NOVE],
   ],
+  t19: [
+    ['marcos de km com 9 planilhas: aparecem em planilhas que não são a de referência, do zoom 18 ao 21', ['1366x768'], async (pg) => {
+      const vai = async (z, bearing = 0) => {
+        await pg.evaluate(({ z, bearing }) => { const E = window.__pavecad.E, m = window.__pavecad.map(), p = E.P.find((q) => /TH44 · Crescente/.test(q.meta.name)); m.jumpTo({ center: [p.rows[30].lon, p.rows[30].lat], zoom: z, bearing }); }, { z, bearing });
+        await pg.waitForTimeout(1200);
+      };
+      const visiveis = () => pg.evaluate(() => [...document.querySelectorAll('.stake')].filter((e) => getComputedStyle(e).visibility !== 'hidden' && e.getBoundingClientRect().width > 0).map((e) => ({ t: e.textContent.replace(/[↑\s]+/g, ' ').trim(), cls: e.className, pid: e.dataset.pid })));
+      for (const z of [18, 19, 20]) {
+        await vai(z);
+        const v = await visiveis(); const info = await pg.evaluate(() => window.__pavecad.marcosInfo());
+        assert.ok(v.length >= 3, `zoom ${z}: rótulos visíveis na TH44 (${v.length})`);
+        assert.equal(info.passo, 20, `zoom ${z}: passo de 20 m`);
+        assert.ok(v.every((x) => /^\d+\+\d{3}$/.test(x.t)), `zoom ${z}: só o marco (14+200), sem intervalo: ` + v.map((x) => x.t).join(' | '));
+      }
+      await vai(21); assert.ok((await visiveis()).length >= 1, 'zoom 21 mostra pelo menos um rótulo');
+      const info = await pg.evaluate(() => window.__pavecad.marcosInfo());
+      console.log(`     marcos com 18 projetos no zoom 21: ${info.ms.toFixed(1)} ms, ${info.rotulos} rótulos e ${info.internos} internos`);
+    }, OPTS_NOVE],
+    ['marcos de km: km cheios longe, 100 m no meio, 20 m e rótulo interno perto; sempre abaixo do orçamento e sem sobreposição', ['1366x768'], async (pg) => {
+      const medir = async (z) => {
+        await pg.evaluate((z) => { const E = window.__pavecad.E, m = window.__pavecad.map(), p = E.P.find((q) => /TH44 · Crescente/.test(q.meta.name)); m.jumpTo({ center: [p.rows[30].lon, p.rows[30].lat], zoom: z, bearing: 0 }); }, z);
+        await pg.waitForTimeout(1200);
+        return pg.evaluate(() => {
+          const info = window.__pavecad.marcosInfo();
+          const v = [...document.querySelectorAll('.stake')].filter((e) => getComputedStyle(e).visibility !== 'hidden' && e.getBoundingClientRect().width > 0);
+          const rs = v.map((e) => e.getBoundingClientRect());
+          let cruzam = 0; for (let i = 0; i < rs.length; i++) for (let j = i + 1; j < rs.length; j++) if (rs[i].left < rs[j].right && rs[i].right > rs[j].left && rs[i].top < rs[j].bottom && rs[i].bottom > rs[j].top) cruzam++;
+          const ms = v.map((e) => e.textContent.replace(/[↑\s]+/g, ' ').trim());
+          return { info, n: v.length, cruzam, textos: ms, internos: v.filter((e) => e.classList.contains('interno')).length, noDom: document.querySelectorAll('.stake').length };
+        });
+      };
+      const longe = await medir(14);
+      assert.equal(longe.info.passo, 500, 'zoom 14: passo de 500 m');
+      assert.ok(longe.n >= 1, 'longe ainda há rótulos');
+      assert.ok(longe.textos.every((t) => /\+(000|500)$/.test(t)), 'longe só km cheio e 500 m: ' + longe.textos.join(' | '));
+      const meio = await medir(16);
+      assert.equal(meio.info.passo, 100, 'zoom 16: passo de 100 m');
+      assert.ok(meio.textos.every((t) => /\+\d00$/.test(t)), '100 m no meio: ' + meio.textos.join(' | '));
+      const perto = await medir(18);
+      assert.equal(perto.info.passo, 20);
+      assert.equal(perto.internos, 0, 'em 18 o segmento ainda tem menos de 100 px: sem rótulo interno');
+      const max = await medir(19.5);
+      assert.ok(max.internos >= 1 && max.info.internos >= 1, 'no zoom máximo há rótulo dentro do segmento: ' + max.textos.join(' | '));
+      assert.ok(max.textos.every((t) => /^\d+\+\d{3}$/.test(t)), 'sem intervalo nos rótulos: ' + max.textos.join(' | '));
+      for (const [nome, r] of [['14', longe], ['16', meio], ['18', perto], ['19,5', max]]) {
+        assert.equal(r.cruzam, 0, `zoom ${nome}: rótulos visíveis não se sobrepõem`);
+        assert.ok(r.noDom <= 400 + 150, `zoom ${nome}: dentro do orçamento (${r.noDom})`);
+      }
+      // com tudo na tela (18 projetos) o passo sobe, mas nunca desliga todos
+      await pg.evaluate(() => window.__pavecad.map().jumpTo({ center: [-47.5, -15.1], zoom: 9 }));
+      await pg.waitForTimeout(800);
+      const a = await pg.evaluate(() => ({ info: window.__pavecad.marcosInfo(), kml: [...document.querySelectorAll('.kmlabel')].filter((e) => getComputedStyle(e).visibility !== 'hidden' && getComputedStyle(e).display !== 'none').length }));
+      assert.ok(a.info.rotulos <= 400);
+    }, OPTS_NOVE],
+    ['marcos de km: cada sentido no lado externo (pistas a 22 m) e um rótulo com setas no eixo (pistas a 16 m); sempre de pé com o mapa girado', ['1366x768'], async (pg) => {
+      // GO: pistas a cerca de 22 m, um rótulo por sentido, cada um para fora da sua pista
+      const r = await pg.evaluate(() => { const E = window.__pavecad.E, m = window.__pavecad.map(); const [a] = E.P; m.jumpTo({ center: [a.rows[300].lon, a.rows[300].lat], zoom: 19, bearing: 0 }); return a.meta.name; });
+      await pg.waitForTimeout(1200);
+      const go = await pg.evaluate(() => {
+        const E = window.__pavecad.E, m = window.__pavecad.map(), info = window.__pavecad.marcosInfo();
+        const cx = (e) => { const b = e.getBoundingClientRect(); return b.left + b.width / 2; };
+        const por = {}; for (const e of document.querySelectorAll('.stake:not(.interno)')) (por[e.dataset.pid] ??= []).push(e);
+        const mapaC = m.getCanvas().getBoundingClientRect();
+        const pontos = E.P.map((p) => { const q = m.project([p.rows[300].lon, p.rows[300].lat]); return { id: p.id, x: mapaC.left + q.x, trav: p.meta.travel }; });
+        const media = (id) => { const l = (por[id] || []).filter((e) => getComputedStyle(e).visibility !== 'hidden'); return l.length ? l.reduce((s, e) => s + cx(e), 0) / l.length : null; };
+        return { pares: info.pares, ids: Object.keys(por), pontos, medias: pontos.map((p) => media(p.id)) };
+      });
+      assert.equal(go.pares, 0, 'GO: pistas separadas por mais de 20 m, sem rótulo de par');
+      assert.equal(go.ids.length, 2, 'um conjunto de rótulos por sentido');
+      const [pa, pb] = go.pontos, [ma, mb] = go.medias;
+      assert.ok(ma !== null && mb !== null, 'os dois sentidos têm rótulo visível');
+      // o rótulo de cada sentido fica do lado de fora: afastado do outro sentido
+      const esquerda = pa.x < pb.x ? 0 : 1;
+      assert.ok(go.medias[esquerda] < go.pontos[esquerda].x, 'a pista da esquerda leva o rótulo à esquerda dela');
+      assert.ok(go.medias[1 - esquerda] > go.pontos[1 - esquerda].x, 'a pista da direita leva o rótulo à direita dela');
+    }, { arquivos: ['rr_go_crescente.xlsx', 'rr_go_decrescente.xlsx'], projetos: 2 }],
+    ['marcos de km: com pistas a menos de 20 m sai um rótulo só, no eixo, com uma seta por sentido que gira com o mapa; o texto não vira', ['1366x768'], async (pg) => {
+      await pg.evaluate(() => { const E = window.__pavecad.E, m = window.__pavecad.map(), p = E.P.find((q) => /TH44 · Crescente/.test(q.meta.name)); m.jumpTo({ center: [p.rows[20].lon, p.rows[20].lat], zoom: 18.2, bearing: 0 }); });
+      await pg.waitForTimeout(1200);
+      const ler = () => pg.evaluate(() => {
+        const info = window.__pavecad.marcosInfo(), par = [...document.querySelectorAll('.stake.par')].find((e) => getComputedStyle(e).visibility !== 'hidden');
+        const mk = par && par.closest('.maplibregl-marker');
+        return { info, temPar: !!par, setas: par ? par.querySelectorAll('.seta').length : 0, rot: par ? [...par.querySelectorAll('.seta')].map((s) => getComputedStyle(s).transform) : [], marker: mk ? getComputedStyle(mk).transform : null, pids: [...new Set([...document.querySelectorAll('.stake:not(.interno)')].map((e) => e.dataset.pid))] };
+      });
+      const a = await ler();
+      assert.ok(a.info.pares > 0 && a.temPar, 'rótulo de par visível');
+      assert.equal(a.setas, 2, 'uma seta por sentido');
+      assert.equal(a.pids.length, 1, 'só a planilha crescente leva o rótulo do par');
+      await pg.evaluate(() => window.__pavecad.map().setBearing(137)); await pg.waitForTimeout(1200);
+      const b = await ler();
+      assert.notDeepEqual(a.rot, b.rot, 'as setas giram com o mapa');
+      assert.notEqual(b.rot[0], b.rot[1], 'e as duas apontam para lados opostos');
+      const m = /matrix\(([^)]+)\)/.exec(b.marker);
+      assert.ok(m, 'marcador com matriz: ' + b.marker);
+      const [ma, mb] = m[1].split(',').map(Number);
+      assert.ok(Math.abs(ma - 1) < 1e-6 && Math.abs(mb) < 1e-6, 'o texto do rótulo continua de pé com o mapa girado (sem rotação): ' + b.marker);
+    }, OPTS_NOVE],
+  ],
   g03: [
     ['a seção é o seletor de faixa (clique, aria-pressed, teclado)', '1366x768', async (pg) => {
       await irParaKm(pg, '170+500'); await aba(pg, 'seg');

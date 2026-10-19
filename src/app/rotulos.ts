@@ -1,8 +1,8 @@
 /** Rótulos de texto do mapa (marcos de km, estacas, plataformas): sem colisão entre si, sem ficar sob os
  *  painéis da interface e sem ser cortados na borda do mapa. Roda depois de cada movimento do mapa.
  *
- *  Prioridade (menor vence): km inteiro (0), 500 m e plataformas (1), 100 m (2), 20 m (3). */
-export const PRIO = { km: 0, meio: 1, poi: 1, cem: 2, vinte: 3 } as const;
+ *  Prioridade (menor vence): km inteiro (0), 500 m e plataformas (1), 100 m (2), 20 m (3); o rótulo interno do segmento (com intervalo) vale como 100 m e ganha dos de 20 m. */
+export const PRIO = { km: 0, meio: 1, poi: 1, cem: 2, vinte: 3, interno: 2 } as const;
 export const prioDeEstaca = (m: number) => (m % 1000 === 0 ? PRIO.km : m % 500 === 0 ? PRIO.meio : m % 100 === 0 ? PRIO.cem : PRIO.vinte);
 
 interface Ret { left: number; top: number; right: number; bottom: number }
@@ -17,7 +17,7 @@ const BLOQUEIOS = [
 ].join(',');
 
 export interface OpcoesRotulos {
-  /** Planilha de referência: só ela mostra rótulo de km e de estaca. */
+  /** Planilha de referência (a selecionada ou a primeira do grupo): só desempata, ganha o lugar quando dois rótulos disputam o mesmo. Todas as planilhas visíveis mostram rótulo. */
   refId: string | null;
   /** Estacas ligadas e visíveis neste zoom: o rótulo de estaca de km inteiro substitui o "km N" cinza. */
   estacasAtivas: boolean;
@@ -35,16 +35,15 @@ export function resolverRotulos(o: OpcoesRotulos) {
     .map(rect)
     .filter((r) => r.right - r.left > 1 && r.bottom - r.top > 1);
 
-  const cand: { e: HTMLElement; r: Ret; prio: number; ord: number }[] = [];
+  const cand: { e: HTMLElement; r: Ret; prio: number; ord: number; ref: number }[] = [];
   for (const e of els) {
     const tipo = e.dataset.rot;
-    if ((tipo === 'km' || tipo === 'estaca') && o.refId && e.dataset.pid !== o.refId) { e.classList.add('rot-oculto'); continue; }
     if (tipo === 'km' && o.estacasAtivas) { e.classList.add('rot-oculto'); continue; }
     const r = rect(e);
     if (r.right - r.left < 1) continue; // oculto por CSS (zoom baixo, camada desligada)
-    cand.push({ e, r, prio: +(e.dataset.prio ?? 3), ord: tipo === 'estaca' ? 0 : 1 });
+    cand.push({ e, r, prio: +(e.dataset.prio ?? 3), ord: tipo === 'estaca' ? 0 : 1, ref: o.refId && e.dataset.pid === o.refId ? 0 : 1 });
   }
-  cand.sort((a, b) => a.prio - b.prio || a.ord - b.ord);
+  cand.sort((a, b) => a.prio - b.prio || a.ref - b.ref || a.ord - b.ord);
 
   const aceitos: Ret[] = [];
   for (const c of cand) {

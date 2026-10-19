@@ -546,3 +546,8 @@ details.rgrp>summary{min-height:44px;gap:10px}
 details.rgrp .rg-n{display:flex;flex-direction:column;min-width:0}
 details.rgrp .rg-n .muted{font-size:var(--fs-meta);font-weight:400}
 details.rgrp .rg-c{display:flex;flex-direction:column;gap:14px;padding:4px 0 14px}
+/* marcos de km por escala: rótulo do par de pistas (setas por sentido) e rótulo dentro do segmento */
+.stake.par{display:inline-flex;align-items:center;gap:4px}
+.stake .seta{display:inline-block;font-style:normal;font-weight:800;line-height:1;transform:rotate(calc((var(--b, 0) - var(--mb, 0)) * 1deg))}
+.stake.interno{background:transparent;border:0;padding:0;color:#fff;font-weight:700;-webkit-text-stroke:3px rgba(0,0,0,.85);paint-order:stroke fill;text-shadow:0 0 3px rgba(0,0,0,.9)}
+.stake.interno{-webkit-text-stroke:0;text-shadow:-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000,1px 1px 0 #000,0 0 4px rgba(0,0,0,.9)}
