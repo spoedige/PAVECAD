@@ -54,7 +54,8 @@ export function initMap(onReady: () => void) {
   });
   const zh = $('#zoomhost');
   zh.appendChild(new maplibregl.NavigationControl({ showCompass: false }).onAdd(map));
-  zh.appendChild(new maplibregl.ScaleControl({ unit: 'metric' }).onAdd(map));
+  // a escala fica no canto superior esquerdo, logo abaixo do cartão de busca (coluna esquerda)
+  $('#escalahost').appendChild(new maplibregl.ScaleControl({ unit: 'metric' }).onAdd(map));
 
   map.on('load', () => {
     for (const [nome, tipo] of [['hachura', 'diag'], ['hpontos', 'pontos'], ['hlinhas', 'linhas']] as const) map.addImage(nome, criarHachura(tipo), { pixelRatio: 2 });

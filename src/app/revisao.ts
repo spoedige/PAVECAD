@@ -13,6 +13,7 @@ import { setTab } from './paineis';
 import { bindItensNotas, itemNotaHtml } from './notasItens';
 import { baixarCsv, baixarXlsx, compartilharNotas } from './exportNotas';
 import { notasNovasSemExportar } from './notaRapida';
+import { atualizarContadorNotas } from './pinoNotas';
 import { precisaLembrar } from '../dominio/notaRapida';
 import { $, cssv, esc, fmt, syncSeg, toast } from './ui';
 
@@ -296,8 +297,7 @@ export function startNote(type: Nota['type'], coords: number[][]) {
 const totalExportavel = () => E.notes.length + E.props.filter((r) => r.pid && !r.orfa).length;
 
 export function refreshNotesLayer() {
-  const contador = document.getElementById('ppN');
-  if (contador) contador.textContent = String(totalExportavel());
+  atualizarContadorNotas(totalExportavel());
   if (!E.mapReady) return;
   const lista = E.notes.filter((n) => !E.editing || E.editing.id !== n.id || !E.editing.isNew).concat(E.editing ? [E.editing] : []);
   const feicoes: GeoJSON.Feature[] = lista.map((n) => ({ type: 'Feature', properties: { id: n.id, cat: n.cat }, geometry: noteGeom(n) }));

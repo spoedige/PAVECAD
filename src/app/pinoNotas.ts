@@ -1,35 +1,20 @@
-import { baixarCsv, baixarXlsx, compartilharNotas } from './exportNotas';
 import { setPainel } from './layout';
-import { notaNoMeuLocal } from './notaRapida';
 import { setTab } from './paineis';
 import { $ } from './ui';
 
-/** Popover do pino da barra de ferramentas: nota no meu local e ver notas. */
-const aberto = () => !$('#pinpop').hidden;
+/** O pino da barra de ferramentas só abre a aba Revisão (Ver notas). Criar nota é pelo menu pressionável; exportar, pela aba Exportar. */
+export const verNotas = () => { setPainel(false); setTab('notas'); };
 
-function abrir(v: boolean) {
-  $('#pinpop').hidden = !v;
-  $('#btnNotas').setAttribute('aria-expanded', String(v));
-  $('#btnNotas').setAttribute('aria-pressed', String(v));
-}
-
-export const alternarPinoNotas = () => { abrir(!aberto()); if (aberto()) ($('#ppLocal') as HTMLElement).focus({ preventScroll: true }); };
-/** Esc fecha o popover. Devolve true quando consumiu. */
-export function fecharPinoNotas(): boolean {
-  if (!aberto()) return false;
-  abrir(false);
-  return true;
+/** Contador no botão: "Ver notas (N)" no nome acessível e um número pequeno quando houver notas ou alterações. */
+export function atualizarContadorNotas(n: number) {
+  const b = document.getElementById('btnNotas'), c = document.getElementById('notasBadge');
+  if (!b || !c) return;
+  b.setAttribute('aria-label', `Ver notas (${n})`);
+  b.setAttribute('title', `Ver notas (${n}) (P)`);
+  c.hidden = n === 0;
+  c.textContent = n > 99 ? '99+' : String(n);
 }
 
 export function initPinoNotas() {
-  $('#btnNotas').addEventListener('click', (e) => { e.stopPropagation(); alternarPinoNotas(); });
-  document.addEventListener('pointerdown', (e) => {
-    const alvo = e.target as Node;
-    if (aberto() && !$('#pinpop').contains(alvo) && !$('#btnNotas').contains(alvo)) abrir(false);
-  });
-  $('#ppLocal').addEventListener('click', () => { abrir(false); void notaNoMeuLocal(); });
-  $('#ppVer').addEventListener('click', () => { abrir(false); setPainel(false); setTab('notas'); });
-  $('#ppXlsx').addEventListener('click', () => { abrir(false); void baixarXlsx(); });
-  $('#ppCsv').addEventListener('click', () => { abrir(false); baixarCsv(); });
-  $('#ppShare').addEventListener('click', () => { abrir(false); void compartilharNotas(); });
+  $('#btnNotas').addEventListener('click', verNotas);
 }

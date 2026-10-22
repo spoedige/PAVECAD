@@ -16,8 +16,8 @@ import { blocosDoUnifilar, drawUni, lacunasDoUnifilar, planilhasDoUnifilar, init
 import { ehCompacto, initLayout, setPainel } from './app/layout';
 import { alternarAlinhar } from './app/alinhar';
 import { alternarLimpo, initGrupos } from './app/grupos';
-import { fecharPinoNotas, initPinoNotas, alternarPinoNotas } from './app/pinoNotas';
-import { fecharNotaRapida, initNotaRapida } from './app/notaRapida';
+import { initPinoNotas, verNotas } from './app/pinoNotas';
+import { fecharNotaRapida, initNotaRapida, notaNoMeuLocal } from './app/notaRapida';
 import { clearFocus } from './app/mapa';
 import { $, observarHud, observarRolagem, observarRolagemH, syncAllSegs, syncSeg, toast } from './app/ui';
 
@@ -91,7 +91,7 @@ window.addEventListener('keydown', (e) => {
   if (k >= '1' && k <= '9') { const v = modosVisiveis(); if (+k - 1 < v.length) setMode(v[+k - 1]); return; }
   if (k === '/') { e.preventDefault(); $('#gokm').focus(); return; }
   if (k === 'Escape') {
-    if (fecharNotaRapida() || fecharPinoNotas()) return;
+    if (fecharNotaRapida()) return;
     if (E.tool) { setTool(null); return; }
     if (E.editing) { E.editing = null; refreshNotesLayer(); renderAll(); return; }
     if (E.focus) { clearFocus(); return; }
@@ -100,7 +100,7 @@ window.addEventListener('keydown', (e) => {
   }
   const lk = k.toLowerCase();
   if (lk === 'h') { alternarLimpo(); return; }
-  if (lk === 'p') { alternarPinoNotas(); return; }
+  if (lk === 'p') { verNotas(); return; }
   if (lk === 'n') { setTool('prop'); return; }
   if (lk === 'q') { rotate(-15); return; }
   if (lk === 'e') { rotate(15); return; }
@@ -131,7 +131,7 @@ if (import.meta.env.DEV) {
   (window as unknown as { __pavecad: unknown }).__pavecad = {
     E,
     setField: (on: boolean, silencioso?: boolean) => { if (E.field !== on) setField(on); if (silencioso) $('#toast').classList.remove('on'); },
-    select, setTab, map: getMap, marcosInfo, blocosDoUnifilar, lacunasDoUnifilar, planilhasDoUnifilar,
+    select, setTab, notaNoMeuLocal, map: getMap, marcosInfo, blocosDoUnifilar, lacunasDoUnifilar, planilhasDoUnifilar,
   };
 }
 

@@ -2,7 +2,6 @@ import { localizar, type Local, type LocP } from '../dominio/localizar';
 import { M_LAT } from '../dominio/medidas';
 import { E, projName, type AppProj } from './estado';
 import { getMap, select, setData } from './mapa';
-import { startNote } from './revisao';
 import { $, esc, toast } from './ui';
 
 interface Fix { lat: number; lon: number; acc: number }
@@ -37,14 +36,13 @@ function onFix(pos: GeolocationPosition) {
   }
   const loc = localizar(E.P as LocP[], lat, lon), chip = $('#gpschip');
   chip.hidden = false;
+  // uma linha curta: onde está e a precisão. Abrir o segmento e anotar saíram: a nota nasce do menu pressionável
   let txt: string;
   gps.loc = loc;
-  if (loc && loc.out < 40 && loc.lane !== null) txt = `<b>km ${esc(loc.p.kmLab[loc.i])}</b> · ${loc.lane ? 'Faixa ' + loc.lane : 'Acostamento'} · ${esc(projName(loc.p as AppProj))}`;
-  else if (loc) txt = `Fora da pista (${Math.round(loc.out || loc.dist)} m) · mais próximo: km ${esc(loc.p.kmLab[loc.i])} ${esc(projName(loc.p as AppProj))}`;
-  else txt = 'Sem planilhas visíveis para localizar';
-  chip.innerHTML = `<span class="num">${txt} · ±${Math.round(acc || 0)} m</span><button class="p" id="gOpen">Abrir</button><button id="gNote">Nota</button><button id="gFollow">${gps.follow ? 'Seguindo' : 'Seguir'}</button>`;
-  $('#gOpen').onclick = () => { const l = gps.loc; if (l) select(l.p.id, l.i, l.lane ?? 1, { tab: true }); };
-  $('#gNote').onclick = () => { if (gps.last) startNote('pin', [[gps.last.lon, gps.last.lat]]); };
+  if (loc && loc.out < 40 && loc.lane !== null) txt = `km ${esc(loc.p.kmLab[loc.i])} · ${loc.lane ? 'Fx ' + loc.lane : 'Acost.'}`;
+  else if (loc) txt = `Fora da pista (${Math.round(loc.out || loc.dist)} m)`;
+  else txt = 'Sem planilha visível';
+  chip.innerHTML = `<span class="num"><b>GPS</b> · ${txt} · ±${Math.round(acc || 0)} m</span><button id="gFollow">${gps.follow ? 'Seguindo' : 'Seguir'}</button>`;
   $('#gFollow').onclick = () => {
     gps.follow = !gps.follow;
     $('#gFollow').textContent = gps.follow ? 'Seguindo' : 'Seguir';

@@ -365,7 +365,6 @@ textarea:focus{box-shadow:inset 0 0 0 2px var(--accent)}
 .unico #btnExample{display:none}
 .unico .tools{display:flex;flex-direction:column;align-items:flex-start;gap:8px;position:absolute;left:var(--g);bottom:calc(var(--uni-h) + 24px + var(--rest-uni,0px));z-index:6}
 .unico .tools #zoomhost{position:relative}
-.unico .tools .maplibregl-ctrl-scale{position:absolute;left:calc(100% + 8px);top:0}
 .unico .tools #btnMore,.unico .tools #btnLimpo{width:var(--tools-w);height:var(--tools-w);border-radius:14px}
 .unico .tools #btnMore,.unico .tools #btnLimpo{background:var(--glass);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);border:var(--bw) solid var(--hair);box-shadow:var(--shadow)}
 .unico .tools #btnMore[aria-expanded="true"],.unico .tools #btnLimpo[aria-pressed="true"]{background:var(--solid);color:var(--fg)}
@@ -385,6 +384,7 @@ textarea:focus{box-shadow:inset 0 0 0 2px var(--accent)}
 .unico .ihead{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"grip grip" "tabs tabs" "km chev";gap:2px 8px;align-items:center;padding:4px 10px 6px 12px;touch-action:pan-x;cursor:grab;user-select:none;-webkit-user-select:none}
 .unico .grip{display:block;grid-area:grip;justify-self:center;width:44px;height:5px;border-radius:3px;background:var(--faint);margin:3px 0 2px}
 .unico .ihead .seg{grid-area:tabs;display:grid;grid-template-columns:repeat(5,minmax(0,1fr))}
+.unico .inspector:not(.collapsed) .ikm{display:none}
 .unico .ikm{display:block;grid-area:km;min-width:0;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .unico #collapse{grid-area:chev}
 .unico .inspector.collapsed .ihead{cursor:pointer}
@@ -447,7 +447,7 @@ textarea:focus{box-shadow:inset 0 0 0 2px var(--accent)}
 .grestaura[data-g=girar]{position:relative}
 html.h-unifilar:not(.limpo){--rest-uni:52px}
 /* grupo oculto: some o grupo e aparece o botão de restaurar no lugar dele */
-html.h-titulo .leftcol>:not(.grestaura){display:none}
+html.h-titulo .leftcol>:not(.grestaura):not(#escalahost){display:none}
 html.h-titulo:not(.limpo) .grestaura[data-g=titulo]{display:grid}
 html.h-ferramentas #toolbar{display:none}
 html.h-ferramentas:not(.limpo) .grestaura[data-g=ferramentas]{display:grid}
@@ -617,23 +617,21 @@ details.rgrp .rg-c{display:flex;flex-direction:column;gap:14px;padding:4px 0 14p
 html.limpo .nr-dica{display:none}
 .nr-dica button{pointer-events:auto}
 /* lista de notas de campo */
-/* popover do pino da barra de ferramentas */
-.topright{position:relative}
-.pinpop{position:absolute;top:calc(100% + 8px);right:0;z-index:8;min-width:236px;padding:6px;display:flex;flex-direction:column;gap:2px;border-radius:16px}
-.pinpop[hidden]{display:none}
-.pinpop button{display:flex;align-items:center;gap:10px;min-height:44px;padding:0 12px;border:0;border-radius:10px;background:none;color:var(--fg);font:inherit;font-weight:600;text-align:left}
-.pinpop button:hover,.pinpop button:focus-visible{background:var(--fill)}
-.pinpop .i{width:20px;height:20px;flex:none}
-.pinpop .pp-baixar{display:flex;align-items:center;gap:4px;border-top:var(--bw) solid var(--hair);margin-top:2px;padding-top:2px}
-.pinpop .pp-main{flex:1 1 auto}
-.pinpop .pp-sec{flex:none;padding:0 10px;color:var(--muted);font-weight:600;font-size:var(--fs-meta)}
-html.h-ferramentas .pinpop,html.limpo .pinpop{display:none}
+/* contador do botão Ver notas, escala na coluna esquerda e linha de GPS abaixo da barra de ferramentas */
+.tbtn{position:relative}
+.tbadge{position:absolute;top:1px;right:1px;min-width:16px;height:16px;padding:0 3px;border-radius:8px;background:var(--accent);color:var(--accent-ink);font-size:11px;font-weight:700;line-height:16px;text-align:center;pointer-events:none}
+.tbadge[hidden]{display:none}
+#escalahost{display:flow-root;pointer-events:none}
+/* celular: a linha de GPS ocupa a largura toda embaixo da barra, sem estourar a tela */
+:root:not(.unico) .topright{flex-wrap:wrap;min-width:0;max-width:100%}
+:root:not(.unico) .trrow{flex-wrap:wrap}
+:root:not(.unico) .topright .gpschip{flex:1 1 100%;align-self:stretch;white-space:normal;justify-content:space-between}
+#escalahost .maplibregl-ctrl-scale{float:none;margin:0}
+.topright .gpschip{position:static;transform:none;max-width:none;align-self:flex-end;border-radius:12px;padding:4px 6px 4px 12px;gap:8px;white-space:nowrap}
 .nr-cap{position:absolute;transform:translateX(-50%);padding:2px 8px;border-radius:999px;background:var(--solid);border:var(--bw) solid var(--hair);font-size:var(--fs-meta);font-weight:600;white-space:nowrap;pointer-events:none;box-shadow:var(--shadow)}
 .nr-cap.aviso{background:var(--warn-bg);border-color:var(--warn-bd)}
 .toast-nota{display:flex;flex-wrap:wrap;align-items:center;gap:8px;justify-content:center}
 .toast-nota input{min-height:40px;min-width:200px;border-radius:10px;border:var(--bw) solid var(--hair);background:var(--fill);color:var(--fg);padding:0 10px;font:inherit}
-/* o popover nasce dentro do .hud (z 5): enquanto aberto, o .hud passa por cima do painel direito */
-.hud:has(.pinpop:not([hidden])){z-index:9}
 /* itens das notas na lista de ocorrências e backup */
 .nrl-ic{display:inline-flex;width:22px;height:22px;flex:none}
 .nrl-ic .i{width:22px;height:22px}
