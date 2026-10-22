@@ -11,14 +11,19 @@ export interface ItemCatalogo {
   mapeado: boolean;
   /** Intensidade da intervenção (0 = sem intervenção). Decide se trocar A por B aumenta, reduz ou só troca a solução. Vazio = sem nível. */
   nivel: number | null;
+  /** Espessura da camada (m) usada na representação 3D do IFC. */
+  espessura: number;
 }
+
+export const ESPESSURA_PADRAO = 0.05;
+export const ESPESSURA_MAX = 2;
 
 export const CATEGORIAS = ['Restauração', 'Reforço', 'Reparo', 'Fresagem', 'Revestimento fino', 'Outro'];
 export const CAT_NAO_MAPEADO = 'Não mapeado';
 export const COR_NAO_MAPEADO = '#8e8e93';
 
 const item = (codigo: string, nome: string, curto: string, cor: string, corCampo: string, categoria: string, nivel: number | null = null): ItemCatalogo =>
-  ({ codigo, nome, curto, cor, corCampo, categoria, mapeado: true, nivel });
+  ({ codigo, nome, curto, cor, corCampo, categoria, mapeado: true, nivel, espessura: ESPESSURA_PADRAO });
 
 /** Nível de "Sem intervenção" (código "-"), que não é item do catálogo. */
 export const NIVEL_SEM_INTERVENCAO = 0;
@@ -61,7 +66,7 @@ export function escurecer(cor: string, f = 0.68): string {
 }
 
 export function get(codigo: string): ItemCatalogo {
-  return ativo.get(codigo) ?? { codigo, nome: codigo, curto: codigo, cor: COR_NAO_MAPEADO, corCampo: escurecer(COR_NAO_MAPEADO), categoria: CAT_NAO_MAPEADO, mapeado: false, nivel: null };
+  return ativo.get(codigo) ?? { codigo, nome: codigo, curto: codigo, cor: COR_NAO_MAPEADO, corCampo: escurecer(COR_NAO_MAPEADO), categoria: CAT_NAO_MAPEADO, mapeado: false, nivel: null, espessura: ESPESSURA_PADRAO };
 }
 
 export const conhecido = (codigo: string) => ativo.has(codigo);
@@ -83,6 +88,7 @@ export function definir(parcial: Partial<ItemCatalogo> & { codigo: string }): It
   novo.curto = novo.curto.trim() || novo.nome;
   if (!hex.test(novo.cor)) novo.cor = atual.cor;
   novo.nivel = typeof novo.nivel === 'number' && Number.isFinite(novo.nivel) && novo.nivel >= 0 ? Math.round(novo.nivel) : null;
+  novo.espessura = typeof novo.espessura === 'number' && Number.isFinite(novo.espessura) && novo.espessura > 0 && novo.espessura <= ESPESSURA_MAX ? Math.round(novo.espessura * 1000) / 1000 : atual.espessura;
   if (parcial.cor && !parcial.corCampo) novo.corCampo = escurecer(novo.cor);
   if (novo.categoria === CAT_NAO_MAPEADO) novo.categoria = 'Outro';
   if (!ativo.has(novo.codigo)) ordem.push(novo.codigo);
@@ -120,7 +126,7 @@ export function restaurarItem(codigo: string) {
 export interface CatalogoJson {
   versao: 1;
   tipo: 'catalogo-solucoes';
-  itens: (Pick<ItemCatalogo, 'codigo' | 'nome' | 'curto' | 'cor' | 'corCampo' | 'categoria'> & { nivel?: number | null })[];
+  itens: (Pick<ItemCatalogo, 'codigo' | 'nome' | 'curto' | 'cor' | 'corCampo' | 'categoria'> & { nivel?: number | null; espessura?: number })[];
 }
 
 /** Só os itens cadastrados (mapeados). Os "Não mapeado" ficam de fora: voltam sozinhos ao ler a planilha. */
@@ -128,7 +134,7 @@ export function exportar(): CatalogoJson {
   return {
     versao: 1,
     tipo: 'catalogo-solucoes',
-    itens: todos().filter((x) => x.mapeado).map(({ codigo, nome, curto, cor, corCampo, categoria, nivel }) => ({ codigo, nome, curto, cor, corCampo, categoria, nivel })),
+    itens: todos().filter((x) => x.mapeado).map(({ codigo, nome, curto, cor, corCampo, categoria, nivel, espessura }) => ({ codigo, nome, curto, cor, corCampo, categoria, nivel, espessura })),
   };
 }
 
@@ -145,6 +151,7 @@ export function importar(j: unknown): number {
       categoria: typeof it.categoria === 'string' && it.categoria ? it.categoria : 'Outro',
       // arquivo antigo, sem nível: mantém o do item atual
       ...(it.nivel === undefined ? {} : { nivel: it.nivel }),
+      ...(typeof it.espessura === 'number' ? { espessura: it.espessura } : {}),
     });
     n++;
   }

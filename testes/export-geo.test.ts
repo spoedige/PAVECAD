@@ -107,3 +107,25 @@ describe('núcleo da exportação', () => {
     expect(kmLabel(f.base.kmNum[0])).toBe(f.km(0));
   });
 });
+
+import * as catalogo from '../src/dominio/catalogo';
+
+describe('espessura no catálogo', () => {
+  it('padrão de 0,05 m, editável e validada, e vai e volta no JSON', () => {
+    expect(catalogo.get('FS3').espessura).toBe(0.05);
+    expect(catalogo.get('XYZ').espessura).toBe(0.05);
+    catalogo.definir({ codigo: 'FS3', espessura: 0.08 });
+    expect(catalogo.get('FS3').espessura).toBe(0.08);
+    catalogo.definir({ codigo: 'FS3', espessura: -1 });
+    expect(catalogo.get('FS3').espessura).toBe(0.08);
+    catalogo.definir({ codigo: 'FS3', espessura: 99 });
+    expect(catalogo.get('FS3').espessura).toBe(0.08);
+    const j = catalogo.exportar();
+    expect(j.itens.find((i) => i.codigo === 'FS3')!.espessura).toBe(0.08);
+    catalogo.restaurarPadrao();
+    expect(catalogo.get('FS3').espessura).toBe(0.05);
+    catalogo.importar(j);
+    expect(catalogo.get('FS3').espessura).toBe(0.08);
+    catalogo.restaurarPadrao();
+  });
+});

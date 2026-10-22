@@ -77,6 +77,7 @@ function linhaSolucao(it: catalogo.ItemCatalogo): string {
     <td><input type="color" data-f="cor" value="${esc(it.cor)}" aria-label="Cor de ${esc(it.codigo)}"></td>
     <td><input type="text" data-f="categoria" list="cfgCats" value="${esc(it.mapeado ? it.categoria : '')}" placeholder="${nm ? catalogo.CAT_NAO_MAPEADO : ''}" aria-label="Categoria de ${esc(it.codigo)}"></td>
     <td><input type="number" class="in-nivel" data-f="nivel" min="0" max="99" step="1" inputmode="numeric" value="${it.nivel ?? ''}" placeholder="–" aria-label="Nível de intensidade de ${esc(it.codigo)}"></td>
+    <td><input type="number" class="in-nivel" data-f="espessura" min="0.005" max="2" step="0.005" inputmode="decimal" value="${it.espessura}" aria-label="Espessura em metros de ${esc(it.codigo)}"></td>
     <td class="num">${ocorrencias(it.codigo).toLocaleString('pt-BR')}</td>
     <td>${catalogo.ehPadrao(it.codigo) ? `<button class="btn" data-rest="${esc(it.codigo)}" style="min-height:30px;padding:3px 10px">Restaurar</button>` : ''}</td></tr>`;
 }
@@ -87,7 +88,7 @@ function renderSolucoes(body: HTMLElement) {
     <div><h2 class="h2">Catálogo de soluções</h2>
       <p class="lead">Nome, cor, categoria e nível de cada código principal lido das planilhas. O nível (0 a 99) mede a intensidade da intervenção e decide, nas alterações feitas em campo, se a troca aumenta, reduz ou só troca a solução. Isso muda só como a solução aparece na tela. O código original continua nos dados e nas exportações: "GAP" pode aparecer como "Reforço", e o arquivo exportado segue dizendo GAP.</p></div>
     <div class="cfg-warn" id="catWarn" ${nm.length ? '' : 'hidden'}><b id="catWarnTxt">${nm.length} código${nm.length > 1 ? 's' : ''} sem cadastro</b><span class="note">Aparecem em cinza como "Não mapeado". Edite o nome, a cor e a categoria para cadastrar.</span></div>
-    <table class="ctable"><thead><tr><th>Código</th><th>Nome exibido</th><th>Nome curto</th><th>Cor</th><th>Categoria</th><th title="Intensidade da intervenção. Define se trocar uma solução por outra aumenta ou reduz (0 = sem intervenção)">Nível</th><th>Ocorrências</th><th></th></tr></thead>
+    <table class="ctable"><thead><tr><th>Código</th><th>Nome exibido</th><th>Nome curto</th><th>Cor</th><th>Categoria</th><th title="Intensidade da intervenção. Define se trocar uma solução por outra aumenta ou reduz (0 = sem intervenção)">Nível</th><th title="Espessura da camada em metros, usada no IFC (padrão 0,05 m)">Espessura (m)</th><th>Ocorrências</th><th></th></tr></thead>
       <tbody id="catBody">${itens.map(linhaSolucao).join('')}</tbody></table>
     <datalist id="cfgCats">${catalogo.CATEGORIAS.map((c) => `<option value="${esc(c)}">`).join('')}</datalist>
     <div class="cfg-row">
@@ -107,9 +108,10 @@ function renderSolucoes(body: HTMLElement) {
     $('#catWarnTxt').textContent = `${n} código${n > 1 ? 's' : ''} sem cadastro`;
   };
   tb.addEventListener('change', (ev) => {
-    const inp = ev.target as HTMLInputElement, tr = inp.closest('tr')!, codigo = tr.dataset.c!, f = inp.dataset.f as 'nome' | 'curto' | 'cor' | 'categoria' | 'nivel';
+    const inp = ev.target as HTMLInputElement, tr = inp.closest('tr')!, codigo = tr.dataset.c!, f = inp.dataset.f as 'nome' | 'curto' | 'cor' | 'categoria' | 'nivel' | 'espessura';
     if (!f) return;
-    const novo = catalogo.definir({ codigo, [f]: f === 'nivel' ? (inp.value.trim() === '' ? null : Number(inp.value)) : inp.value });
+    const novo = catalogo.definir({ codigo, [f]: f === 'nivel' ? (inp.value.trim() === '' ? null : Number(inp.value)) : f === 'espessura' ? Number(inp.value.replace(',', '.')) : inp.value });
+    if (f === 'espessura') inp.value = String(novo.espessura);
     if (f === 'nivel') inp.value = novo.nivel === null ? '' : String(novo.nivel);
     tr.classList.remove('nm');
     tr.querySelector<HTMLElement>('.badge')!.hidden = true;
