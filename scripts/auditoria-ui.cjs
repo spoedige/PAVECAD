@@ -262,7 +262,11 @@ const ESTADOS = [
     const p = await centrar(pg);
     await limparDicas(pg);
     await pg.mouse.move(p.x, p.y); await pg.mouse.down(); await pg.waitForTimeout(700); await pg.mouse.up();
-    await pg.waitForSelector('#nr .nr-op', { timeout: 5000 }); await pausa(pg, 500);
+    // a pressão longa é o gesto de toque; se a ferramenta de captura não a entregar, o botão direito abre o mesmo menu
+    if (!(await pg.locator('#nr .nr-op').first().isVisible().catch(() => false))) { await pg.keyboard.press('Escape'); await pg.mouse.click(p.x, p.y, { button: 'right' }); }
+    const topo = await pg.evaluate(({ x, y }) => { const t = document.elementFromPoint(x, y); return t ? (t.id || t.className || t.tagName) : 'nada'; }, p);
+    await pg.waitForSelector('#nr .nr-op', { timeout: 5000 }).catch((e) => { throw new Error(`o menu não abriu em ${Math.round(p.x)},${Math.round(p.y)} (elemento: ${topo})`); });
+    await pausa(pg, 500);
   }, desfazer: async (pg) => { await pg.keyboard.press('Escape'); await pausa(pg, 250); } },
   { id: 'configuracoes-solucoes', aplicar: async (pg) => { await pg.evaluate(() => document.querySelector('#btnCfg')?.click()); await pg.waitForSelector('#cfg:not([hidden])'); await pausa(pg, 500); }, desfazer: async (pg) => { await pg.evaluate(() => document.querySelector('#cfgClose')?.click()); await pausa(pg, 250); } },
   { id: 'configuracoes-campo', aplicar: async (pg) => { await pg.evaluate(() => document.querySelector('#btnCfg')?.click()); await pg.waitForSelector('#cfg:not([hidden])'); await pg.click('#cfgTabs [data-ct=campo]'); await pausa(pg, 700); }, desfazer: async (pg) => { await pg.evaluate(() => document.querySelector('#cfgClose')?.click()); await pausa(pg, 250); } },
