@@ -11,6 +11,7 @@ import { baseSources, CHAVE_NITIDEZ, MAP_MAX_ZOOM, nitidezSalva, recarregarEsri,
 import { agendarRotulos, PRIO, prioDeEstaca, resolverRotulos } from './rotulos';
 import { alinhado, cabeRotuloInterno, dentroDoOrcamento, direcaoNaTela, deslocamentoParaFora, metrosPorPixel, passoComOrcamento, PISTAS_JUNTAS_M, prioDoMarco, rotuloInterno, rumoDe } from '../mapa/marcos';
 import { E, H, NOTE_CATS, getP, kmFmt, kmReal, padraoAtivo, padraoDosPares, projName, visibleProjects, type AppProj, type FocoPred } from './estado';
+import { ehCelular } from './layout';
 import { $, cssv, esc, fmt, syncSeg, toast } from './ui';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -55,7 +56,7 @@ export function initMap(onReady: () => void) {
   const zh = $('#zoomhost');
   zh.appendChild(new maplibregl.NavigationControl({ showCompass: false }).onAdd(map));
   // a escala fica no canto superior esquerdo, logo abaixo do cartão de busca (coluna esquerda)
-  $('#escalahost').appendChild(new maplibregl.ScaleControl({ unit: 'metric' }).onAdd(map));
+  $('#escalahost').appendChild(new maplibregl.ScaleControl({ unit: 'metric', maxWidth: 96 }).onAdd(map));
 
   map.on('load', () => {
     for (const [nome, tipo] of [['hachura', 'diag'], ['hpontos', 'pontos'], ['hlinhas', 'linhas']] as const) map.addImage(nome, criarHachura(tipo), { pixelRatio: 2 });
@@ -74,10 +75,14 @@ export function initMap(onReady: () => void) {
     map.addLayer({ id: 'notes-pt', type: 'circle', source: 'notes', filter: ['==', ['geometry-type'], 'Point'], paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 8, 6, 18, 10], 'circle-color': catc, 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 2.5 } });
     map.addSource('props', { type: 'geojson', data: EMPTY });
     map.addSource('psel', { type: 'geojson', data: EMPTY });
+    map.addSource('phl', { type: 'geojson', data: EMPTY });
     map.addLayer({ id: 'props-fill', type: 'fill', source: 'props', minzoom: 11, paint: { 'fill-color': '#888', 'fill-opacity': 0.94 } }, 'notes-fill');
     map.addLayer({ id: 'props-line', type: 'line', source: 'props', minzoom: 11, paint: { 'line-color': '#000', 'line-width': 1.4, 'line-dasharray': [2, 1.2] } }, 'notes-fill');
     map.addLayer({ id: 'psel-fill', type: 'fill', source: 'psel', paint: { 'fill-color': '#07f', 'fill-opacity': 0.4 } }, 'notes-fill');
     map.addLayer({ id: 'psel-line', type: 'line', source: 'psel', paint: { 'line-color': '#07f', 'line-width': 2.4 } }, 'notes-fill');
+    // trecho de 20 m sob o dedo enquanto a pressão carrega
+    map.addLayer({ id: 'phl-fill', type: 'fill', source: 'phl', paint: { 'fill-color': '#07f', 'fill-opacity': 0.38 } }, 'notes-fill');
+    map.addLayer({ id: 'phl-line', type: 'line', source: 'phl', paint: { 'line-color': '#ffffff', 'line-width': 3 } }, 'notes-fill');
     map.addLayer({ id: 'draft-fill', type: 'fill', source: 'draft', filter: ['==', ['geometry-type'], 'Polygon'], paint: { 'fill-color': '#0a84ff', 'fill-opacity': 0.18 } });
     map.addLayer({ id: 'draft-line', type: 'line', source: 'draft', filter: ['!=', ['geometry-type'], 'Point'], paint: { 'line-color': '#0a84ff', 'line-width': 3, 'line-dasharray': [2, 1.5] } });
     map.addLayer({ id: 'draft-pt', type: 'circle', source: 'draft', filter: ['==', ['geometry-type'], 'Point'], paint: { 'circle-radius': 5, 'circle-color': '#ffffff', 'circle-stroke-color': '#0a84ff', 'circle-stroke-width': 2.5 } });
@@ -107,16 +112,22 @@ export function initMap(onReady: () => void) {
   });
   map.on('mouseout', () => { tip.style.display = 'none'; });
 
+  const dicaVista = (marcar?: string): boolean => {
+    try { if (marcar) localStorage.setItem('pavecad-dica-zoom', '1'); return localStorage.getItem('pavecad-dica-zoom') === '1'; } catch { return false; }
+  };
+  $('#zoomnoteOk').addEventListener('click', () => { dicaVista('zoom'); $('#zoomnote').hidden = true; });
   const onZ = () => {
     const z = map.getZoom();
     $('.stage').classList.toggle('zoom-hi', z >= 11.5);
-    $('#zoomnote').textContent = z < 15.6 ? 'Aproxime para ver a largura real das faixas.' : '';
+    // dica única: some quando o usuário aproxima o suficiente ou toca em Entendi, e não volta (lembrado no aparelho)
+    if (z >= 15.6) dicaVista('zoom');
+    $('#zoomnote').hidden = !(z < 15.6 && !dicaVista());
   };
   map.on('zoom', onZ);
   onZ();
   map.on('rotate', () => { $('#compass').style.transform = `rotate(${-map.getBearing()}deg)`; });
   map.on('rotate', () => map.getContainer().style.setProperty('--mb', map.getBearing().toFixed(1)));
-  map.on('moveend', () => { updateStakes(); if (!legendAberta()) renderLegend(); });
+  map.on('moveend', () => { updateStakes(); renderLegend(); });
   map.on('move', () => H.onView());
   new MutationObserver(() => setTimeout(applyPaint, 20)).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => setTimeout(applyPaint, 40));
@@ -351,6 +362,7 @@ export function applyPaint() {
   map.setPaintProperty('props-line', 'line-color', cssv('--fg'));
   map.setPaintProperty('psel-fill', 'fill-color', cssv('--accent'));
   map.setPaintProperty('psel-line', 'line-color', cssv('--accent'));
+  map.setPaintProperty('phl-fill', 'fill-color', cssv('--accent'));
   renderLegend();
   H.onView();
 }
@@ -374,11 +386,16 @@ function legendItems(): LegItem[] {
   return slot(E.mode)!.labels.map((l, i) => ({ key: String(i), c: Q()[i], l, s: l }));
 }
 
-// No layout único (601 px ou mais) a legenda começa recolhida (botão pequeno); a escolha do usuário, quando existe, vale sobre o padrão.
-const OCULTAR_LEGENDA = `<button class="gocultar" type="button" data-ocultar="legenda" aria-label="Ocultar legenda" title="Ocultar legenda"><svg class="i" viewBox="0 0 24 24"><path d="M3 3l18 18"/><path d="M10.6 6.1A10 10 0 0 1 12 6c6.5 0 10 6 10 6a17 17 0 0 1-3.2 3.9M6.2 7C3.7 8.7 2 12 2 12s3.5 6 10 6c1.6 0 3-.4 4.2-.9"/><path d="M9.9 10a3 3 0 0 0 4.1 4.1"/></svg></button>`;
-const legendAberta = () => legendOpen && E.tool !== 'prop';
-let legendOpen = !window.matchMedia('(min-width: 601px)').matches;
-try { const v = localStorage.getItem('pavecad-leg'); if (v !== null) legendOpen = v !== '0'; } catch { /* sem storage */ }
+/** Legenda completa: um popover aberto pelo botão do cartão de controles ou pelo "+N" da linha de cores do unifilar. Fica aberto até o usuário fechar. */
+let legAberta = false;
+export const legendaAberta = () => legAberta;
+export function setLegendaAberta(v: boolean) {
+  legAberta = v;
+  $('#legend').hidden = !v;
+  $('#btnLegenda').setAttribute('aria-expanded', String(v));
+  $('#btnLegenda').setAttribute('aria-pressed', String(v));
+  if (v) renderLegend();
+}
 
 /** Quantos segmentos de cada classe aparecem na vista atual (chave da legenda -> contagem). */
 function contagemNaVista(): Map<string, number> {
@@ -424,27 +441,30 @@ const padraoDe = (it: LegItem): 'crit' | 'pontos' | 'linhas' | null => {
 const ehCritica = (it: LegItem) => !!padraoDe(it);
 
 export function renderLegend() {
-  const el = $('#legend'), items = legendItems();
-  // com a barra Propor solução aberta a legenda fica compacta, para a pilha de baixo caber em telas baixas
-  const aberta = legendAberta();
+  const items = legendItems();
   const I = slot(E.mode);
   const title = I ? `${I.label} · ${I.unit}${I.lim ? ' · ' + I.lim : ''}` : 'Solução';
-  let h = '';
-  if (!aberta) {
-    const { top, mais } = topoDaLegenda(items);
-    const nomes = top.map((it) => `<span class="lt"><i class="${padraoDe(it) ?? ''}" style="background-color:${it.c}"></i>${esc(it.s)}</span>`).join('');
-    h += `<div class="legrow"><button class="legtog" id="legTog" aria-expanded="false" aria-label="Expandir legenda" title="${esc(DESCRICAO_MODO[E.mode])}"><span class="legtop">${nomes || '<span class="lt">Legenda</span>'}</span>${mais ? `<span class="legmais" aria-label="mais ${mais} classes na vista">+${mais}</span>` : ''}</button>${OCULTAR_LEGENDA}</div>`;
-  } else {
-    h += `<div class="leghead"><h4 title="${esc(DESCRICAO_MODO[E.mode])}">${title}</h4><span class="legbtns"><button class="legtog sm" id="legTog" aria-expanded="true" aria-label="Recolher legenda" title="Recolher"><svg class="i" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>${OCULTAR_LEGENDA}</span></div>`;
-    h += `<ul title="Toque em um item para ocultar. Cor mais clara = 50% da área">` +
-      items.map((it) => `<li><button type="button" data-k="${esc(it.key)}" aria-pressed="${!E.dim.has(it.key)}"><span class="sw${padraoDe(it) ? ' ' + padraoDe(it) : ''}" style="background-color:${it.c}"></span>${esc(it.s)}</button></li>`).join('') + '</ul>';
-    h += `<p class="legnote">${esc(DESCRICAO_MODO[E.mode])}<br>${ABREVIACOES_FAIXA}${items.some((i) => padraoDe(i) === 'crit') ? '<br>Hachura diagonal: classe crítica' : ''}${items.some((i) => padraoDe(i) === 'pontos') ? '<br>Pontos: GAP' : ''}${items.some((i) => padraoDe(i) === 'linhas') ? '<br>Linhas: Micro' : ''}</p>`;
+  // linha de cores do unifilar: as 3 classes mais presentes na vista e, se houver outras, um "+N" que abre a lista completa
+  const { top, mais } = topoDaLegenda(items);
+  const chips = top.map((it) => `<span class="lt"><i class="${padraoDe(it) ?? ''}" style="background-color:${it.c}"></i>${esc(it.s)}</span>`).join('')
+    + (mais ? `<button type="button" class="legmais" aria-label="Mostrar as outras ${mais} cores da legenda" aria-haspopup="dialog">+${mais}</button>` : '');
+  for (const id of ['unileg', 'gavCores']) {
+    const ch = document.getElementById(id);
+    if (!ch) continue;
+    ch.innerHTML = chips;
+    const m = ch.querySelector<HTMLElement>('.legmais');
+    if (m) m.onclick = () => setLegendaAberta(true);
   }
+  if (!legAberta) return;
+  const el = $('#legend');
+  let h = `<div class="leghead"><h4 title="${esc(DESCRICAO_MODO[E.mode])}">${title}</h4><button class="iconbtn" id="legFechar" type="button" aria-label="Fechar legenda" title="Fechar"><svg class="i" viewBox="0 0 24 24"><path d="M5 12h14"/></svg></button></div>`;
+  h += `<ul title="Toque em um item para ocultar. Cor mais clara = 50% da área">` +
+    items.map((it) => `<li><button type="button" data-k="${esc(it.key)}" aria-pressed="${!E.dim.has(it.key)}"><span class="sw${padraoDe(it) ? ' ' + padraoDe(it) : ''}" style="background-color:${it.c}"></span>${esc(it.s)}</button></li>`).join('') + '</ul>';
+  h += `<p class="legnote">${esc(DESCRICAO_MODO[E.mode])}<br>${ABREVIACOES_FAIXA}${items.some((i) => padraoDe(i) === 'crit') ? '<br>Hachura diagonal: classe crítica' : ''}${items.some((i) => padraoDe(i) === 'pontos') ? '<br>Pontos: GAP' : ''}${items.some((i) => padraoDe(i) === 'linhas') ? '<br>Linhas: Micro' : ''}</p>`;
   el.innerHTML = h;
   el.querySelectorAll<HTMLButtonElement>('li button').forEach((b) =>
     b.addEventListener('click', () => { const k = b.dataset.k!; E.dim.has(k) ? E.dim.delete(k) : E.dim.add(k); applyPaint(); }));
-  const lt = document.getElementById('legTog');
-  if (lt) lt.onclick = () => { legendOpen = !legendOpen; try { localStorage.setItem('pavecad-leg', legendOpen ? '1' : '0'); } catch { /* sem storage */ } renderLegend(); };
+  $('#legFechar').onclick = () => setLegendaAberta(false);
 }
 
 /* ---------------------------------------------------------------- */
@@ -510,7 +530,8 @@ function tipHtml(h: Exclude<Hit, { note: Nota }>): string {
   return `<b>km ${p.kmLab[row]}</b> <span>· ${lane ? 'Faixa ' + lane : 'Acostamento'}${multi ? ' · ' + esc(projName(p)) : ''}</span>${l2.map((x) => '<br>' + esc(x)).join('')}`;
 }
 
-export function select(pid: string, row: number, lane: number, opt: { pan?: boolean; tab?: boolean } = {}) {
+/** `semGaveta`: no celular, selecionar não abre a gaveta (usado por "Ir para km", que precisa do mapa à vista). */
+export function select(pid: string, row: number, lane: number, opt: { pan?: boolean; tab?: boolean; semGaveta?: boolean } = {}) {
   const p = getP(pid);
   if (!p) return;
   const refAntes = refProjeto()?.id;
@@ -568,10 +589,12 @@ function onMapClick(e: MapMouseEvent) {
 /** Folga do enquadramento: a rodovia deve caber na parte livre do mapa, fora dos cartões flutuantes. Mede os elementos de verdade
  *  (topo, barra lateral e legenda à esquerda, painel à direita, unifilar embaixo); telas estreitas mantêm a folga fixa. */
 const fitPad = () => {
+  // celular: a rodovia cabe entre a barra superior, a coluna do polegar (direita) e a gaveta fechada
+  if (ehCelular()) return { top: 68, left: 24, right: 84, bottom: 72 + 28 };
   if (innerWidth <= 900) return { top: 110, left: 30, right: 30, bottom: 70 };
   const ret = (s: string) => { const e = document.querySelector<HTMLElement>(s); return e && e.checkVisibility() ? e.getBoundingClientRect() : null; };
   const m = 12;
-  const topo = Math.max(0, ...['#modes', '.topright', '#titlecard'].map((s) => ret(s)?.bottom ?? 0)) + m;
+  const topo = Math.max(0, ...['#layerbox', '.topright', '#titlecard'].map((s) => ret(s)?.bottom ?? 0)) + m;
   // a legenda recolhida muda de largura conforme as classes da vista (até 330 px): reserva o máximo
   const leg = ret('#legend');
   const esq = Math.max(0, ret('#tools')?.right ?? 0, leg ? Math.max(leg.right, leg.left + 330) : 0) + m;
@@ -775,7 +798,7 @@ export function goLabel(text: string) {
   if (!best) { toast('Esse km está fora dos trechos visíveis'); return; }
   const r = best.p.rows[best.i];
   map.flyTo({ center: [r.lon, r.lat], zoom: Math.max(map.getZoom(), 17.2), duration: 900 });
-  select(best.p.id, best.i, 1, { tab: true });
+  select(best.p.id, best.i, 1, { tab: true, semGaveta: ehCelular() });
 }
 
 /** Projetos visíveis do mesmo rodovia/UF ativo, crescente antes de decrescente. */

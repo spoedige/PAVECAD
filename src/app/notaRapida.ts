@@ -9,14 +9,23 @@ import { trColor, trShort } from '../dominio/solucoes';
 import * as db from './persist';
 import { E, getP, projName, type AppProj, type Nota } from './estado';
 import { montarLevantamento } from './levantamento';
-import { getMap } from './mapa';
+import { ehCelular } from './layout';
+import { getMap, setData } from './mapa';
 import { obterPosicao } from './posicao';
 import { aplicarProposta, atualizarProposta, refreshNotesLayer, removerProposta, renderNotes } from './revisao';
 import { cssv, esc, toast } from './ui';
 
-/** Tempo de pressão (ms) e movimento (px) que separam "segurar" de "arrastar". */
+/** Tempo de pressão (ms) e movimento (px) que separam "segurar" de "arrastar". O tempo é configurável em Ajustes (400, 500 ou 700 ms). */
 export const PRESSAO_MS = 500;
+export const PRESSAO_OPCOES = [400, 500, 700] as const;
+export const CHAVE_PRESSAO = 'pavecad-pressao-ms';
 export const PRESSAO_MOVE_PX = 8;
+/** A mira e o anel só aparecem depois disto, para não piscar em toques e rolagens. */
+export const PRESSAO_ATRASO_MS = 150;
+export const pressaoMs = (): number => {
+  try { const v = +(localStorage.getItem(CHAVE_PRESSAO) ?? 0); if ((PRESSAO_OPCOES as readonly number[]).includes(v)) return v; } catch { /* sem storage */ }
+  return PRESSAO_MS;
+};
 const TAM = 64;
 /** Quanto tempo a roda fica aberta depois de gravar, com Estender, Observação e Desfazer. */
 const POS_GRAVAR_MS = 5000;
@@ -62,7 +71,7 @@ interface Menu {
   voltar: Fase;
 }
 let menu: Menu | null = null;
-let raiz: HTMLElement, anel: HTMLElement;
+let raiz: HTMLElement, anel: HTMLElement, live: HTMLElement;
 let timerRoda: ReturnType<typeof setTimeout> | undefined;
 
 export const notaRapidaAberta = () => !!menu;
@@ -499,15 +508,27 @@ export function initNotaRapida() {
   raiz.setAttribute('role', 'dialog'); raiz.setAttribute('aria-label', 'Menu de campo');
   stage().appendChild(raiz);
   anel = document.createElement('div');
-  anel.className = 'nr-anel'; anel.hidden = true;
-  anel.innerHTML = '<svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="20" pathLength="100"/></svg>';
+  anel.className = 'nr-anel'; anel.hidden = true; anel.setAttribute('aria-hidden', 'true');
+  // anel de 44 px de raio em volta do dedo, só com transform e opacity: um fio de fundo e duas metades que giram; mira fina no centro
+  anel.innerHTML = '<i class="nr-fio"></i><i class="nr-meia nr-m1"><b></b></i><i class="nr-meia nr-m2"><b></b></i><i class="nr-mira"></i>';
   stage().appendChild(anel);
+  live = document.createElement('div');
+  live.className = 'nr-live'; live.hidden = true; live.setAttribute('aria-hidden', 'true');
+  stage().appendChild(live);
   try { void navigator.storage?.persist?.(); } catch { /* sem persistência garantida */ }
 
   const map = getMap();
   const cont = map.getCanvasContainer();
-  let timer: ReturnType<typeof setTimeout> | undefined, ini: { x: number; y: number; id: number } | null = null, disparouEm = 0;
-  const cancelar = () => { clearTimeout(timer); ini = null; anel.hidden = true; };
+  let timer: ReturnType<typeof setTimeout> | undefined, mostra: ReturnType<typeof setTimeout> | undefined, sai: ReturnType<typeof setTimeout> | undefined;
+  let ini: { x: number; y: number; id: number } | null = null, disparouEm = 0;
+  const limparDestaque = () => setData('phl', { type: 'FeatureCollection', features: [] });
+  /** Cancelar: o anel encolhe e some em 150 ms, sem abrir nada. */
+  const cancelar = (animar = true) => {
+    clearTimeout(timer); clearTimeout(mostra); ini = null;
+    live.hidden = true; limparDestaque();
+    if (!anel.hidden && animar) { anel.classList.remove('nr-roda'); anel.classList.add('nr-sai'); clearTimeout(sai); sai = setTimeout(() => { anel.hidden = true; anel.classList.remove('nr-sai'); }, 150); }
+    else { anel.hidden = true; anel.classList.remove('nr-roda', 'nr-sai'); }
+  };
   const livre = () => E.mapReady && !E.tool && E.tab !== 'al' && !menu;
   const noMapa = (e: PointerEvent) => (e.target as HTMLElement).classList.contains('maplibregl-canvas');
   const abrirEm = (cx: number, cy: number) => {
@@ -515,25 +536,44 @@ export function initNotaRapida() {
     const marcador = marcadorEm(cx - box.left, cy - box.top);
     if (marcador) abrirEdicao(marcador, pt, ll.lng, ll.lat); else abrirMenuNota(ll.lng, ll.lat, pt, 'pressao', null);
   };
+  /** Depois de 150 ms: mira no ponto exato, anel de progresso, rótulo ao vivo (km e faixa) e o trecho de 20 m mais próximo em destaque. */
+  const mostrarAnel = (cx: number, cy: number, dur: number) => {
+    const p = relativo(cx, cy), box = cont.getBoundingClientRect(), ll = map.unproject([cx - box.left, cy - box.top]);
+    anel.style.left = p.x + 'px'; anel.style.top = p.y + 'px';
+    anel.style.setProperty('--nr-dur', Math.max(100, dur - PRESSAO_ATRASO_MS) + 'ms');
+    clearTimeout(sai);
+    anel.hidden = false; anel.classList.remove('nr-roda', 'nr-sai'); void anel.getBoundingClientRect(); anel.classList.add('nr-roda');
+    const res = resolverLocal(E.P as LocP[], ll.lat, ll.lng, null), l = res.local;
+    live.textContent = res.estado === 'sem-planilha' ? 'Trecho não definido' : res.estado === 'fora' || !l ? 'Fora do trecho'
+      : `km ${l.p.kmLab[l.i]} · ${l.lane === 0 ? 'Acost.' : l.lane === null ? 'fora da pista' : 'Fx ' + l.lane}`;
+    // deslocado para fora do dedo: acima do anel, ou abaixo quando o ponto está perto do topo
+    const area0 = stage().getBoundingClientRect(), acima = p.y > 118;
+    live.style.left = Math.min(area0.width - 80, Math.max(80, p.x)) + 'px';
+    live.style.top = (acima ? p.y - 76 : p.y + 62) + 'px';
+    live.hidden = false;
+    if (l && l.lane !== null && (res.estado === 'dentro' || res.estado === 'proximo')) {
+      const f = (l.p as unknown as AppProj).polyByFid.get(l.i * 8 + (l.lane || 7));
+      setData('phl', { type: 'FeatureCollection', features: f ? [{ type: 'Feature', properties: {}, geometry: f.geometry }] : [] });
+    } else limparDestaque();
+  };
 
   cont.addEventListener('pointerdown', (e) => {
     if (ini && e.pointerId !== ini.id) { cancelar(); return; } // segundo dedo: é gesto de zoom ou rotação
     if ((e.pointerType === 'mouse' && e.button !== 0) || !livre() || !noMapa(e)) return;
+    const dur = pressaoMs();
     ini = { x: e.clientX, y: e.clientY, id: e.pointerId };
-    const p = relativo(e.clientX, e.clientY);
-    anel.style.left = p.x + 'px'; anel.style.top = p.y + 'px';
-    anel.hidden = false; anel.classList.remove('nr-roda'); void anel.getBoundingClientRect(); anel.classList.add('nr-roda');
+    mostra = setTimeout(() => { if (ini) mostrarAnel(ini.x, ini.y, dur); }, PRESSAO_ATRASO_MS);
     timer = setTimeout(() => {
       if (!ini) return;
       const { x, y } = ini;
-      cancelar(); disparouEm = Date.now();
+      cancelar(false); disparouEm = Date.now();
       E.cliqueSuprimidoAte = Date.now() + 700;
       vibrar(30);
       abrirEm(x, y);
-    }, PRESSAO_MS);
+    }, dur);
   });
   cont.addEventListener('pointermove', (e) => { if (ini && e.pointerId === ini.id && Math.hypot(e.clientX - ini.x, e.clientY - ini.y) > PRESSAO_MOVE_PX) cancelar(); });
-  for (const ev of ['pointerup', 'pointercancel', 'pointerleave'] as const) cont.addEventListener(ev, cancelar);
+  for (const ev of ['pointerup', 'pointercancel', 'pointerleave'] as const) cont.addEventListener(ev, () => cancelar());
   // o menu de contexto do navegador nunca aparece sobre o mapa; o botão direito do mouse abre o menu direto
   cont.addEventListener('contextmenu', (e) => {
     e.preventDefault();
@@ -567,10 +607,10 @@ function mostrarDicaSePreciso() {
     if (!E.P.length || document.querySelector('.nr-dica')) return;
     clearInterval(iv);
     const d = document.createElement('div');
-    d.className = 'glass nr-dica'; d.setAttribute('role', 'status');
+    d.className = 'glass dica nr-dica'; d.setAttribute('role', 'status');
     d.innerHTML = '<span>Segure no mapa para anotar</span><button type="button" class="btn p">Entendi</button>';
     d.querySelector('button')!.addEventListener('click', () => { d.remove(); try { localStorage.setItem(CHAVE_DICA, '1'); } catch { /* sem storage */ } });
-    stage().appendChild(d);
+    (ehCelular() ? stage() : document.querySelector('.leftcol') ?? stage()).appendChild(d);
   };
   const iv = setInterval(tentar, 1500);
 }

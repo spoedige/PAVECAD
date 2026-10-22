@@ -11,10 +11,7 @@ import { getMap, hitAt, renderLegend, select, setData } from './mapa';
 import * as db from './persist';
 import { setTab } from './paineis';
 import { bindItensNotas, itemNotaHtml } from './notasItens';
-import { baixarCsv, baixarXlsx, compartilharNotas } from './exportNotas';
-import { notasNovasSemExportar } from './notaRapida';
 import { atualizarContadorNotas } from './pinoNotas';
-import { precisaLembrar } from '../dominio/notaRapida';
 import { $, cssv, esc, fmt, syncSeg, toast } from './ui';
 
 const tc = (k: string) => trColor(k, E.field, cssv('--none'));
@@ -225,7 +222,7 @@ function propsHtml(): string {
   const rows = Object.entries(sum).map(([k, v]) => `<div class="row"><span class="sw" style="background:${tc(k)}"></span><div class="grow">${esc(trLabel(k))}</div><div class="val num">${fmt(v.area, 0)} <span class="muted" style="font-weight:400;font-size:var(--fs-meta)">m² · ${fmt(v.len / 1000, 2)} km·faixa</span></div></div>`).join('');
   return `${orfasHtml}<div>${head}<div class="list">${cards}</div>
     <div class="list" style="margin-top:8px">${rows}<div class="row"><div class="grow muted">Total proposto</div><div class="val num">${fmt(tl.area, 0)} <span class="muted" style="font-weight:400;font-size:var(--fs-meta)">m²</span></div></div></div>
-    <div class="btns" style="margin-top:8px"><button class="btn" id="pCsv">Copiar tabela (CSV)</button><button class="btn" id="pCsvDown">Baixar CSV</button><button class="btn d" id="pAll">Limpar todas</button></div>${aviso}</div>`;
+    <div class="btns" style="margin-top:8px"><button class="btn d" id="pAll">Limpar todas</button></div>${aviso}</div>`;
 }
 
 function bindProps(el: HTMLElement) {
@@ -258,22 +255,30 @@ function bindProps(el: HTMLElement) {
     renderNotes();
     toast('Propostas removidas');
   };
-  const cv = el.querySelector<HTMLElement>('#pCsv');
-  const eixo: EixoCsv = (p, r) => eixoDaFaixa(p as unknown as AppProj, r.lane, r.r0, r.r1);
-  const csv = (eol: string) => propostasCsv(E.props.filter((r) => !r.orfa), (id) => getP(id ?? ''), projName, trLabel, eixo, eol);
-  if (cv) cv.onclick = () => copiar(csv('\n'), 'Tabela copiada. Cole no Excel');
-  const dn = el.querySelector<HTMLElement>('#pCsvDown');
-  if (dn) dn.onclick = () => {
-    // BOM UTF-8 para o Excel reconhecer os acentos; separador ";" e vírgula decimal
-    try {
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(new Blob(['\uFEFF', csv('\r\n')], { type: 'text/csv;charset=utf-8' }));
-      a.download = nomeArquivoCsv();
-      document.body.appendChild(a); a.click(); a.remove();
-      const z = E.P[0]?.crs;
-      toast(`${nomeArquivoCsv()} gerado${z ? `. Coordenadas em SIRGAS 2000, UTM fuso ${z.zone}S` : ''}`, 4500);
-    } catch { toast('Download indisponível aqui. Use Copiar tabela.'); }
-  };
+}
+
+/* ---------------------------------------------------------------- */
+/* CSV das propostas (cartão da aba Exportar)                        */
+/* ---------------------------------------------------------------- */
+const eixoCsv: EixoCsv = (p, r) => eixoDaFaixa(p as unknown as AppProj, r.lane, r.r0, r.r1);
+const csvPropostas = (eol: string) => propostasCsv(E.props.filter((r) => !r.orfa), (id) => getP(id ?? ''), projName, trLabel, eixoCsv, eol);
+export const totalPropostas = () => E.props.filter((r) => !r.orfa && r.pid).length;
+
+export function copiarPropostasCsv() {
+  if (!totalPropostas()) { toast('Nenhuma proposta para exportar'); return; }
+  copiar(csvPropostas('\n'), 'Tabela copiada. Cole no Excel');
+}
+export function baixarPropostasCsv() {
+  if (!totalPropostas()) { toast('Nenhuma proposta para exportar'); return; }
+  // BOM UTF-8 para o Excel reconhecer os acentos; separador ";" e vírgula decimal
+  try {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob(['\uFEFF', csvPropostas('\r\n')], { type: 'text/csv;charset=utf-8' }));
+    a.download = nomeArquivoCsv();
+    document.body.appendChild(a); a.click(); a.remove();
+    const z = E.P[0]?.crs;
+    toast(`${nomeArquivoCsv()} gerado${z ? `. Coordenadas em SIRGAS 2000, UTM fuso ${z.zone}S` : ''}`, 4500);
+  } catch { toast('Download indisponível aqui. Use Copiar tabela.'); }
 }
 
 /* ---------------------------------------------------------------- */
@@ -294,7 +299,7 @@ export function startNote(type: Nota['type'], coords: number[][]) {
 }
 
 /** Linhas da planilha de notas: as notas e as alterações de solução (propostas) das planilhas carregadas. */
-const totalExportavel = () => E.notes.length + E.props.filter((r) => r.pid && !r.orfa).length;
+export const totalExportavel = () => E.notes.length + E.props.filter((r) => r.pid && !r.orfa).length;
 
 export function refreshNotesLayer() {
   atualizarContadorNotas(totalExportavel());
@@ -371,15 +376,6 @@ function ocorrenciasHtml(): string {
   return `<div><div class="sect">Ocorrências</div>${visiveis.map((g) => g.html).join('')}${alternar}<p class="note" style="margin-top:7px">Notas de campo e pontos reconstruídos pelo km quando a coordenada da planilha estava repetida, saltando ou retrocedendo. A planilha original não muda. O mesmo resumo está no log da aba Ajustes.</p></div>`;
 }
 
-/** Exportar as notas: planilha (principal), CSV e compartilhar. */
-function exportarHtml(): string {
-  const n = totalExportavel(), novas = notasNovasSemExportar();
-  const lembrete = precisaLembrar(novas) ? `<p class="nrl-lembrete" style="margin-bottom:8px">${novas} notas novas sem exportar. Baixe a planilha para guardar uma cópia.</p>` : '';
-  return `<div><div class="sect">Exportar notas <span style="text-transform:none;font-weight:500">${n}</span></div>${lembrete}
-    <div class="btns"><button class="btn p" id="exXlsx" ${n ? '' : 'disabled'}>Baixar planilha (.xlsx)</button><button class="btn" id="exCsv" ${n ? '' : 'disabled'}>Baixar CSV</button><button class="btn" id="exShare" ${n ? '' : 'disabled'}>Compartilhar</button></div>
-    <p class="note" style="margin-top:7px">As notas ficam neste aparelho e funcionam sem internet. A planilha traz data, hora, local, coordenadas em graus e UTM.</p></div>`;
-}
-
 export function renderNotes() {
   const el = document.getElementById('t-notas');
   if (!el) return;
@@ -396,8 +392,7 @@ export function renderNotes() {
     <div><div class="sect">Anotações <span style="text-transform:none;font-weight:500">${E.notes.filter((n) => !n.rapida).length}</span></div>
       ${list.length ? `<div class="list">${list.map((n) => `<div class="note-card"><button class="note-top" data-n="${n.id}"><span class="sw" style="background:${NOTE_CATS[n.cat].c};width:12px;height:12px"></span>
         <span class="t"><b>${esc(n.text || 'Sem texto')}</b><span>${NOTE_CATS[n.cat].l} · ${noteSummary(n)}${n.loc ? ' · ' + esc(locDe(n.loc).name) + ' km ' + esc(locDe(n.loc).km) : ''} · ${new Date(n.t).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}${n.photos?.length ? ' · ' + n.photos.length + ' foto(s)' : ''}</span></span></button></div>`).join('')}</div>`
-        : (ed ? '' : '<p class="vazio">Nenhuma anotação. Use o ponto no mapa (P).</p>')}</div>
-    ${exportarHtml()}`;
+        : (ed ? '' : '<p class="vazio">Nenhuma anotação. Use o ponto no mapa (P).</p>')}</div>`;
 
   if (ed) {
     const txt = () => { ed.text = $<HTMLTextAreaElement>('#noteText').value; };
@@ -427,9 +422,6 @@ export function renderNotes() {
   bindItensNotas(el);
   const vz = document.getElementById('qVazias');
   if (vz) vz.onclick = () => { mostrarVazias = !mostrarVazias; renderNotes(); };
-  $('#exXlsx').onclick = () => void baixarXlsx();
-  $('#exCsv').onclick = () => baixarCsv();
-  $('#exShare').onclick = () => void compartilharNotas();
 }
 
 export function openNote(id: string) {

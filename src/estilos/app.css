@@ -164,7 +164,7 @@ svg.i{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.8;stro
 /* Fade no rodapé só enquanto há mais conteúdo abaixo (classe .mais, ligada por observarRolagem). No fim da rolagem o último item aparece inteiro. */
 .inspector .tabbody.mais{-webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 28px),transparent);mask-image:linear-gradient(to bottom,#000 calc(100% - 28px),transparent)}
 .tabbody[hidden]{display:none}
-#t-seg{gap:10px;padding-bottom:8px}
+#t-seg{gap:6px;padding-bottom:8px}
 #t-seg .lead span{display:block;overflow-wrap:anywhere}
 #t-seg .h1{font-size:22px;white-space:nowrap}
 #t-seg .xsticks{height:14px}
@@ -189,7 +189,7 @@ button.row:hover{background:var(--fill)}
 .chips{display:flex;flex-wrap:wrap;gap:6px}
 .chip{display:inline-flex;align-items:center;gap:6px;border-radius:999px;background:var(--fill);padding:4px 10px;font-size:var(--fs-meta);font-weight:500}
 .vazio{margin:0;font-size:var(--fs-meta);color:var(--muted);line-height:1.4}
-.linkbtn{border:0;background:none;color:var(--accent);padding:0;font:inherit;font-weight:600;cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+.linkbtn{border:0;background:none;color:var(--accent-text);padding:0;font:inherit;font-weight:600;cursor:pointer;text-decoration:underline;text-underline-offset:2px}
 .empty{color:var(--muted);padding:28px 8px;text-align:center;line-height:1.6}
 .empty b{display:block;color:var(--fg);font-size:15px;margin-bottom:4px}
 .btn{border:0;border-radius:10px;background:var(--fill);padding:7px 12px;font-weight:500;min-height:max(34px,var(--tap));display:inline-flex;align-items:center;gap:6px;justify-content:center}
@@ -203,7 +203,7 @@ button.row:hover{background:var(--fill)}
 .shead>div:first-child{flex:1;min-width:0}
 .sbtns{display:flex;gap:6px;flex:none}
 .params{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
-.param{background:var(--fill);border-radius:10px;padding:6px 9px;min-width:0}
+.param{background:var(--fill);border-radius:10px;padding:5px 9px;min-width:0}
 .param .k{font-size:var(--fs-meta);color:var(--muted);font-weight:500;line-height:1.1}
 .param .v{font-size:18px;font-weight:600;letter-spacing:-.02em;margin-top:1px;line-height:1.1;white-space:nowrap}
 .param .v small{font-size:var(--fs-meta);font-weight:500;color:var(--muted);margin-left:3px;letter-spacing:0}
@@ -224,14 +224,11 @@ button.row:hover{background:var(--fill)}
 .prow .nm{flex:1;min-width:0;background:transparent;border:0;text-align:left;padding:0}
 .prow .nm b{display:block;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .prow .nm span{display:block;font-size:var(--fs-meta);color:var(--muted)}
-.dirb{font-size:var(--fs-meta);font-weight:700;border-radius:5px;padding:2px 5px;background:var(--accent);color:var(--accent-ink);flex:none}
-.dirb.d{background:#ff9500;color:#000}
-.dirb.m{background:#8e8e93;color:#fff}
 
 .field{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 12px;min-height:max(42px,var(--tap))}
 .field+.field{border-top:var(--bw) solid var(--hair)}
 .field label{flex:none}
-.field select,.field input[type=number]{border:0;background:transparent;color:var(--accent);font-weight:500;text-align:right;text-align-last:right;max-width:58%;padding:4px 2px;border-radius:6px}
+.field select,.field input[type=number]{border:0;background:transparent;color:var(--accent-text);font-weight:500;text-align:right;text-align-last:right;max-width:58%;padding:4px 2px;border-radius:6px}
 .field input[type=number]{width:80px}
 .sw2{position:relative;width:46px;height:28px;border-radius:999px;background:var(--fill2);border:0;flex:none;transition:background .2s}
 .sw2::after{content:'';position:absolute;top:2px;left:2px;width:24px;height:24px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.35);transition:transform .2s}
@@ -320,7 +317,7 @@ textarea:focus{box-shadow:inset 0 0 0 2px var(--accent)}
 }
 /* Em telas baixas, a pilha legenda + barra de propor encostaria na coluna esquerda: a legenda sai enquanto a barra está aberta. */
 @media (min-width:901px) and (max-height:820px){.modo-propor .legend{display:none}}
-@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+@media (prefers-reduced-motion: reduce){*:not(.nr-anel):not(.nr-anel *){transition:none!important;animation:none!important}}
 
 /* Lista de atalhos: aberta pelo botão "?" ou pela tecla ?. Em telas de toque não há teclado, então o botão some. */
 .ajuda-fundo{position:fixed;inset:0;background:rgba(0,0,0,.28);z-index:24}
@@ -552,11 +549,6 @@ details.rgrp .rg-c{display:flex;flex-direction:column;gap:14px;padding:4px 0 14p
 .stake.interno{background:transparent;border:0;padding:0;color:#fff;font-weight:700;-webkit-text-stroke:3px rgba(0,0,0,.85);paint-order:stroke fill;text-shadow:0 0 3px rgba(0,0,0,.9)}
 .stake.interno{-webkit-text-stroke:0;text-shadow:-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000,1px 1px 0 #000,0 0 4px rgba(0,0,0,.9)}
 /* Nota rápida de campo: anel de pressão, menu circular e cartão de local */
-.nr-anel{position:absolute;width:56px;height:56px;margin:-28px 0 0 -28px;z-index:8;pointer-events:none}
-.nr-anel svg{width:100%;height:100%;transform:rotate(-90deg)}
-.nr-anel circle{fill:rgba(0,0,0,.12);stroke:var(--accent);stroke-width:4;stroke-linecap:round;stroke-dasharray:100;stroke-dashoffset:100}
-.nr-anel.nr-roda circle{animation:nr-anel .5s linear forwards}
-@keyframes nr-anel{to{stroke-dashoffset:0}}
 .nr{position:absolute;inset:0;z-index:9}
 .nr[hidden]{display:none}
 .nr-fundo{position:absolute;inset:0;background:rgba(0,0,0,.18)}
@@ -586,7 +578,7 @@ details.rgrp .rg-c{display:flex;flex-direction:column;gap:14px;padding:4px 0 14p
 .nr-centro small{font-size:12px;font-weight:600;line-height:1.2}
 .nr-centro-b{pointer-events:auto;background:var(--solid);color:var(--fg);text-shadow:none;border:2px solid var(--fg);border-radius:50%;width:84px;height:84px;justify-content:center;font:inherit;box-shadow:var(--shadow)}
 .nr-centro-b small{color:var(--muted)}
-.nr-pronto{font-size:12px;font-weight:700;color:var(--accent)}
+.nr-pronto{font-size:13px;font-weight:700;color:var(--accent-text)}
 .nr-sw{display:inline-block;flex:none;border-radius:50%;width:14px;height:14px;border:1px solid rgba(0,0,0,.35)}
 .nr-lista{position:absolute;z-index:2;overflow-y:auto;overscroll-behavior:contain;background:var(--solid);border:var(--bw) solid var(--hair);border-radius:16px;box-shadow:var(--shadow);padding:4px}
 .nr-li{display:flex;align-items:center;gap:10px;width:100%;min-height:44px;padding:0 10px;border:0;border-radius:10px;background:none;color:var(--fg);font:inherit;text-align:left}

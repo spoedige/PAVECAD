@@ -13,6 +13,8 @@ export function atualizarContadorNotas(n: number) {
   b.setAttribute('title', `Ver notas (${n}) (P)`);
   c.hidden = n === 0;
   c.textContent = n > 99 ? '99+' : String(n);
+  const r = document.getElementById('revN');
+  if (r) { r.hidden = n === 0; r.textContent = String(n); }
 }
 
 export function initPinoNotas() {

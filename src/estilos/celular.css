@@ -1,0 +1,93 @@
+/* Layout de celular (html.celular: até 600 px de largura, ou paisagem com menos de 500 px de altura): mapa livre, barra superior única,
+   coluna do polegar e gaveta inferior com três estados. Carregado por último. */
+:root{--gav-fechada:calc(72px + env(safe-area-inset-bottom,0px))}
+.topc,.coldir,.localpop,.escala-slot,.gav-res{display:none}
+.tic{display:none}
+
+html.celular{--gav-h:var(--gav-fechada)}
+html.celular.gav-meia{--gav-h:45vh}
+html.celular.gav-cheia{--gav-h:85vh}
+@supports (height:1dvh){html.celular.gav-meia{--gav-h:45dvh}html.celular.gav-cheia{--gav-h:85dvh}}
+html.celular .app{height:100vh}
+@supports (height:1dvh){html.celular .app{height:100dvh}}
+
+/* o que só existe na tela maior */
+html.celular .hud,html.celular .tools,html.celular .grestaura{display:none!important}
+
+/* barra superior única: localização, camada e Mapa */
+html.celular .topc{display:flex;position:absolute;z-index:7;left:var(--g);right:var(--gr);top:max(8px,env(safe-area-inset-top,0px));gap:8px;height:44px;align-items:center}
+.cchip,.cbtn,.cfab{border:var(--bw) solid var(--hair);background:var(--glass);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);box-shadow:var(--shadow);color:var(--fg)}
+.cchip{flex:1 1 auto;min-width:0;height:44px;padding:0 14px;border-radius:14px;font-weight:600;font-size:14px;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cbtn{flex:none;width:44px;height:44px;border-radius:14px;display:grid;place-items:center}
+.cslot{flex:none;display:flex}
+.cslot .layerbox{display:block}
+.cslot .lchip{height:44px;border-radius:14px;padding:0 10px 0 12px}
+html.celular .localpop{display:block;position:absolute;z-index:9;left:var(--g);right:var(--gr);top:calc(max(8px,env(safe-area-inset-top,0px)) + 52px);padding:12px;border-radius:16px}
+html.celular .localpop[hidden]{display:none}
+.lp-rot{display:block;font-size:13px;font-weight:600;color:var(--muted);margin:0 0 6px 2px}
+.lp-vias{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.lp-vias:empty{display:none}
+.localpop .search{height:48px}
+
+/* coluna do polegar: GPS (destacado) e tela limpa */
+html.celular .coldir{display:flex;flex-direction:column;align-items:center;gap:10px;position:absolute;right:max(12px,env(safe-area-inset-right,0px));bottom:calc(var(--gav-h) + 12px);z-index:6}
+.cfab{width:48px;height:48px;border-radius:50%;display:grid;place-items:center}
+.cfab.destaque{background:var(--accent);color:var(--accent-ink);border-color:transparent}
+.cfab[aria-pressed="true"]{box-shadow:0 0 0 3px var(--accent),var(--shadow)}
+.cfab[hidden]{display:none}
+html.limpo.celular .coldir{display:flex!important}
+html.limpo.celular .topc,html.limpo.celular .uni,html.limpo.celular .inspector,html.limpo.celular .drawer,html.limpo.celular .escala-slot,html.limpo.celular .dock{display:none!important}
+
+/* escala acima da gaveta */
+html.celular .escala-slot{display:block;position:absolute;left:max(12px,var(--g));bottom:calc(var(--gav-h) + 10px);z-index:5;pointer-events:none}
+
+/* gaveta inferior: unifilar compacto com a linha de resumo (fechada) e a folha de abas (meia e cheia) */
+html.celular .uni{left:0!important;right:0!important;bottom:0!important;top:auto!important;height:var(--gav-fechada)!important;border-radius:18px 18px 0 0;padding:8px 12px calc(2px + env(safe-area-inset-bottom,0px));gap:2px;z-index:8;overflow:hidden}
+html.celular .uni::before{content:'';position:absolute;left:50%;top:3px;width:44px;height:4px;margin-left:-22px;border-radius:2px;background:var(--faint)}
+html.celular .uni .uni-h{display:none}
+html.celular .uni .gav-res{display:flex;align-items:center;gap:8px;height:22px;flex:none;min-width:0}
+.gav-res>*{flex:none}
+.gav-txt{flex:1 1 auto!important;min-width:0;font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-height:44px;display:flex;align-items:center;margin:-11px 0;cursor:pointer;position:relative;z-index:1}
+.gav-cores{display:inline-flex;align-items:center;gap:8px;font-size:13px;white-space:nowrap;overflow:hidden;flex:0 1 auto!important;min-width:0;max-width:52%;min-height:44px;margin:-11px 0;cursor:pointer;position:relative;z-index:1}
+.gav-cores .lt{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.gav-cores .legmais{flex:none}
+.gav-cores .legmais{border:var(--bw) solid var(--hair);background:var(--fill);border-radius:999px;padding:0 10px;height:28px;font-weight:600;font-size:13px}
+.gav-uni{width:44px;height:44px;margin:-11px 0 -11px 0;border-radius:12px;background:var(--fill);border:0;box-shadow:none;position:relative;z-index:1}
+html.celular .uni-wrap{flex:none;height:40px}
+html.celular .uni-wrap #uniregua{display:none}
+html.celular .uni.collapsed .uni-wrap{display:block}
+html.celular .inspector{left:0!important;right:0!important;width:auto!important;top:auto!important;bottom:var(--gav-fechada)!important;height:calc(var(--gav-h) - var(--gav-fechada))!important;max-height:none!important;border-radius:18px 18px 0 0;z-index:8}
+html.celular.gav-fechada .inspector{display:none}
+html.celular .inspector .ihead{grid-template-areas:"grip" "tabs";grid-template-columns:minmax(0,1fr);padding:2px 8px 4px}
+html.celular .inspector .ihead .ikm,html.celular .inspector .ihead #collapse,html.celular .inspector .ihead .gocultar{display:none}
+html.celular .seg.lg{grid-area:tabs;display:grid;grid-template-columns:repeat(5,minmax(0,1fr))}
+html.celular .seg.lg button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;min-height:48px;padding:3px 1px;font-size:13px}
+html.celular .tic{display:block;width:18px;height:18px}
+html.celular .tabbody{padding-bottom:calc(8px + env(safe-area-inset-bottom,0px))}
+
+/* unifilar completo: folha de 85% aberta pelo botão da linha de resumo */
+html.celular .uni.expandido{height:85dvh!important;z-index:14;padding:12px 12px calc(10px + env(safe-area-inset-bottom,0px));gap:6px}
+html.celular .uni.expandido .uni-h{display:flex}
+html.celular .uni.expandido .gav-res{display:none}
+html.celular .uni.expandido .uni-wrap{height:auto}
+html.celular .uni.expandido .uni-wrap #uniregua{display:block}
+
+/* folha "Mapa", legenda e dica sobem junto com a gaveta */
+html.celular .drawer{position:fixed!important;left:8px!important;right:8px!important;bottom:calc(var(--gav-h) + 8px)!important;top:auto!important;max-height:calc(100dvh - 130px);overflow:auto;z-index:12;width:auto}
+html.celular .drawer .dsec-grade{flex-direction:row;flex-wrap:wrap}
+html.celular .drawer .dsec-grade .chipbtn{min-height:44px}
+html.celular .legpop{left:8px;right:8px;width:auto;bottom:calc(var(--gav-h) + 8px);max-height:50dvh;z-index:12}
+html.celular .dock{left:8px!important;right:8px!important;bottom:calc(var(--gav-h) + 8px)!important}
+html.celular .nr-dica{position:absolute;left:12px;right:84px;bottom:calc(var(--gav-h) + 40px);top:auto;transform:none;max-width:none;z-index:7}
+html.celular .toast{bottom:calc(var(--gav-h) + 16px)}
+html:not(.celular) .dsec-cel{display:none}
+html.celular .dsec-cel{display:flex}
+
+/* paisagem no celular: a gaveta vira painel lateral direito de 40% da largura; a barra superior e o unifilar ocupam os 60% da esquerda */
+html.cel-paisagem{--gav-h:var(--gav-fechada)!important}
+html.cel-paisagem .topc{right:calc(40% + 8px)}
+html.cel-paisagem .uni{right:40%!important}
+html.cel-paisagem .inspector{left:60%!important;top:0!important;bottom:0!important;height:auto!important;border-radius:0}
+html.cel-paisagem.gav-meia .coldir,html.cel-paisagem.gav-cheia .coldir{right:calc(40% + 12px)}
+html.cel-paisagem .drawer{right:calc(40% + 8px)!important}
+html.cel-paisagem .nr-dica{right:calc(40% + 84px)}

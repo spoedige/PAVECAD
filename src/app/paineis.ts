@@ -6,23 +6,21 @@ import { edgesOf } from '../geometry/build';
 import { tituloDe } from '../dominio/titulo';
 import { atualizarRotulosKm, E, getP, kmVis, padraoAtivo, projName, rodoviaNome, visibleProjects, type AppProj } from './estado';
 import { abrirLidas, regeometrar, removerProjeto } from './projetos';
+import { renderDash, selo } from './dashboard';
+import { CHAVE_PRESSAO, PRESSAO_OPCOES, pressaoMs } from './notaRapida';
+import { ROTULO_CAMADA, atualizarChipCamada, guardarCamada } from './camadas';
+import { renderExp } from './exportar';
 import { abrirAlinhar, aoSairDeAlinhar, renderAlinhar } from './alinhar';
 import { contadorSelecao, htmlSelecao, itemDe, ligarSelecao } from './selecaoPlanilhas';
 import { IC } from './icones';
 import { applyLayers, applyPaint, clearFocus, clearSel, fitAll, fitFocus, fitList, getMap, renderLegend, select, setBase, setFocus, setProjectData, stepSel, updateSelLayer, updateStakes, applyVisibility, temMapTiler } from './mapa';
 import { drawUni, renderGroups } from './unifilar';
-import { baixarBackup, refreshProp, refreshPropLayers, renderNotes, resolveProps, startNote } from './revisao';
+import { refreshProp, refreshPropLayers, renderNotes, resolveProps, startNote } from './revisao';
 import { $, cssv, esc, fmt, syncAllSegs, syncSeg, toast, toastAcao } from './ui';
 
 const Q = () => (E.field ? Q5F : Q5);
 const tc = (k: string) => trColor(k, E.field, cssv('--none'));
 const TREAT_LABELS = ['Estrutural', 'Fresagem funcional', 'Fresagem estrutural', 'Selagem', 'Microfresagem', 'Fresagem fina', 'Revestimento'];
-/** Selo da planilha com coordenadas reconstruídas na importação (Planservi). */
-const selo = (p: AppProj) => {
-  const n = p.qualidade?.corrigidos?.length ?? 0;
-  return n ? `<b class="selo" title="Coordenadas reconstruídas pelo km na importação. A planilha original não muda. Detalhe na aba Revisão">coordenadas corrigidas: ${n}</b>` : '';
-};
-const dirBadge = (p: AppProj) => /Marginal/i.test(p.meta.via) ? '<span class="dirb m">MARG</span>' : p.meta.travel > 0 ? '<span class="dirb">CRESC</span>' : '<span class="dirb d">DECRESC</span>';
 const flyTo = (p: AppProj, i: number, zoom = 17.2) => { const r = p.rows[i]; getMap().flyTo({ center: [r.lon, r.lat], zoom: Math.max(getMap().getZoom(), zoom), duration: 800 }); };
 
 /* ---------------------------------------------------------------- */
@@ -32,11 +30,12 @@ export function setTab(t: typeof E.tab) {
   if (E.tab === 'al' && t !== 'al') aoSairDeAlinhar();
   E.tab = t;
   document.querySelectorAll<HTMLElement>('#tabs button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.t === t)));
-  for (const x of ['resumo', 'seg', 'ana', 'notas', 'aj', 'al']) $(`#t-${x}`).hidden = x !== t;
+  for (const x of ['seg', 'ana', 'notas', 'exp', 'aj', 'al']) $(`#t-${x}`).hidden = x !== t;
   if (t === 'al') renderAlinhar();
   syncSeg($('#tabs'));
   if (t === 'ana') renderAna();
   if (t === 'notas') renderNotes();
+  if (t === 'exp') renderExp();
   syncAllSegs();
 }
 
@@ -51,15 +50,18 @@ export function modosVisiveis(): ModeKey[] {
 export function renderModes() {
   const vis = modosVisiveis();
   document.querySelectorAll<HTMLButtonElement>('#modes button').forEach((b) => {
-    const k = b.dataset.m as ModeKey, i = vis.indexOf(k);
-    b.hidden = i < 0;
-    if (i >= 0) b.title = `${DESCRICAO_MODO[k]}. Atalho: ${i + 1}`;
+    const k = b.dataset.m as ModeKey, i = vis.indexOf(k), sem = i < 0 && E.P.length > 0;
+    b.disabled = sem;
+    b.innerHTML = `<span>${ROTULO_CAMADA[k]}</span>${sem ? '<small>sem dado</small>' : k === E.mode ? '<svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>' : ''}`;
+    b.title = sem ? 'Sem dado nas planilhas carregadas' : `${DESCRICAO_MODO[k]}${i >= 0 ? `. Atalho: ${i + 1}` : ''}`;
+    b.setAttribute('aria-selected', String(k === E.mode));
   });
-  if (!vis.includes(E.mode)) setMode('sol', true);
-  syncSeg($('#modes'));
+  if (E.P.length && !vis.includes(E.mode)) setMode('sol', true);
+  atualizarChipCamada();
 }
 
 export function renderViews() {
+  document.documentElement.classList.toggle('vazio', !E.P.length);
   const v = visibleProjects();
   const t = tituloDe((v.length ? v : E.P).map((q) => ({ meta: { uf: rodoviaNome(q.meta.uf) } }))), n = E.P.length;
   $('#title').textContent = t;
@@ -72,10 +74,11 @@ export function renderAll() {
   renderModes();
   renderViews();
   renderLegend();
-  renderResumo();
+  renderDash();
   renderSeg();
   renderAna();
   renderNotes();
+  renderExp();
   renderAj();
   if (E.tab === 'al') renderAlinhar();
   renderGroups();
@@ -86,10 +89,9 @@ export function renderAll() {
 export function setMode(m: ModeKey, silent = false) {
   E.mode = m;
   E.dim.clear();
-  document.querySelectorAll<HTMLElement>('#modes button').forEach((x) => x.setAttribute('aria-pressed', String(x.dataset.m === m)));
-  syncSeg($('#modes'));
+  if (!silent) guardarCamada(m);
+  renderModes();
   applyPaint();
-  renderResumo();
   renderSeg();
   if (!silent) renderAna();
 }
@@ -107,26 +109,18 @@ export function setField(on: boolean) {
 }
 
 /* ---------------------------------------------------------------- */
-/* Resumo                                                            */
+/* Resumo (seção da Análise)                                         */
 /* ---------------------------------------------------------------- */
-/** Rodovias recolhidas no Resumo (lembradas enquanto a página estiver aberta). */
+/** Seções da Análise recolhidas pelo usuário (lembradas enquanto a página estiver aberta). */
+const anaFechadas = new Set<string>();
 const rodoviasFechadas = new Set<string>();
 
-export function renderResumo() {
-  const el = $('#t-resumo'), V = visibleProjects();
-  if (!E.P.length) { el.innerHTML = '<div class="empty"><b>Nenhuma planilha carregada</b>Toque em Planilhas e escolha um ou mais arquivos no padrão RoadRunner.</div>'; return; }
-  const key: IndKey = E.mode === 'sol' ? 'iri' : E.mode, M = IND[key];
-  const linhaPlanilha = (p: AppProj) => `<div class="prow">
-        <button class="iconbtn" data-eye="${p.id}" aria-label="${p.visible ? 'Ocultar' : 'Mostrar'} ${esc(projName(p))}" style="width:30px;height:30px">${p.visible ? IC.eye : IC.eyeoff}</button>
-        <button class="nm" data-fly="${p.id}"><b>${esc(projName(p))}</b><span class="num">km ${fmt(p.meta.kmi === null ? null : kmVis(p.meta.kmi), 0)} a ${fmt(p.meta.kmf === null ? null : kmVis(p.meta.kmf), 0)} · ${p.rows.length.toLocaleString('pt-BR')} seg · ${p.meta.format === 'planservi' ? 'Planservi' : 'RoadRunner'}</span>${selo(p) ? `<span>${selo(p)}</span>` : ''}</button>
-        ${dirBadge(p)}
-        <button class="iconbtn" data-del="${p.id}" aria-label="Remover ${esc(projName(p))}" style="width:30px;height:30px">${IC.trash}</button></div>`;
-  /** Totais, soluções e piores pontos de um conjunto de planilhas visíveis. */
-  const estatisticas = (Vg: AppProj[]) => {
-    const R = resumo(Vg), cr = criticos(Vg, key);
-    const rows = Object.entries(R.st).filter(([k]) => k !== '-').sort((a, b) => b[1].area - a[1].area);
-    const maxA = Math.max(1, ...rows.map((r) => r[1].area));
-    return `<div><h2 class="h1 num">${fmt(R.ext, 1)} km</h2><p class="lead num">${Vg.length} planilha${Vg.length !== 1 ? 's' : ''} ${Vg.length !== 1 ? 'visíveis' : 'visível'} · ${R.nR.toLocaleString('pt-BR')} segmentos de 20 m${R.drKm ? ` · ${fmt(R.drKm, 1)} km de dreno` : ''}</p>
+/** Totais, soluções e piores pontos de um conjunto de planilhas visíveis. */
+function estatisticas(Vg: AppProj[], key: IndKey) {
+  const M = IND[key], R = resumo(Vg), cr = criticos(Vg, key);
+  const rows = Object.entries(R.st).filter(([k]) => k !== '-').sort((a, b) => b[1].area - a[1].area);
+  const maxA = Math.max(1, ...rows.map((r) => r[1].area));
+  return `<div><h2 class="h1 num">${fmt(R.ext, 1)} km</h2><p class="lead num">${Vg.length} planilha${Vg.length !== 1 ? 's' : ''} ${Vg.length !== 1 ? 'visíveis' : 'visível'} · ${R.nR.toLocaleString('pt-BR')} segmentos de 20 m${R.drKm ? ` · ${fmt(R.drKm, 1)} km com dreno` : ''}</p>
       ${Object.keys(R.poi).length ? `<div class="chips" style="margin-top:8px">${Object.entries(R.poi).map(([t, n]) => `<span class="chip">${esc(t)} · ${n}</span>`).join('')}</div>` : ''}</div>
     <div><div class="sect">Soluções</div><div class="list">
       ${rows.map(([k, v]) => `<div class="row"><span class="sw" style="background:${tc(k)}"></span>
@@ -138,47 +132,19 @@ export function renderResumo() {
         <div class="grow">km ${esc(o.p.kmLab[o.i])} <span class="muted">· Fx ${o.lane}${Vg.length > 1 ? ' · ' + esc(projName(o.p)) : ''}</span></div>
         <div class="val num">${fmt(o.v * M.scale, M.dec)} <span class="muted" style="font-weight:400;font-size:var(--fs-meta)">${M.unit}</span></div></button>`).join('')}
     </div></div>`;
-  };
-  const vias = [...new Set(E.P.map((p) => p.meta.uf))];
-  const botaoAdd = '<button class="btn" id="addFiles" style="min-height:28px;padding:3px 10px;font-size:var(--fs-meta)">+ Adicionar</button>';
-  if (vias.length <= 1) {
-    el.innerHTML = `
-    <div><div class="sect">Planilhas ${botaoAdd}</div>
-      <div class="list">${E.P.map(linhaPlanilha).join('')}</div></div>
-    ${estatisticas(V)}`;
-  } else {
-    // mais de uma rodovia: um grupo recolhível por rodovia, cada um com suas planilhas, totais, soluções e piores pontos
-    const grupos = vias.map((uf) => {
-      const todas = E.P.filter((p) => p.meta.uf === uf), vis = todas.filter((p) => p.visible);
-      const ext = vis.length ? resumo(vis).ext : 0;
-      return `<details class="rgrp" data-uf="${esc(uf)}" ${rodoviasFechadas.has(uf) ? '' : 'open'}>
-        <summary><span class="rg-n"><b>${esc(rodoviaNome(uf))}</b><span class="muted num">${todas.length} planilha${todas.length !== 1 ? 's' : ''} · ${fmt(ext, 1)} km visíveis</span></span></summary>
-        <div class="rg-c"><div class="list">${todas.map(linhaPlanilha).join('')}</div>${vis.length ? estatisticas(vis) : '<p class="note">Nenhuma planilha visível nesta rodovia.</p>'}</div></details>`;
-    }).join('');
-    el.innerHTML = `<div><div class="sect">Rodovias ${botaoAdd}</div></div>${grupos}`;
-    el.querySelectorAll<HTMLDetailsElement>('details.rgrp').forEach((d) => d.addEventListener('toggle', () => {
-      if (d.open) rodoviasFechadas.delete(d.dataset.uf!); else rodoviasFechadas.add(d.dataset.uf!);
-    }));
-  }
-  el.querySelectorAll<HTMLElement>('[data-eye]').forEach((b) => (b.onclick = () => {
-    const p = getP(b.dataset.eye!)!;
-    p.visible = !p.visible;
-    applyVisibility(p);
-    if (E.sel && !getP(E.sel.pid)?.visible) E.sel = null;
-    updateSelLayer(); refreshPropLayers(); renderAll();
-  }));
-  el.querySelectorAll<HTMLElement>('[data-fly]').forEach((b) => (b.onclick = () => {
-    const p = getP(b.dataset.fly!)!;
-    p.visible = true; applyVisibility(p); E.activeGroup = p.meta.uf; fitList([p]); renderAll();
-  }));
-  el.querySelectorAll<HTMLElement>('[data-del]').forEach((b) => (b.onclick = () => removeProject(b.dataset.del!)));
-  el.querySelectorAll<HTMLElement>('[data-go]').forEach((b) => (b.onclick = () => {
-    const [pid, i, l] = b.dataset.go!.split(':'), p = getP(pid)!;
-    flyTo(p, +i);
-    select(pid, +i, +l, { tab: true });
-  }));
-  const af = document.getElementById('addFiles');
-  if (af) af.onclick = () => $('#file').click();
+}
+
+/** Resumo das soluções e dos piores pontos. Com mais de uma rodovia, um grupo recolhível por rodovia. */
+function resumoHtml(V: AppProj[]): string {
+  const key: IndKey = E.mode === 'sol' ? 'iri' : E.mode;
+  const vias = [...new Set(V.map((p) => p.meta.uf))];
+  if (vias.length <= 1) return estatisticas(V, key);
+  return vias.map((uf) => {
+    const vis = V.filter((p) => p.meta.uf === uf), ext = resumo(vis).ext;
+    return `<details class="rgrp" data-uf="${esc(uf)}" ${rodoviasFechadas.has(uf) ? '' : 'open'}>
+      <summary><span class="rg-n"><b>${esc(rodoviaNome(uf))}</b><span class="muted num">${vis.length} planilha${vis.length !== 1 ? 's' : ''} · ${fmt(ext, 1)} km visíveis</span></span></summary>
+      <div class="rg-c">${estatisticas(vis, key)}</div></details>`;
+  }).join('');
 }
 
 export function removeProject(id: string) {
@@ -221,7 +187,7 @@ let segDetEscolhido = false;
 
 export function renderSeg() {
   const el = $('#t-seg'), s = E.sel;
-  if (!s) { el.innerHTML = '<div class="empty"><b>Nenhum segmento selecionado</b>Clique em uma faixa no mapa ou no unifilar.</div>'; $('#ikm').textContent = 'Nenhum segmento'; return; }
+  if (!s) { el.innerHTML = '<div class="empty"><b>Toque na via para ver o segmento</b>Ou toque no unifilar.</div>'; $('#ikm').textContent = 'Toque na via para ver o segmento'; return; }
   const p = getP(s.pid);
   if (!p) { E.sel = null; return renderSeg(); }
   $('#ikm').textContent = `km ${p.kmLab[s.row]} · ${projName(p)}`;
@@ -321,14 +287,22 @@ export function renderAna() {
       <div class="stack">${tot ? keys.filter((k) => acc[k].cls[ci]).map((k) => `<button data-k="${esc(k)}" data-c="${ci}" style="flex:${acc[k].cls[ci]};background:${tc(k)}" title="${esc(trLabel(k))}: ${fmt(acc[k].cls[ci] * 0.02, 1)} km"></button>`).join('') : ''}</div></div>`;
   }).join('');
   const rules = violacoes(V);
-  el.innerHTML = `
-    <div><h2 class="h2">Solução × patologias</h2><p class="lead">Distribuição de cada indicador dentro de cada solução, nas planilhas visíveis. Toque em uma célula para ver os trechos no mapa.</p></div>
+  const sec = (id: string, titulo: string, corpo: string) => `<details class="ana-sec" data-sec="${id}" ${anaFechadas.has(id) ? '' : 'open'}><summary>${titulo}</summary><div class="ana-c">${corpo}</div></details>`;
+  const matrizHtml = `<p class="lead">Distribuição de cada indicador dentro de cada solução, nas planilhas visíveis. Toque em uma célula para ver os trechos no mapa.</p>
     <div class="seg" id="anSeg" role="group" aria-label="Indicador" style="align-self:flex-start">${inds.map((k) => `<button data-i="${k}" aria-pressed="${k === key}">${IND[k].label.replace(' máx', '')}</button>`).join('')}</div>
     <div><div class="sect">${M.label} por solução <span style="text-transform:none;font-weight:500">${M.unit}</span></div>
       <table class="matrix"><thead><tr><th></th>${M.labels.map((l, i) => `<th style="color:${Q()[i]}">${l.replace(' a ', '–')}</th>`).join('')}<th style="text-align:right">Média</th></tr></thead><tbody>${matrix}</tbody></table></div>
-    <div><div class="sect">Soluções dentro de cada classe de ${M.label}</div>${stacks}</div>
-    <div><div class="sect">Verificações de coerência</div><p class="note" style="margin-bottom:8px">Critérios provisórios, para ajustar ao padrão da concessionária.</p>
-      <div class="list">${rules.map(({ regra, n }, ri) => `<div class="rule ${n ? 'bad' : 'ok'}"><div class="t">${regra.t}<small>${regra.s}</small></div><div class="n num">${fmt(n * 0.02, 1)}<span class="muted" style="font-size:var(--fs-meta);font-weight:500"> km</span></div><button class="btn" data-r="${ri}" ${n ? '' : 'disabled'} style="min-height:30px;padding:3px 10px">Ver</button></div>`).join('')}</div></div>`;
+    <div><div class="sect">Soluções dentro de cada classe de ${M.label}</div>${stacks}</div>`;
+  const regrasHtml = `<p class="note" style="margin-bottom:8px">Critérios provisórios, para ajustar ao padrão da concessionária.</p>
+      <div class="list">${rules.map(({ regra, n }, ri) => `<div class="rule ${n ? 'bad' : 'ok'}"><div class="t">${regra.t}<small>${regra.s}</small></div><div class="n num">${fmt(n * 0.02, 1)}<span class="muted" style="font-size:var(--fs-meta);font-weight:500"> km</span></div><button class="btn" data-r="${ri}" ${n ? '' : 'disabled'} style="min-height:30px;padding:3px 10px">Ver</button></div>`).join('')}</div>`;
+  el.innerHTML = sec('resumo', 'Resumo das soluções', resumoHtml(V)) + sec('matriz', 'Solução × patologias', matrizHtml) + sec('regras', 'Verificações de coerência', regrasHtml);
+  el.querySelectorAll<HTMLDetailsElement>('details.ana-sec').forEach((d) => d.addEventListener('toggle', () => { if (d.open) anaFechadas.delete(d.dataset.sec!); else anaFechadas.add(d.dataset.sec!); }));
+  el.querySelectorAll<HTMLDetailsElement>('details.rgrp').forEach((d) => d.addEventListener('toggle', () => { if (d.open) rodoviasFechadas.delete(d.dataset.uf!); else rodoviasFechadas.add(d.dataset.uf!); }));
+  el.querySelectorAll<HTMLElement>('[data-go]').forEach((b) => (b.onclick = () => {
+    const [pid, i, l] = b.dataset.go!.split(':'), q = getP(pid)!;
+    flyTo(q, +i);
+    select(pid, +i, +l, { tab: true });
+  }));
   el.querySelectorAll<HTMLElement>('#anSeg button').forEach((b) => b.addEventListener('click', () => { E.anInd = b.dataset.i as IndKey; renderAna(); }));
   const focusCell = (k: string, ci: number) => {
     setMode(E.anInd, true);
@@ -391,6 +365,7 @@ export function renderAj() {
     <div><div class="sect">Aparência</div><div class="list">
       <div class="field"><div><div>Padrão além da cor</div><div class="note">Hachura nas classes críticas (RE, RP e as piores de IGG, FC e ATR). Liga sozinho no modo campo. O RP sempre tem hachura, até você desligar aqui</div></div><button class="sw2" id="s-pad" role="switch" aria-checked="${padraoAtivo()}" aria-label="Padrão além da cor"></button></div>
       <div class="field"><div><div>Modo privacidade</div><div class="note">Oculta nomes de planilha, rodovia e km na tela e nas exportações. Os dados no aparelho não mudam</div></div><button class="sw2" id="s-priv" role="switch" aria-checked="${E.privacidade}" aria-label="Modo privacidade"></button></div>
+      <div class="field"><div><div>Duração da pressão no mapa</div><div class="note">Tempo segurando o dedo até abrir o menu de campo</div></div><div class="seg" id="s-press" role="group" aria-label="Duração da pressão">${PRESSAO_OPCOES.map((v) => `<button type="button" data-ms="${v}" aria-pressed="${pressaoMs() === v}">${v} ms</button>`).join('')}</div></div>
       <div class="field"><div><div>Modo campo (sol)</div><div class="note">Contraste máximo, cores fortes, alvos de toque maiores</div></div><button class="sw2" id="s-field" role="switch" aria-checked="${E.field}" aria-label="Modo campo"></button></div></div></div>
     <div><div class="sect">Camadas</div><div class="list">
       ${([['drain', 'Drenos', 'Lado externo. Linha cheia tipo R, tracejada tipo P. Passe o mouse para ver detalhes'], ['poi', 'OAE e pedágio', 'Marcadores nos trechos observados'], ['km', 'Marcos e estacas', 'Estaca a cada 20 m com zoom máximo, 100 m e 500 m ao afastar'], ['notes', 'Anotações', '']] as const).map(([k, t, s]) => `<div class="field"><div><div>${t}</div>${s ? `<div class="note">${s}</div>` : ''}</div><button class="sw2" data-layer="${k}" role="switch" aria-checked="${E.layers[k]}" aria-label="${t}"></button></div>`).join('')}</div></div>
@@ -402,10 +377,7 @@ export function renderAj() {
 nE = cos θ , nN = −sin θ   (invertido no sentido decrescente)
 e(n) = e0 + dir · Σ largura(1..n)
 P(n) = P + e(n) · (nE , nN)</div>
-      <p class="note" style="margin-top:8px">O sentido decrescente usa o mesmo cálculo com a normal invertida, porque as linhas da planilha seguem a quilometragem crescente.</p></details>
-    <details class="bk"><summary>Backup (.json)</summary>
-      <p class="note" style="margin:6px 0">Cópia das notas deste aparelho (inclui fotos) para guardar ou levar a outro. Para a planilha das notas, use o pino da barra de ferramentas.</p>
-      <div class="btns"><button class="btn" id="bkDown">Baixar backup</button><button class="btn" id="bkImp">Restaurar backup</button></div></details>`;
+      <p class="note" style="margin-top:8px">O sentido decrescente usa o mesmo cálculo com a normal invertida, porque as linhas da planilha seguem a quilometragem crescente.</p></details>`;
   ligarSelecao(el, { itens: lista, marcadas: E.settingsSel, origem: p ? itemDe(p) : undefined, aoMudar: () => renderAj() });
   document.getElementById('irAlinhar')?.addEventListener('click', () => abrirAlinhar());
   if (p) {
@@ -437,9 +409,14 @@ P(n) = P + e(n) · (nE , nN)</div>
   const bs = $<HTMLSelectElement>('#a-base');
   bs.value = E.base;
   bs.onchange = () => { setBase(bs.value as typeof E.base); syncBaseSeg(); };
-  $('#bkDown').onclick = () => baixarBackup();
-  $('#bkImp').onclick = () => $('#importIn').click();
   $('#s-field').onclick = () => setField(!E.field);
+  el.querySelectorAll<HTMLElement>('#s-press button').forEach((b) => (b.onclick = () => {
+    try { localStorage.setItem(CHAVE_PRESSAO, b.dataset.ms!); } catch { /* sem storage */ }
+    el.querySelectorAll<HTMLElement>('#s-press button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    syncSeg($('#s-press'));
+    toast(`Pressão de ${b.dataset.ms} ms`);
+  }));
+  syncSeg($('#s-press'));
   $('#s-priv').onclick = () => setPrivacidade(!E.privacidade);
   $('#s-pad').onclick = () => {
     E.padrao = !padraoAtivo();

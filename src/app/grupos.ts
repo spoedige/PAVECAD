@@ -9,7 +9,6 @@ export const GRUPOS = [
   { id: 'titulo', rotulo: 'título e busca', icone: ico('<circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5.5 5.5"/>') },
   { id: 'ferramentas', rotulo: 'ferramentas', icone: ico('<path d="M4 6h8M18 6h2M4 12h2M12 12h8M4 18h10M20 18h0"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/>') },
   { id: 'girar', rotulo: 'alinhar e girar', icone: ico('<circle cx="12" cy="12" r="9"/><path d="M15.6 8.4l-2.1 5.1-5.1 2.1 2.1-5.1z"/>') },
-  { id: 'legenda', rotulo: 'legenda', icone: ico('<circle cx="5.5" cy="7" r="1.2"/><circle cx="5.5" cy="12" r="1.2"/><circle cx="5.5" cy="17" r="1.2"/><path d="M10 7h10M10 12h10M10 17h10"/>') },
   { id: 'unifilar', rotulo: 'unifilar', icone: ico('<path d="M3 7h18M3 12h12M3 17h16"/>') },
   { id: 'painel', rotulo: 'painel', icone: ico('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M14 4v16"/>') },
 ] as const;
@@ -58,7 +57,7 @@ export const alternarLimpo = () => setLimpo(!limpo);
 
 /** Cria os botões de restaurar, cada um no lugar do seu grupo (a CSS mostra só o do grupo oculto). */
 function criarRestauracoes() {
-  const onde: Record<Id, string> = { titulo: '.leftcol', ferramentas: '.topright', girar: '#tools', legenda: '.dock', unifilar: '.app', painel: '.app' };
+  const onde: Record<Id, string> = { titulo: '.leftcol', ferramentas: '.topright', girar: '#tools', unifilar: '.app', painel: '.app' };
   for (const g of GRUPOS) {
     const b = document.createElement('button');
     b.type = 'button';

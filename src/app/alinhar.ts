@@ -11,7 +11,7 @@ import { $, toast, toastAcao } from './ui';
  *  Longitudinal e transversal em metros, relativos ao sentido de percurso de cada planilha. Os passos mostram o resultado no mapa
  *  na hora; "Aplicar às selecionadas" grava no aparelho e oferece Desfazer. Sair da ferramenta sem aplicar volta ao valor gravado. */
 
-let abaAnterior: typeof E.tab = 'resumo';
+let abaAnterior: typeof E.tab = 'seg';
 let foco: string | null = null;
 
 const gravado = (p: AppProj): Desloc => E.deslocSalvos[p.meta.name] ?? { l: 0, t: 0 };
@@ -51,7 +51,7 @@ export function abrirAlinhar() {
 export function fecharAlinhar() {
   if (E.tab !== 'al') return;
   descartar();
-  setTab(abaAnterior === 'al' ? 'resumo' : abaAnterior);
+  setTab(abaAnterior === 'al' ? 'seg' : abaAnterior);
 }
 export const alternarAlinhar = () => (alinharAberto() ? fecharAlinhar() : abrirAlinhar());
 

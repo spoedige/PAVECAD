@@ -15,15 +15,44 @@
   <div class="stage">
     <div id="map" aria-label="Mapa do projeto"></div>
 
+    <div class="topc" id="topc">
+      <button class="cchip" id="cLocal" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="localpop" title="Localização: ir para km"><span id="cLocalTxt">Sem planilha</span></button>
+      <span class="cslot" id="cCamadaSlot"></span>
+      <button class="cbtn" id="cMapa" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="drawer" aria-label="Mapa" title="Fundo, rotação, legenda e mais"><svg class="i" viewBox="0 0 24 24"><circle cx="5.5" cy="12" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/><circle cx="18.5" cy="12" r="1.2" fill="currentColor"/></svg></button>
+    </div>
+    <div class="glass localpop" id="localpop" role="dialog" aria-label="Ir para km" hidden>
+      <label for="cGoKm" class="lp-rot">Ir para km</label>
+      <div class="search"><svg class="i" viewBox="0 0 24 24" style="color:var(--faint)"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input id="cGoKm" class="num" placeholder="Ex.: 177+000" inputmode="decimal" aria-label="Ir para km"><button class="go" id="cGoBtn" type="button" aria-label="Ir"><svg class="i" viewBox="0 0 24 24" style="width:14px;height:14px"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></div>
+      <div class="lp-vias" id="cVias"></div>
+    </div>
+    <div class="coldir" id="coldir">
+      <button class="cfab" id="btnCompassC" type="button" aria-label="Norte para cima" title="Norte para cima" hidden><span id="compassF" style="display:grid;transition:transform .15s"><svg class="i" viewBox="0 0 24 24"><path d="M12 3l4.5 9h-9z" fill="#ff3b30" stroke="#ff3b30"/><path d="M12 21l-4.5-9h9z" fill="currentColor" stroke="currentColor"/></svg></span></button>
+      <button class="cfab destaque" id="cGps" type="button" aria-pressed="false" aria-label="Minha posição" title="Minha posição"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></button>
+      <button class="cfab" id="cLimpo" type="button" aria-pressed="false" aria-label="Tela limpa" title="Tela limpa"><svg class="i" viewBox="0 0 24 24"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
+    </div>
     <div class="hud">
     <div class="leftcol">
       <div class="glass titlecard" id="titlecard">
-      <div class="title" id="titlebox"><div class="ttx"><b id="title">PaveCAD</b><span id="subtitle"></span></div><button class="iconbtn" id="btnOverview" type="button" aria-label="Visão geral" title="Visão geral: enquadra todas as planilhas"><svg class="i" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button><button class="gocultar" type="button" data-ocultar="titulo" aria-label="Ocultar título e busca" title="Ocultar título e busca"><svg class="i" viewBox="0 0 24 24"><path d="M3 3l18 18"/><path d="M10.6 6.1A10 10 0 0 1 12 6c6.5 0 10 6 10 6a17 17 0 0 1-3.2 3.9M6.2 7C3.7 8.7 2 12 2 12s3.5 6 10 6c1.6 0 3-.4 4.2-.9"/><path d="M9.9 10a3 3 0 0 0 4.1 4.1"/></svg></button></div>
+      <div class="title" id="titlebox"><div class="ttx"><b id="title">PaveCAD</b><button type="button" class="subbtn" id="subtitle" title="Abrir os projetos (planilhas)"></button></div><button class="iconbtn" id="btnOverview" type="button" aria-label="Visão geral" title="Visão geral: enquadra todas as planilhas"><svg class="i" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button><button class="gocultar" type="button" data-ocultar="titulo" aria-label="Ocultar título e busca" title="Ocultar título e busca"><svg class="i" viewBox="0 0 24 24"><path d="M5 12h14"/></svg></button></div>
       <div class="search">
         <svg class="i" viewBox="0 0 24 24" style="color:var(--faint)"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
         <input id="gokm" class="num" placeholder="Ir para km" inputmode="decimal" aria-label="Ir para km">
         <button class="go" id="goBtn" type="button" aria-label="Ir"><svg class="i" viewBox="0 0 24 24" style="width:14px;height:14px"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
       </div>
+      </div>
+      <div class="layerbox" id="layerbox">
+        <button class="lchip" id="btnCamada" type="button" aria-haspopup="listbox" aria-expanded="false" aria-controls="modes" title="Camada do mapa (C)"><span id="camadaNome">Solução</span><svg class="i" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>
+        <div class="glass lpop" id="modes" role="listbox" aria-label="Camada do mapa" hidden>
+          <button type="button" role="option" data-m="sol" aria-selected="true">Solução</button>
+          <button type="button" role="option" data-m="iri" aria-selected="false" title="Atalho: 2">IRI</button>
+          <button type="button" role="option" data-m="atr" aria-selected="false">ATR</button>
+          <button type="button" role="option" data-m="d0" aria-selected="false">D0</button>
+          <button type="button" role="option" data-m="rc" aria-selected="false">Rc</button>
+          <button type="button" role="option" data-m="def" aria-selected="false">Defeitos</button>
+          <button type="button" role="option" data-m="igg" aria-selected="false">IGG</button>
+          <button type="button" role="option" data-m="fc2" aria-selected="false">FC-2</button>
+          <button type="button" role="option" data-m="fc3" aria-selected="false">FC-3</button>
+        </div>
       </div>
       <div id="escalahost"></div>
             <div id="zoomhost"></div>
@@ -33,21 +62,10 @@
         <button class="tbtn" id="rotR" aria-label="Girar 15 graus à direita" title="Girar à direita (E)"><svg class="i" viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-3-6.2M20 4v4h-4"/></svg></button>
         <button class="chipbtn" id="rotA" title="Pista na vertical, no sentido de tráfego (R)" style="border:0;background:var(--fill)">Pista na vertical</button>
       </div>
-      <p class="zoomnote" id="zoomnote"></p>
+      <div class="glass dica zoomnote" id="zoomnote" role="status" hidden><span id="zoomnoteTxt">Aproxime para ver a largura real das faixas.</span><button class="btn" type="button" id="zoomnoteOk">Entendi</button></div>
     </div>
     <div class="hud-main">
     <div class="topbar">
-      <div class="seg modes glass" id="modes" role="group" aria-label="Colorir por">
-        <button data-m="sol" aria-pressed="true" title="Atalho: 1">Solução</button>
-        <button data-m="iri" aria-pressed="false" title="Atalho: 2">IRI</button>
-        <button data-m="atr" aria-pressed="false" title="Atalho: 3">ATR</button>
-        <button data-m="d0" aria-pressed="false" title="Atalho: 4">D0</button>
-        <button data-m="rc" aria-pressed="false" title="Atalho: 5">Rc</button>
-        <button data-m="def" aria-pressed="false" title="Atalho: 6">Defeitos</button>
-        <button data-m="igg" aria-pressed="false" hidden>IGG</button>
-        <button data-m="fc2" aria-pressed="false" hidden>FC-2</button>
-        <button data-m="fc3" aria-pressed="false" hidden>FC-3</button>
-      </div>
       <div class="topright">
         <div class="trrow">
           <div class="basegrp" id="basegrp">
@@ -71,12 +89,13 @@
           <button class="pillbtn primary" id="btnFile" type="button"><svg class="i" viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></svg>Abrir planilhas</button>
         </div>
         <div class="glass toolbar" id="toolbar" role="toolbar" aria-label="Ferramentas">
-          <button class="tbtn" id="btnGps" aria-pressed="false" title="Minha posição (G)" aria-label="Minha posição"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg><span class="dot"></span></button>
-          <button class="tbtn" data-tool="prop" aria-pressed="false" title="Propor nova solução (N)" aria-label="Propor nova solução"><svg class="i" viewBox="0 0 24 24"><path d="M7 7h11l-3-3M17 17H6l3 3"/></svg></button>
-          <button class="tbtn" id="btnField" aria-pressed="false" title="Modo campo para uso ao sol (S)" aria-label="Modo campo"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button>
-          <button class="tbtn" id="btnAlinhar" data-alinhar aria-pressed="false" title="Alinhar planilhas: deslocar as coordenadas (A)" aria-label="Alinhar planilhas"><svg class="i" viewBox="0 0 24 24"><path d="M12 3v18M3 12h18M12 3l-2.5 2.5M12 3l2.5 2.5M12 21l-2.5-2.5M12 21l2.5-2.5M3 12l2.5-2.5M3 12l2.5 2.5M21 12l-2.5-2.5M21 12l-2.5 2.5"/></svg></button>
-          <button class="tbtn" id="btnNotas" type="button" title="Ver notas (P)" aria-label="Ver notas"><svg class="i" viewBox="0 0 24 24"><path d="M12 21s-6-5.2-6-10a6 6 0 1 1 12 0c0 4.8-6 10-6 10z"/><circle cx="12" cy="11" r="2.2"/></svg><span class="tbadge" id="notasBadge" hidden></span></button>
-          <button class="tbtn" type="button" data-ocultar="ferramentas" aria-label="Ocultar ferramentas" title="Ocultar ferramentas" style="color:var(--muted)"><svg class="i" viewBox="0 0 24 24"><path d="M3 3l18 18"/><path d="M10.6 6.1A10 10 0 0 1 12 6c6.5 0 10 6 10 6a17 17 0 0 1-3.2 3.9M6.2 7C3.7 8.7 2 12 2 12s3.5 6 10 6c1.6 0 3-.4 4.2-.9"/><path d="M9.9 10a3 3 0 0 0 4.1 4.1"/></svg></button>
+          <button class="tbtn" id="btnGps" aria-pressed="false" title="Minha posição (G)" aria-label="Minha posição"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg><span class="dot"></span><span class="tl">Posição</span></button>
+          <button class="tbtn" data-tool="prop" aria-pressed="false" title="Propor nova solução (N)" aria-label="Propor nova solução"><svg class="i" viewBox="0 0 24 24"><path d="M7 7h11l-3-3M17 17H6l3 3"/></svg><span class="tl">Propor</span></button>
+          <button class="tbtn" id="btnField" aria-pressed="false" title="Modo campo para uso ao sol (S)" aria-label="Modo campo"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><span class="tl">Campo</span></button>
+          <button class="tbtn" id="btnAlinhar" data-alinhar aria-pressed="false" title="Alinhar planilhas: deslocar as coordenadas (A)" aria-label="Alinhar planilhas"><svg class="i" viewBox="0 0 24 24"><path d="M12 3v18M3 12h18M12 3l-2.5 2.5M12 3l2.5 2.5M12 21l-2.5-2.5M12 21l2.5-2.5M3 12l2.5-2.5M3 12l2.5 2.5M21 12l-2.5-2.5M21 12l-2.5 2.5"/></svg><span class="tl">Alinhar</span></button>
+          <button class="tbtn" id="btnProjetos" type="button" aria-haspopup="dialog" title="Projetos (J)" aria-label="Projetos"><svg class="i" viewBox="0 0 24 24"><path d="M3 7l9-4 9 4-9 4zM3 12l9 4 9-4M3 17l9 4 9-4"/></svg><span class="tl">Projetos</span></button>
+          <button class="tbtn" id="btnNotas" type="button" title="Ver notas (P)" aria-label="Ver notas"><svg class="i" viewBox="0 0 24 24"><path d="M12 21s-6-5.2-6-10a6 6 0 1 1 12 0c0 4.8-6 10-6 10z"/><circle cx="12" cy="11" r="2.2"/></svg><span class="tbadge" id="notasBadge" hidden></span><span class="tl">Notas</span></button>
+          <button class="tbtn" type="button" data-ocultar="ferramentas" aria-label="Ocultar ferramentas" title="Ocultar ferramentas" style="color:var(--muted)"><svg class="i" viewBox="0 0 24 24"><path d="M5 12h14"/></svg></button>
         </div>
         <div class="glass gpschip" id="gpschip" hidden></div>
       </div>
@@ -84,44 +103,67 @@
     </div>
     </div>
 
-    <nav class="tools" id="tools" aria-label="Controles do mapa">
+    <nav class="glass tools" id="tools" aria-label="Controles do mapa">
+      <button class="tbtn" id="btnCompass" type="button" aria-label="Norte para cima" title="Norte para cima" hidden><span id="compassC" style="display:grid;transition:transform .15s"><svg class="i" viewBox="0 0 24 24"><path d="M12 3l4.5 9h-9z" fill="#ff3b30" stroke="#ff3b30"/><path d="M12 21l-4.5-9h9z" fill="currentColor" stroke="currentColor"/></svg></span></button>
+      <button class="tbtn" id="btnLegenda" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="legend" aria-label="Legenda" title="Legenda"><svg class="i" viewBox="0 0 24 24"><circle cx="5.5" cy="7" r="1.2"/><circle cx="5.5" cy="12" r="1.2"/><circle cx="5.5" cy="17" r="1.2"/><path d="M10 7h10M10 12h10M10 17h10"/></svg></button>
       <button class="tbtn" id="btnLimpo" type="button" aria-pressed="false" aria-label="Mapa limpo: ocultar os controles (H)" title="Mapa limpo (H)"><svg class="i" viewBox="0 0 24 24"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
-      <button class="tbtn" id="btnMore" type="button" aria-expanded="false" aria-controls="drawer" title="Alinhar, girar e base do mapa" aria-label="Mais ferramentas do mapa"><svg class="i" viewBox="0 0 24 24"><circle cx="5.5" cy="12" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/><circle cx="18.5" cy="12" r="1.2" fill="currentColor"/></svg></button>
+      <button class="tbtn" id="btnMore" type="button" aria-expanded="false" aria-controls="drawer" title="Fundo do mapa, alinhar e girar" aria-label="Mais ferramentas do mapa"><svg class="i" viewBox="0 0 24 24"><circle cx="5.5" cy="12" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/><circle cx="18.5" cy="12" r="1.2" fill="currentColor"/></svg></button>
     </nav>
-    <div class="glass drawer" id="drawer" role="group" aria-label="Mais ferramentas do mapa"><div class="drawer-h"><span>Mapa</span><button class="chipbtn drawer-al" id="btnAlinharG" data-alinhar type="button" aria-pressed="false" title="Deslocar as coordenadas das planilhas (A)">Alinhar planilhas</button><button class="gocultar" type="button" data-ocultar="girar" aria-label="Ocultar girar e pista na vertical" title="Ocultar girar e pista na vertical"><svg class="i" viewBox="0 0 24 24"><path d="M3 3l18 18"/><path d="M10.6 6.1A10 10 0 0 1 12 6c6.5 0 10 6 10 6a17 17 0 0 1-3.2 3.9M6.2 7C3.7 8.7 2 12 2 12s3.5 6 10 6c1.6 0 3-.4 4.2-.9"/><path d="M9.9 10a3 3 0 0 0 4.1 4.1"/></svg></button></div></div>
+    <div class="glass legpop" id="legend" role="dialog" aria-label="Legenda" hidden></div>
+    <div class="glass drawer" id="drawer" role="group" aria-label="Mais ferramentas do mapa">
+      <div class="drawer-h"><span>Mapa</span><button class="gocultar" type="button" data-ocultar="girar" aria-label="Ocultar a gaveta de rotação" title="Ocultar alinhar e girar"><svg class="i" viewBox="0 0 24 24"><path d="M5 12h14"/></svg></button></div>
+      <section class="dsec" aria-labelledby="dsFundo"><h4 id="dsFundo">Fundo do mapa</h4><div class="dsec-c" id="dsFundoC"></div></section>
+      <section class="dsec" aria-labelledby="dsDados"><h4 id="dsDados">Dados</h4><div class="dsec-c"><button class="chipbtn drawer-al" id="btnAlinharG" data-alinhar type="button" aria-pressed="false" title="Deslocar as coordenadas das planilhas (A)">Alinhar planilhas</button></div></section>
+      <section class="dsec dsec-cel" aria-labelledby="dsAcoes"><h4 id="dsAcoes">Mais</h4><div class="dsec-c dsec-grade">
+        <button class="chipbtn" id="dLegenda" type="button">Legenda completa</button>
+        <button class="chipbtn" id="dProjetos" type="button">Projetos</button>
+        <button class="chipbtn" id="dAbrir" type="button">Abrir planilhas</button>
+        <button class="chipbtn" id="dExportar" type="button">Exportar</button>
+        <button class="chipbtn" id="dPropor" type="button">Propor solução</button>
+        <button class="chipbtn" id="dConfig" type="button">Configurações</button>
+        <button class="chipbtn" id="dLimpa" type="button">Tela limpa</button></div></section>
+      <section class="dsec" aria-labelledby="dsRot"><h4 id="dsRot">Rotação</h4><div class="dsec-c" id="dsRotC"></div></section>
+    </div>
+    <section class="glass dash" id="dash" role="dialog" aria-modal="false" aria-labelledby="dashTitulo" hidden>
+      <div class="dash-h"><h2 id="dashTitulo">Projetos</h2><span class="grow"></span>
+        <button class="pillbtn" id="dashAbrir" type="button"><svg class="i" viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></svg>Abrir planilhas</button>
+        <button class="iconbtn" id="dashFechar" type="button" aria-label="Fechar projetos" title="Fechar (Esc)"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+      <div class="dash-c" id="dashCorpo"></div>
+    </section>
+    <div class="escala-slot" id="escalaSlot"></div>
     <div class="glass toast" id="toast" role="status" aria-live="polite"></div>
     <div class="glass tip" id="tip"></div>
   </div>
   <div class="dock">
     <div class="glass propbar" id="propbar" hidden></div>
-    <div class="glass legend" id="legend"></div>
   </div>
 
   <aside class="glass inspector" id="inspector">
     <div class="ihead" id="ihead">
       <div class="grip" aria-hidden="true"></div>
       <div class="seg lg" id="tabs" role="tablist">
-        <button role="tab" aria-selected="true" data-t="resumo">Resumo</button>
-        <button role="tab" aria-selected="false" data-t="seg">Segmento</button>
-        <button role="tab" aria-selected="false" data-t="ana">Análise</button>
-        <button role="tab" aria-selected="false" data-t="notas">Revisão</button>
-        <button role="tab" aria-selected="false" data-t="aj">Ajustes</button>
+        <button role="tab" aria-selected="true" data-t="seg"><svg class="i tic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h10M4 17h13"/></svg><span class="tt">Segmento</span></button>
+        <button role="tab" aria-selected="false" data-t="ana"><svg class="i tic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19V9M12 19V5M19 19v-7"/></svg><span class="tt">Análise</span></button>
+        <button role="tab" aria-selected="false" data-t="notas"><svg class="i tic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10l3 3v13H7zM10 11h7M10 15h7"/></svg><span class="tt">Revisão<span class="tcount" id="revN" hidden></span></span></button>
+        <button role="tab" aria-selected="false" data-t="exp"><svg class="i tic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 19h14"/></svg><span class="tt">Exportar</span></button>
+        <button role="tab" aria-selected="false" data-t="aj"><svg class="i tic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h8M18 6h2M4 12h2M12 12h8M4 18h10M20 18h0"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/></svg><span class="tt">Ajustes</span></button>
       </div>
       <div class="ikm" id="ikm"></div>
-      <button class="gocultar" type="button" data-ocultar="painel" aria-label="Ocultar painel" title="Ocultar painel"><svg class="i" viewBox="0 0 24 24"><path d="M3 3l18 18"/><path d="M10.6 6.1A10 10 0 0 1 12 6c6.5 0 10 6 10 6a17 17 0 0 1-3.2 3.9M6.2 7C3.7 8.7 2 12 2 12s3.5 6 10 6c1.6 0 3-.4 4.2-.9"/><path d="M9.9 10a3 3 0 0 0 4.1 4.1"/></svg></button>
+      <button class="gocultar" type="button" data-ocultar="painel" aria-label="Ocultar painel" title="Ocultar painel"><svg class="i" viewBox="0 0 24 24"><path d="M5 12h14"/></svg></button>
       <button class="iconbtn" id="collapse" aria-label="Recolher painel" title="Recolher painel"><svg class="i" viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></svg></button>
     </div>
-    <div class="tabbody" id="t-resumo"></div>
-    <div class="tabbody" id="t-seg" hidden></div>
+    <div class="tabbody" id="t-seg"></div>
     <div class="tabbody" id="t-ana" hidden></div>
     <div class="tabbody" id="t-notas" hidden></div>
+    <div class="tabbody" id="t-exp" hidden></div>
     <div class="tabbody" id="t-aj" hidden></div>
     <div class="tabbody" id="t-al" hidden></div>
   </aside>
 
   <section class="glass uni" id="unicard" aria-label="Unifilar">
-    <div class="uni-h"><b>Unifilar</b><span class="chips" id="unigroups"></span><span class="sub" id="unisub"></span>
-      <button class="gocultar" type="button" data-ocultar="unifilar" aria-label="Ocultar unifilar" title="Ocultar unifilar"><svg class="i" viewBox="0 0 24 24"><path d="M3 3l18 18"/><path d="M10.6 6.1A10 10 0 0 1 12 6c6.5 0 10 6 10 6a17 17 0 0 1-3.2 3.9M6.2 7C3.7 8.7 2 12 2 12s3.5 6 10 6c1.6 0 3-.4 4.2-.9"/><path d="M9.9 10a3 3 0 0 0 4.1 4.1"/></svg></button>
+    <div class="gav-res" id="gavRes"><span class="gav-txt" id="gavTxt">Abra uma planilha</span><span class="gav-cores" id="gavCores"></span><button class="cbtn gav-uni" id="gavUni" type="button" aria-label="Abrir o unifilar completo" title="Unifilar completo"><svg class="i" viewBox="0 0 24 24"><path d="M3 7h18M3 12h12M3 17h16"/></svg></button></div>
+    <div class="uni-h"><b>Unifilar</b><span class="chips" id="unigroups"></span><span class="unileg" id="unileg" aria-label="Cores do mapa"></span><span class="sub" id="unisub"></span>
+      <button class="gocultar" type="button" data-ocultar="unifilar" aria-label="Ocultar unifilar" title="Ocultar unifilar"><svg class="i" viewBox="0 0 24 24"><path d="M5 12h14"/></svg></button>
       <button class="iconbtn" id="uniToggle" aria-label="Recolher unifilar" title="Recolher unifilar" style="width:26px;height:26px"><svg class="i" viewBox="0 0 24 24" style="width:14px;height:14px"><path d="M6 9l6 6 6-6"/></svg></button></div>
     <div class="uni-wrap" id="uniwrap"><canvas id="uniregua" aria-hidden="true"></canvas><canvas id="uni"></canvas><div id="unihover"><span></span></div></div>
   </section>

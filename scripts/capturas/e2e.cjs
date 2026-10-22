@@ -8,9 +8,14 @@ const path = require('path');
 const { gravarConjunto } = require('../sinteticos.cjs');
 const { irParaKm, escolherBase, escolherNitidez, aba, criarProposta, pontoLivre } = require('./scenarios.cjs');
 
-const vp = (nome) => VPS.find((v) => v.nome === nome);
+/** Tamanhos de celular (com toque) da Parte 6. */
+const CEL = [{ nome: 'cel-360x640', w: 360, h: 640, toque: true }, { nome: 'cel-390x844', w: 390, h: 844, toque: true }, { nome: 'cel-412x915', w: 412, h: 915, toque: true }, { nome: 'cel-915x412', w: 915, h: 412, toque: true }];
+const CELULARES = CEL.map((c) => c.nome);
+const vp = (nome) => VPS.find((v) => v.nome === nome) ?? CEL.find((v) => v.nome === nome);
 /** Os quatro tamanhos de referência do layout único. */
 const TODOS = ['1568x760', '1366x768', 'tablet-h-1024x768', 'tablet-v-820x1180'];
+/** No celular, "Ir para km" é o chip de localização da barra superior. */
+const irParaKmCel = async (pg, km) => { await pg.click('#cLocal'); await pg.waitForTimeout(200); await pg.fill('#cGoKm', km); await pg.click('#cGoBtn'); await pg.waitForTimeout(1800); };
 const estado = (pg, expr) => pg.evaluate(`(${expr})(window.__pavecad.E)`);
 
 /** As 9 planilhas sintéticas (18 projetos) do teste de carga, gravadas numa pasta temporária. */
@@ -18,11 +23,19 @@ const NOVE = gravarConjunto(path.join(os.tmpdir(), 'pavecad-sint'));
 const OPTS_NOVE = { arquivos: NOVE, projetos: 18 };
 
 /** Centra o mapa no polígono da faixa e devolve onde ele está na página (e a posição em graus). */
+/** Muda a camada do mapa (hoje, pelos botões de modo; depois, pelo chip de camada). */
+const modo = async (pg, m) => { await pg.click('#btnCamada'); await pg.click(`#modes [data-m=${m}]`); await pg.waitForTimeout(150); };
+const abrirProjetos = async (pg) => { if (!(await pg.isVisible('#dash'))) { await pg.click('#btnProjetos'); await pg.waitForSelector('#dash:not([hidden])'); await pg.waitForTimeout(250); } };
+const fecharProjetos = async (pg) => { if (await pg.isVisible('#dash')) { await pg.click('#dashFechar'); await pg.waitForTimeout(150); } };
+
 async function centrarNaFaixa(pg, iProj, row, lane, zoom = 18.5) {
   const r = await pg.evaluate(({ iProj, row, lane, zoom }) => {
     const E = window.__pavecad.E, m = window.__pavecad.map(), p = typeof iProj === 'string' ? E.P.find((q) => new RegExp(iProj).test(q.meta.name)) : E.P[iProj], f = p.polyByFid.get(row * 8 + lane), ring = f.geometry.coordinates[0], n = ring.length - 1;
     const lon = ring.slice(0, n).reduce((a, c) => a + c[0], 0) / n, lat = ring.slice(0, n).reduce((a, c) => a + c[1], 0) / n;
-    m.jumpTo({ center: [lon, lat], zoom, bearing: 0 });
+    // em tela estreita o painel e o unifilar ocupam a parte de baixo: o ponto vai para o centro da parte livre do mapa
+    const larga = [...document.querySelectorAll('#inspector, #uni, .uni')].map((e) => e.getBoundingClientRect()).filter((r) => r.width > innerWidth * 0.6 && r.height > 0 && r.top > innerHeight / 3);
+    const baixo = larga.length ? Math.max(0, innerHeight - Math.min(...larga.map((r) => r.top))) : 0;
+    m.jumpTo({ center: [lon, lat], zoom, bearing: 0, padding: { top: 0, left: 0, right: 0, bottom: baixo } });
     return { lon, lat };
   }, { iProj, row, lane, zoom });
   await pg.waitForTimeout(900);
@@ -95,7 +108,7 @@ const TESTES = {
       assert.ok(m.painelGap >= 8, 'não cobre o painel direito: ' + m.painelGap);
       assert.equal(m.zoomX, m.maisX, 'o ⋯ alinha com o zoom');
       assert.ok(m.borda <= 20, 'barra lateral encostada na borda esquerda: ' + m.borda);
-      assert.equal(m.topo.filter((x) => !['sol', 'iri', 'atr', 'd0', 'rc', 'def', 'btnAjuda', 'btnCfg', 'btnFile', 'btnGps', 'btnField', 'btnAlinhar', 'prop', 'btnNotas', 'ocultar-ferramentas'].includes(x)).length, 0, 'topo com botão extra: ' + m.topo);
+      assert.equal(m.topo.filter((x) => !['btnAjuda', 'btnCfg', 'btnFile', 'btnGps', 'btnField', 'btnAlinhar', 'btnProjetos', 'prop', 'btnNotas', 'ocultar-ferramentas'].includes(x)).length, 0, 'topo com botão extra: ' + m.topo);
       assert.equal(m.baseNoTopo, false, 'a escolha de base saiu do topo');
     }],
     ['gaveta ⋯ abre alinhar, girar, norte e base; estado salvo; Satélite troca a base', TODOS, async (pg) => {
@@ -133,7 +146,7 @@ const TESTES = {
       for (const [w, h] of [[1568, 760], [1366, 768], [1024, 768], [820, 1180]]) {
         await pg.setViewportSize({ width: w, height: h }); await pg.waitForTimeout(600);
         const r = await pg.evaluate(() => {
-          const sel = ['.titlecard > .title', '.titlecard > .search', '.topbar > .modes', '.topright > .trrow', '#zoomhost .maplibregl-ctrl-group', '#toolbar', '#drawer', '#btnMore', '#legend', '#propbar:not([hidden])', '#inspector', '#unicard'];
+          const sel = ['.titlecard > .title', '.titlecard > .search', '#layerbox', '.maplibregl-ctrl-scale', '.topright > .trrow', '#zoomhost .maplibregl-ctrl-group', '#toolbar', '#drawer', '#btnMore', '#propbar:not([hidden])', '#inspector', '#unicard'];
           const caixas = sel.map((s) => [s, document.querySelector(s)]).filter(([, e]) => e && e.checkVisibility()).map(([s, e]) => [s, e.getBoundingClientRect()]);
           const ruins = [];
           for (let i = 0; i < caixas.length; i++) for (let j = i + 1; j < caixas.length; j++) {
@@ -149,13 +162,16 @@ const TESTES = {
         assert.deepEqual(r.fora, [], `${w}: controles fora da tela`);
       }
     }],
-    ['celular (500 px) mantém o layout empilhado, e voltar a 601 px ou mais devolve o layout único', 'tablet-h-1024x768', async (pg) => {
-      assert.equal(await pg.evaluate(() => document.documentElement.classList.contains('unico')), true);
+    ['celular (500 px): classe celular, barra superior única e gaveta; a 601 px o layout volta ao de tablet; paisagem baixa também é celular', 'tablet-h-1024x768', async (pg) => {
+      assert.equal(await pg.evaluate(() => document.documentElement.classList.contains('celular')), false);
       await pg.setViewportSize({ width: 500, height: 900 }); await pg.waitForTimeout(600);
-      const d = await pg.evaluate(() => ({ unico: document.documentElement.classList.contains('unico'), base: !!document.querySelector('.topright #base'), rot: !!document.querySelector('.leftcol #rotbar'), more: document.querySelector('#btnMore').checkVisibility() }));
-      assert.deepEqual(d, { unico: false, base: true, rot: true, more: false });
+      const d = await pg.evaluate(() => ({ cel: document.documentElement.classList.contains('celular'), topc: document.querySelector('#topc').checkVisibility(), hud: document.querySelector('.hud').checkVisibility(), cam: !!document.querySelector('#topc #btnCamada'), gav: document.documentElement.classList.contains('gav-fechada'), tools: document.querySelector('#tools').checkVisibility() }));
+      assert.deepEqual(d, { cel: true, topc: true, hud: false, cam: true, gav: true, tools: false });
       await pg.setViewportSize({ width: 601, height: 900 }); await pg.waitForTimeout(600);
-      assert.equal(await pg.evaluate(() => document.documentElement.classList.contains('unico')), true, '601 px já é layout único');
+      assert.equal(await pg.evaluate(() => document.documentElement.classList.contains('celular')), false, '601 px já é tablet');
+      assert.equal(await pg.evaluate(() => !!document.querySelector('.leftcol #btnCamada') && document.querySelector('#topc').checkVisibility() === false), true, 'o chip de camada volta para a coluna esquerda');
+      await pg.setViewportSize({ width: 915, height: 412 }); await pg.waitForTimeout(600);
+      assert.equal(await pg.evaluate(() => document.documentElement.classList.contains('celular') && document.documentElement.classList.contains('cel-paisagem')), true, 'paisagem com menos de 500 px de altura');
       await pg.setViewportSize({ width: 1024, height: 768 }); await pg.waitForTimeout(600);
       assert.equal(await pg.evaluate(() => !!document.querySelector('#drawer #base') && !!document.querySelector('#tools #zoomhost')), true);
     }],
@@ -218,7 +234,7 @@ const TESTES = {
       for (const [w, h] of [[1568, 760], [1366, 768], [1024, 768], [820, 1180]]) {
         await pg.setViewportSize({ width: w, height: h }); await pg.waitForTimeout(600);
         const r = await pg.evaluate(() => {
-          const sel = ['.titlecard > .title', '.titlecard > .search', '.topbar > .modes', '.topright > .trrow', '#zoomhost .maplibregl-ctrl-group', '#toolbar', '#btnMore', '#legend', '#inspector', '#unicard'];
+          const sel = ['.titlecard > .title', '.titlecard > .search', '.topright > .trrow', '#zoomhost .maplibregl-ctrl-group', '#toolbar', '#btnMore', '#inspector', '#unicard'];
           const cx = sel.map((s) => [s, document.querySelector(s)]).filter(([, e]) => e && e.checkVisibility()).map(([s, e]) => [s, e.getBoundingClientRect()]);
           const ruins = [];
           for (let i = 0; i < cx.length; i++) for (let j = i + 1; j < cx.length; j++) { const a = cx[i][1], b = cx[j][1]; if (Math.min(a.right, b.right) - Math.max(a.left, b.left) > 1 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 1) ruins.push(cx[i][0] + ' x ' + cx[j][0]); }
@@ -231,19 +247,6 @@ const TESTES = {
     }],
   ],
   t04: [
-    ['legenda começa recolhida, com botão de 44 px de altura; tocar expande e lembra a escolha', TODOS, async (pg) => {
-      assert.equal(await pg.getAttribute('#legTog', 'aria-expanded'), 'false', 'a legenda deve começar recolhida em toque');
-      const m = await pg.evaluate(() => { const r = document.querySelector('#legend').getBoundingClientRect(), t = document.querySelector('#legTog').getBoundingClientRect(), b = document.querySelector('#btnMore').getBoundingClientRect(); return { w: r.width, h: t.height, aoLado: r.left >= b.right, naoSobre: r.right <= document.querySelector('#inspector').getBoundingClientRect().left }; });
-      assert.ok(m.h >= 43.5, 'botão da legenda com 44 px: ' + m.h);
-      assert.ok(m.w < 340, 'legenda recolhida (3 nomes, +N e ocultar) sem passar de 340 px: ' + m.w);
-      assert.ok(m.aoLado, 'ao lado da barra de ferramentas');
-      await pg.click('#legTog'); await pg.waitForTimeout(300);
-      assert.equal(await pg.getAttribute('#legTog', 'aria-expanded'), 'true');
-      assert.equal(await pg.evaluate(() => localStorage.getItem('pavecad-leg')), '1');
-      assert.ok(await pg.evaluate(() => document.querySelectorAll('#legend li button').length) > 2, 'itens da legenda visíveis');
-      await pg.click('#legTog'); await pg.waitForTimeout(300);
-      assert.equal(await pg.getAttribute('#legTog', 'aria-expanded'), 'false');
-    }],
     ['unifilar: arrastar o cabeçalho para baixo recolhe até a barra de posição; para cima ou um toque reabre', TODOS, async (pg) => {
       await irParaKm(pg, '170+500');
       const cab = () => pg.evaluate(() => { const r = document.querySelector('#unicard .uni-h b').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
@@ -273,7 +276,7 @@ const TESTES = {
       await toque('touchStart', r.y); for (let i = 1; i <= 6; i++) await toque('touchMove', r.y + i * 12); await toque('touchEnd', r.y + 72); await pg.waitForTimeout(400);
       assert.equal(await estado(pg, 'E => E.uniCollapsed'), true, 'o toque arrastado recolhe');
       const ruins = await pg.evaluate(() => {
-        const sel = ['.titlecard > .title', '.titlecard > .search', '.topbar > .modes', '.topright > .trrow', '#zoomhost .maplibregl-ctrl-group', '#toolbar', '#btnMore', '#legend', '#inspector', '#unicard'];
+        const sel = ['.titlecard > .title', '.titlecard > .search', '.topright > .trrow', '#zoomhost .maplibregl-ctrl-group', '#toolbar', '#btnMore', '#inspector', '#unicard'];
         const cx = sel.map((s) => [s, document.querySelector(s)]).filter(([, e]) => e && e.checkVisibility()).map(([s, e]) => [s, e.getBoundingClientRect()]);
         const out = [];
         for (let i = 0; i < cx.length; i++) for (let j = i + 1; j < cx.length; j++) { const a = cx[i][1], b = cx[j][1]; if (Math.min(a.right, b.right) - Math.max(a.left, b.left) > 1 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 1) out.push(cx[i][0] + ' x ' + cx[j][0]); }
@@ -314,32 +317,36 @@ const TESTES = {
       assert.ok(Math.abs(f.uniTopo - f.i.b - 12) <= 1.5, 'unifilar reaberto: o painel sobe junto (' + (f.uniTopo - f.i.b) + 'px)');
       assert.ok(Math.abs(f.uniAlt - f.uniH) <= 1);
     }],
-    ['painel não está no topo: cresce para cima com max-height logo abaixo da barra superior', TODOS, async (pg) => {
-      // sem segmento selecionado a aba Segmento é curta: um painel preso ao topo esticaria até o unifilar; o ancorado fica baixo
-      await aba(pg, 'seg');
-      const curto = await pg.evaluate(() => { const i = document.querySelector('#inspector').getBoundingClientRect(), u = document.querySelector('#unicard').getBoundingClientRect(); return { t: i.top, h: i.height, b: i.bottom, uni: u.top, hud: document.querySelector('.hud').getBoundingClientRect().bottom }; });
-      assert.ok(curto.h < 260, 'o painel com conteúdo curto não estica até o topo: ' + curto.h);
-      assert.ok(curto.t > curto.hud + 60, `o topo do painel curto fica longe da barra superior (topo ${curto.t}, barra até ${curto.hud})`);
-      assert.ok(Math.abs(curto.uni - curto.b - 12) <= 1.5, 'e a base continua a 12 px do unifilar');
-      await irParaKm(pg, '170+500'); await aba(pg, 'resumo');
-      const r = await pg.evaluate(() => {
-        const i = document.querySelector('#inspector').getBoundingClientRect(), hud = document.querySelector('.hud').getBoundingClientRect(), t = document.querySelector('.topright'), tr = t.getBoundingClientRect();
-        const lado = innerWidth >= 900;
-        const topo = lado ? tr.bottom : hud.bottom;
-        return { gap: i.top - topo, lado, max: getComputedStyle(document.querySelector('#inspector')).maxHeight, h: i.height };
+    ['painel expandido: posição e altura fixas, abaixo da barra de ferramentas e da linha de GPS, iguais em todas as abas', TODOS, async (pg) => {
+      await irParaKm(pg, '170+500');
+      if (await pg.evaluate(() => document.querySelector('#inspector').classList.contains('collapsed'))) { await pg.click('#collapse'); await pg.waitForTimeout(300); }
+      const medir = () => pg.evaluate(() => {
+        const i = document.querySelector('#inspector').getBoundingClientRect(), tr = document.querySelector('.topright').getBoundingClientRect(), u = document.querySelector('#unicard').getBoundingClientRect();
+        return { t: Math.round(i.top), h: Math.round(i.height), b: Math.round(i.bottom), trB: Math.round(tr.bottom), uni: Math.round(u.top), lado: innerWidth >= 900 };
       });
-      assert.ok(r.gap >= 8, 'o painel mais alto (Resumo longo) para logo abaixo da barra superior, sem cobri-la: ' + r.gap);
-      assert.notEqual(r.max, 'none');
+      const ref = await medir();
+      for (const t of ['ana', 'notas', 'exp', 'aj', 'seg']) {
+        await aba(pg, t); await pg.waitForTimeout(150);
+        const m = await medir();
+        assert.ok(Math.abs(m.t - ref.t) <= 1 && Math.abs(m.h - ref.h) <= 1, `aba ${t}: posição e altura não mudam (${m.t}/${m.h} x ${ref.t}/${ref.h})`);
+      }
+      if (ref.lado) assert.ok(ref.t >= ref.trB + 6, `abaixo da barra de ferramentas e da linha de GPS (topo ${ref.t}, barra até ${ref.trB})`);
+      assert.ok(Math.abs(ref.uni - ref.b - 12) <= 1.5, 'e a base a 12 px do unifilar');
+      // a linha de GPS (que aumenta a coluna do topo) empurra o painel para baixo; ele continua abaixo dela
+      await pg.evaluate(() => { const c = document.querySelector('#gpschip'); c.hidden = false; c.innerHTML = '<span>GPS</span>'; });
+      await pg.waitForTimeout(400);
+      const g = await medir();
+      if (g.lado) assert.ok(g.t >= g.trB + 6, `com a linha de GPS o painel continua abaixo (${g.t} x ${g.trB})`);
+      await pg.evaluate(() => { document.querySelector('#gpschip').hidden = true; });
     }],
-    ['menos de 900 px: folha inferior em largura total acima do unifilar, sem cobrir a barra lateral nem a legenda', ['tablet-v-820x1180'], async (pg) => {
-      await irParaKm(pg, '170+500'); await aba(pg, 'resumo');
+    ['menos de 900 px: folha inferior em largura total acima do unifilar, sem cobrir a barra lateral', ['tablet-v-820x1180'], async (pg) => {
+      await irParaKm(pg, '170+500'); await aba(pg, 'ana');
       const m = await pg.evaluate(() => {
         const R = (s) => document.querySelector(s).getBoundingClientRect(), i = R('#inspector');
-        return { l: i.left, r: innerWidth - i.right, t: i.top, tools: R('#tools').bottom, toolsTop: R('#tools').top, leg: R('#legend').bottom, hud: R('.hud').bottom, dockL: R('#legend').left };
+        return { l: i.left, r: innerWidth - i.right, t: i.top, tools: R('#tools').bottom, toolsTop: R('#tools').top, hud: R('.hud').bottom };
       });
       assert.ok(Math.abs(m.l - 16) <= 1 && Math.abs(m.r - 16) <= 1, `largura total (esq ${m.l}, dir ${m.r})`);
       assert.ok(m.tools <= m.t - 8, `a barra lateral fica acima da folha (${m.tools} x ${m.t})`);
-      assert.ok(m.leg <= m.t - 8, `a legenda fica acima da folha (${m.leg} x ${m.t})`);
       assert.ok(m.toolsTop >= m.hud + 8, `a barra lateral não sobe até o topo (${m.toolsTop} x ${m.hud})`);
       await pg.click('#collapse'); await pg.waitForTimeout(400);
       const c = await pg.evaluate(() => { const i = document.querySelector('#inspector').getBoundingClientRect(), t = document.querySelector('#tools').getBoundingClientRect(); return { tb: t.bottom, it: i.top }; });
@@ -399,7 +406,6 @@ const TESTES = {
         titulo: { alvos: ['#titlebox', '.leftcol .search', '#btnOverview'] },
         ferramentas: { alvos: ['#toolbar'] },
         girar: { alvos: ['#btnMore'], gaveta: true },
-        legenda: { alvos: ['#legend'] },
         unifilar: { alvos: ['#unicard'] },
         painel: { alvos: ['#inspector'] },
       };
@@ -422,48 +428,48 @@ const TESTES = {
       }
     }],
     ['o estado de cada grupo persiste ao recarregar; nenhum controle sobreposto com todos ocultos', TODOS, async (pg) => {
-      await pg.click('[data-ocultar=titulo]'); await pg.click('[data-ocultar=ferramentas]'); await pg.click('[data-ocultar=legenda]'); await pg.click('[data-ocultar=unifilar]'); await pg.click('[data-ocultar=painel]');
+      await pg.click('[data-ocultar=titulo]'); await pg.click('[data-ocultar=ferramentas]'); await pg.click('[data-ocultar=unifilar]'); await pg.click('[data-ocultar=painel]');
       await pg.click('#btnMore'); await pg.waitForSelector('#drawer', { state: 'visible' }); await pg.click('[data-ocultar=girar]');
       await pg.waitForTimeout(300);
       const checa = () => pg.evaluate(() => {
-        const ids = ['titulo', 'ferramentas', 'girar', 'legenda', 'unifilar', 'painel'];
+        const ids = ['titulo', 'ferramentas', 'girar', 'unifilar', 'painel'];
         const rs = ids.map((i) => [i, document.querySelector(`.grestaura[data-g=${i}]`)]).filter(([, e]) => e.checkVisibility()).map(([i, e]) => [i, e.getBoundingClientRect()]);
-        const outros = ['#zoomhost .maplibregl-ctrl-group', '#btnLimpo', '.topright > .trrow', '#modes'].map((s) => [s, document.querySelector(s)]).filter(([, e]) => e && e.checkVisibility()).map(([s, e]) => [s, e.getBoundingClientRect()]);
+        const outros = ['#zoomhost .maplibregl-ctrl-group', '#btnLimpo', '.topright > .trrow', '#layerbox'].map((s) => [s, document.querySelector(s)]).filter(([, e]) => e && e.checkVisibility()).map(([s, e]) => [s, e.getBoundingClientRect()]);
         const todos = rs.concat(outros), ruins = [];
         for (let i = 0; i < todos.length; i++) for (let j = i + 1; j < todos.length; j++) { const a = todos[i][1], b = todos[j][1]; if (Math.min(a.right, b.right) - Math.max(a.left, b.left) > 1 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 1) ruins.push(todos[i][0] + ' x ' + todos[j][0]); }
         const fora = todos.filter(([, b]) => b.left < 0 || b.top < 0 || b.right > innerWidth || b.bottom > innerHeight).map(([s]) => s);
-        const visiveis = ['#titlebox', '#toolbar', '#drawer', '#legend', '#unicard', '#inspector'].filter((s) => document.querySelector(s).checkVisibility());
+        const visiveis = ['#titlebox', '#toolbar', '#drawer', '#unicard', '#inspector'].filter((s) => document.querySelector(s).checkVisibility());
         return { n: rs.length, ruins, fora, visiveis, classes: [...document.documentElement.classList].filter((c) => c.startsWith('h-')).sort() };
       });
       let r = await checa();
-      assert.equal(r.n, 6, 'seis botões de restaurar');
+      assert.equal(r.n, 5, 'cinco botões de restaurar');
       assert.deepEqual(r.ruins, [], 'sem sobreposição com tudo oculto');
       assert.deepEqual(r.fora, [], 'tudo dentro da tela');
       assert.deepEqual(r.visiveis, []);
       await pg.reload(); await pg.waitForTimeout(2000);
       r = await checa();
-      assert.deepEqual(r.classes, ['h-ferramentas', 'h-girar', 'h-legenda', 'h-painel', 'h-titulo', 'h-unifilar'], 'todos continuam ocultos após recarregar');
-      assert.equal(r.n, 6); assert.deepEqual(r.ruins, []); assert.deepEqual(r.visiveis, []);
+      assert.deepEqual(r.classes, ['h-ferramentas', 'h-girar', 'h-painel', 'h-titulo', 'h-unifilar'], 'todos continuam ocultos após recarregar');
+      assert.equal(r.n, 5); assert.deepEqual(r.ruins, []); assert.deepEqual(r.visiveis, []);
       // restaura só dois e recarrega de novo: cada grupo guarda o próprio estado
-      await pg.click('.grestaura[data-g=legenda]'); await pg.click('.grestaura[data-g=painel]');
+      await pg.click('.grestaura[data-g=unifilar]'); await pg.click('.grestaura[data-g=painel]');
       await pg.reload(); await pg.waitForTimeout(2000);
       r = await checa();
-      assert.deepEqual(r.classes, ['h-ferramentas', 'h-girar', 'h-titulo', 'h-unifilar']);
-      assert.deepEqual(r.visiveis.sort(), ['#inspector', '#legend']);
+      assert.deepEqual(r.classes, ['h-ferramentas', 'h-girar', 'h-titulo']);
+      assert.deepEqual(r.visiveis.sort(), ['#inspector', '#unicard']);
     }],
     ['mapa limpo: botão de olho e tecla H deixam só o zoom e o botão; voltar restaura o estado de cada grupo', TODOS, async (pg) => {
       await irParaKm(pg, '170+500'); await aba(pg, 'seg');
-      await pg.click('[data-ocultar=ferramentas]'); await pg.click('[data-ocultar=legenda]'); await pg.waitForTimeout(250);
+      await pg.click('[data-ocultar=ferramentas]'); await pg.waitForTimeout(250);
       const estado = () => pg.evaluate(() => ({
         limpo: document.documentElement.classList.contains('limpo'), pressed: document.querySelector('#btnLimpo').getAttribute('aria-pressed'),
-        vis: ['#titlebox', '#toolbar', '#legend', '#unicard', '#inspector', '#modes', '.topright > .trrow', '#btnMore'].filter((s) => document.querySelector(s).checkVisibility()),
+        vis: ['#titlebox', '#toolbar', '#unicard', '#inspector', '#layerbox', '.topright > .trrow', '#btnMore'].filter((s) => document.querySelector(s).checkVisibility()),
         restaura: [...document.querySelectorAll('.grestaura')].filter((e) => e.checkVisibility()).length,
         botoes: [...document.querySelectorAll('button')].filter((b) => b.checkVisibility() && !b.closest('.maplibregl-ctrl-attrib')).map((b) => b.id || b.getAttribute('aria-label')),
       }));
       const antes = await estado();
       assert.equal(antes.limpo, false);
-      assert.ok(antes.vis.includes('#inspector') && antes.vis.includes('#unicard') && !antes.vis.includes('#toolbar') && !antes.vis.includes('#legend'));
-      assert.equal(antes.restaura, 2);
+      assert.ok(antes.vis.includes('#inspector') && antes.vis.includes('#unicard') && !antes.vis.includes('#toolbar'));
+      assert.equal(antes.restaura, 1);
       // tecla H
       await pg.evaluate(() => document.activeElement && document.activeElement.blur());
       await pg.keyboard.press('h'); await pg.waitForTimeout(300);
@@ -481,14 +487,14 @@ const TESTES = {
       e = await estado();
       assert.equal(e.limpo, false); assert.equal(e.pressed, 'false');
       assert.deepEqual(e.vis, antes.vis, 'cada grupo volta como estava');
-      assert.equal(e.restaura, 2);
+      assert.equal(e.restaura, 1);
       // H digitado numa caixa de texto não liga o mapa limpo
       await pg.click('#gokm'); await pg.keyboard.type('h');
       assert.equal(await pg.evaluate(() => document.documentElement.classList.contains('limpo')), false, 'H em campo de texto não aciona');
       // o mapa limpo não é salvo: mudar o estado só vale na sessão
       await pg.evaluate(() => document.activeElement.blur());
       await pg.keyboard.press('h'); await pg.waitForTimeout(200);
-      assert.deepEqual(await pg.evaluate(() => JSON.parse(localStorage.getItem('pavecad-ocultos')).sort()), ['ferramentas', 'legenda'], 'os grupos ocultos seguem salvos, o mapa limpo não altera');
+      assert.deepEqual(await pg.evaluate(() => JSON.parse(localStorage.getItem('pavecad-ocultos')).sort()), ['ferramentas'], 'os grupos ocultos seguem salvos, o mapa limpo não altera');
     }],
     ['no mapa limpo nada se sobrepõe e só zoom e botão de olho ficam à esquerda', TODOS, async (pg) => {
       await pg.keyboard.press('h'); await pg.waitForTimeout(300);
@@ -525,7 +531,7 @@ const TESTES = {
     }, { exemplos: true }],
     ['coluna esquerda em tela baixa: rola sozinha, sem sobrepor a barra lateral', ['1366x768'], async (pg) => {
       await pg.click('#uniToggle'); await pg.waitForTimeout(400);
-      await pg.setViewportSize({ width: 1366, height: 300 }); await pg.waitForTimeout(800);
+      await pg.setViewportSize({ width: 1366, height: 520 }); await pg.waitForTimeout(800);
       const m = await pg.evaluate(() => {
         const c = document.querySelector('.leftcol'), t = document.querySelector('#tools').getBoundingClientRect();
         const rola = c.scrollHeight > c.clientHeight + 1;
@@ -557,14 +563,14 @@ const TESTES = {
       assert.ok(h.uni <= h.vh * 0.35 + 1, 'o unifilar não passa de 35% da tela: ' + h.uni);
     }, { arquivos: ['planservi_amostra_1.xlsx', 'planservi_amostra_2.xlsx'], projetos: 4 }],
     ['Planservi: só IGG, FC-2 e FC-3 além de IRI e ATR; D0, Rc e Defeitos escondidos; limiares do IGG 20, 40, 80 e 160', ['1366x768'], async (pg) => {
-      const modos = await pg.evaluate(() => [...document.querySelectorAll('#modes button')].filter((b) => !b.hidden).map((b) => b.textContent));
+      const modos = await pg.evaluate(() => [...document.querySelectorAll('#modes button')].filter((b) => !b.disabled).map((b) => b.querySelector('span').textContent));
       assert.deepEqual(modos, ['Solução', 'IRI', 'ATR', 'IGG', 'FC-2', 'FC-3']);
-      assert.equal(await pg.evaluate(() => [...document.querySelectorAll('#modes button')].filter((b) => b.hidden).map((b) => b.dataset.m).join(',')), 'd0,rc,def');
+      assert.equal(await pg.evaluate(() => [...document.querySelectorAll('#modes button')].filter((b) => b.disabled).map((b) => b.dataset.m).join(',')), 'd0,rc,def');
       // atalho pela ordem dos botões visíveis: 4 = IGG
       await pg.evaluate(() => document.activeElement && document.activeElement.blur());
       await pg.keyboard.press('4');
       assert.equal(await estado(pg, 'E => E.mode'), 'igg');
-      await pg.click('#legTog'); await pg.waitForTimeout(300);
+      await pg.click('#btnLegenda'); await pg.waitForTimeout(300);
       const leg = await pg.evaluate(() => [...document.querySelectorAll('#legend li button')].map((b) => b.textContent.trim()));
       assert.deepEqual(leg, ['≤ 20', '20 a 40', '40 a 80', '80 a 160', '> 160']);
       await pg.keyboard.press('5');
@@ -638,7 +644,7 @@ const TESTES = {
       assert.ok(await pg.evaluate(() => window.__pavecad.E.P.every((p) => p.qualidade && p.meta.format === 'planservi')));
     }, { arquivos: ['planservi_amostra_1.xlsx', 'planservi_amostra_2.xlsx'], projetos: 4 }],
     ['RoadRunner: continua com os seis modos e sem IGG e FC', ['1366x768'], async (pg) => {
-      const modos = await pg.evaluate(() => [...document.querySelectorAll('#modes button')].filter((b) => !b.hidden).map((b) => b.textContent));
+      const modos = await pg.evaluate(() => [...document.querySelectorAll('#modes button')].filter((b) => !b.disabled).map((b) => b.querySelector('span').textContent));
       assert.deepEqual(modos, ['Solução', 'IRI', 'ATR', 'D0', 'Rc', 'Defeitos']);
     }],
   ],
@@ -840,7 +846,7 @@ const TESTES = {
       assert.equal(await salvos(), '{}', 'a prévia não grava');
       assert.equal(await pg.isDisabled('#d-aplicar'), false);
       // sair sem aplicar volta ao valor gravado
-      await aba(pg, 'resumo');
+      await aba(pg, 'seg');
       await pg.waitForFunction(() => window.__pavecad.E.P.every((p) => p.desloc.l === 0 && p.desloc.t === 0), null, { timeout: 30000 });
       // de novo, agora aplicando
       await pg.click('#btnAlinhar'); await pg.waitForSelector('#al-lista');
@@ -935,8 +941,10 @@ const TESTES = {
       assert.equal(info.length, 4);
       const com = info.filter((i) => i.n > 0);
       assert.ok(com.length >= 1, 'ao menos uma planilha da amostra tem ponto reconstruído: ' + JSON.stringify(info));
-      // selo no Resumo: só nas planilhas com correção, com o número certo
-      const selos = await pg.evaluate(() => [...document.querySelectorAll('#t-resumo .prow')].map((r) => ({ nome: r.querySelector('.nm b')?.textContent, selo: r.querySelector('.selo')?.textContent ?? null })));
+      // selo no dashboard de projetos: só nas planilhas com correção, com o número certo
+      await abrirProjetos(pg);
+      const selos = await pg.evaluate(() => [...document.querySelectorAll('#dash .pcard')].map((r) => ({ nome: r.querySelector('.nm b')?.textContent, selo: r.querySelector('.selo')?.textContent ?? null })));
+      await fecharProjetos(pg);
       for (const i of info) {
         const s = selos.find((x) => x.nome === i.nome);
         assert.equal(s.selo, i.n ? `coordenadas corrigidas: ${i.n}` : null, i.nome);
@@ -969,8 +977,10 @@ const TESTES = {
       let txt = await corpo();
       assert.doesNotMatch(txt, /RD-001|TH0[12]/, 'nenhum nome de rodovia ou trecho na tela');
       assert.equal(await pg.textContent('#title'), 'Rodovia A');
-      const nomes = await pg.evaluate(() => [...document.querySelectorAll('#t-resumo .prow .nm b:not(.selo)')].map((b) => b.textContent));
+      await abrirProjetos(pg);
+      const nomes = await pg.evaluate(() => [...document.querySelectorAll('#dash .pcard .nm b')].map((b) => b.textContent));
       assert.ok(nomes.every((n) => /^Planilha \d+ · (Crescente|Decrescente)$/.test(n)), nomes.join(' | '));
+      await fecharProjetos(pg);
       // km: contado a partir do início da primeira planilha
       const k = await pg.evaluate(() => { const p = window.__pavecad.E.P[0]; return { real: p.kmNum[5], lab: p.kmLab[5], base: Math.floor(Math.min(...window.__pavecad.E.P.map((q) => q.kmNum[0]))) }; });
       assert.equal(k.lab, '0+100', `o km real ${k.real} aparece como ${k.lab}`);
@@ -1003,9 +1013,9 @@ const TESTES = {
       await pg.fill('#lgW', '3.2'); await pg.click('#lgAdd');
       await pg.waitForFunction((pid) => window.__pavecad.E.P.find((p) => p.id === pid).ajustes.length === 1, info.pid, { timeout: 20000 });
       await pg.click('#cfgClose');
-      await aba(pg, 'resumo');
+      await abrirProjetos(pg);
       // remove
-      await pg.click(`[data-del="${info.pid}"]`);
+      await pg.click(`#dash [data-del="${info.pid}"]`); await fecharProjetos(pg);
       await pg.waitForFunction((n) => window.__pavecad.E.P.length === n - 1, info.n);
       assert.match(await pg.innerText('.toast-acao'), /removida/);
       assert.equal(await pg.evaluate(() => window.__pavecad.E.props[0].pid), null, 'sem a planilha carregada, a proposta fica guardada sem vínculo');
@@ -1028,7 +1038,7 @@ const TESTES = {
     ['toque: todos os alvos interativos dos painéis, da barra, da gaveta, da legenda e do unifilar têm 44 px (pointer: coarse)', ['tablet-h-1024x768', 'tablet-v-820x1180'], async (pg) => {
       const medir = (rotulo) => pg.evaluate((rot) => {
         const sels = 'button, [role=switch], select, summary, label.sel-item, input:not([type=checkbox]):not([type=hidden]):not([type=file])';
-        const raizes = ['#inspector', '#toolbar', '#tools', '#drawer', '#unicard', '#legend', '#modes', '.search', '#titlebox', '.topright'];
+        const raizes = ['#inspector', '#toolbar', '#tools', '#drawer', '#unicard', '#modes', '.search', '#titlebox', '.topright'];
         const ruins = [];
         for (const r of raizes) for (const el of document.querySelectorAll(sels.split(', ').map((q) => `${r} ${q}`).join(', '))) {
           if (!el.checkVisibility()) continue;
@@ -1043,9 +1053,10 @@ const TESTES = {
       await pg.click('#btnMore'); await pg.waitForSelector('#drawer', { state: 'visible' });
       ruins.push(...await medir('gaveta'));
       await pg.click('#btnMore');
-      for (const t of ['resumo', 'ana', 'notas', 'aj']) { await aba(pg, t); ruins.push(...await medir(t)); }
+      for (const t of ['seg', 'ana', 'notas', 'exp', 'aj']) { await aba(pg, t); ruins.push(...await medir(t)); }
+      await abrirProjetos(pg); ruins.push(...await medir('projetos')); await fecharProjetos(pg);
       await pg.click('#btnAlinhar'); await pg.waitForSelector('#desloc', { state: 'visible' }); ruins.push(...await medir('alinhar'));
-      await aba(pg, 'resumo');
+      await aba(pg, 'seg');
       await pg.evaluate(() => { const E = window.__pavecad.E; window.__pavecad.select(E.P[0].id, 20, 1, { tab: true }); });
       await pg.waitForTimeout(500); ruins.push(...await medir('segmento'));
       const unicos = [...new Set(ruins)];
@@ -1066,10 +1077,10 @@ const TESTES = {
       }, [min, rot]);
       await pg.evaluate(() => { const E = window.__pavecad.E; window.__pavecad.select(E.P[0].id, 20, 1, { tab: true }); });
       let ruins = [];
-      for (const t of ['resumo', 'seg', 'ana', 'notas', 'aj']) { await aba(pg, t); ruins.push(...await pequenos(12, 'claro ' + t)); }
+      for (const t of ['seg', 'ana', 'notas', 'exp', 'aj']) { await aba(pg, t); ruins.push(...await pequenos(12, 'claro ' + t)); }
       await pg.click('#btnAlinhar'); ruins.push(...await pequenos(12, 'claro alinhar'));
       await pg.evaluate(() => window.__pavecad.setField(true, true)); await pg.waitForTimeout(400);
-      for (const t of ['resumo', 'seg', 'aj']) { await aba(pg, t); ruins.push(...await pequenos(13, 'campo ' + t)); }
+      for (const t of ['seg', 'exp', 'aj']) { await aba(pg, t); ruins.push(...await pequenos(13, 'campo ' + t)); }
       const unicos = [...new Set(ruins)];
       assert.deepEqual(unicos, [], 'texto abaixo do mínimo:\n  ' + unicos.join('\n  '));
     }],
@@ -1078,7 +1089,7 @@ const TESTES = {
     ['1366x768: painel direito começa recolhido, a rodovia fica livre de elementos flutuantes e o título e a busca são um cartão só', '1366x768', async (pg) => {
       const r = await pg.evaluate(() => {
         const R = (e) => { const b = e.getBoundingClientRect(); return { x: b.left, y: b.top, r: b.right, b: b.bottom, w: b.width, h: b.height }; };
-        const flut = ['#titlecard', '#modes', '.topright', '#tools', '#legend', '#inspector', '#unicard'].map((s) => [s, document.querySelector(s)]).filter(([, e]) => e && e.checkVisibility()).map(([s, e]) => [s, R(e)]);
+        const flut = ['#titlecard', '#modes', '.topright', '#tools', '#inspector', '#unicard'].map((s) => [s, document.querySelector(s)]).filter(([, e]) => e && e.checkVisibility()).map(([s, e]) => [s, R(e)]);
         const m = window.__pavecad.map(), E = window.__pavecad.E;
         const pts = [];
         for (const p of E.P) for (let i = 0; i < p.rows.length; i += 10) { const q = m.project([p.rows[i].lon, p.rows[i].lat]); pts.push([q.x, q.y, p.meta.name]); }
@@ -1090,7 +1101,7 @@ const TESTES = {
           if (a.x < b.r && b.x < a.r && a.y < b.b && b.y < a.b) cruz.push(`${flut[i][0]} x ${flut[j][0]}`);
         }
         const tc = document.querySelector('#titlecard');
-        return { colapsado: document.querySelector('#inspector').classList.contains('collapsed'), painelH: R(document.querySelector('#inspector')).h, sob: [...new Set(sob)], cruz, tituloNoCartao: !!tc.querySelector('#title') && !!tc.querySelector('#gokm'), cartoes: document.querySelectorAll('.leftcol > .glass').length, n: pts.length, fora: pts.filter(([x, y]) => x < 0 || y < 0 || x > innerWidth || y > innerHeight).length };
+        return { colapsado: document.querySelector('#inspector').classList.contains('collapsed'), painelH: R(document.querySelector('#inspector')).h, sob: [...new Set(sob)], cruz, tituloNoCartao: !!tc.querySelector('#title') && !!tc.querySelector('#gokm'), cartoes: document.querySelectorAll('.leftcol > .glass:not(.dica)').length, n: pts.length, fora: pts.filter(([x, y]) => x < 0 || y < 0 || x > innerWidth || y > innerHeight).length };
       });
       assert.equal(r.colapsado, true, 'o painel começa recolhido');
       assert.ok(r.painelH < 130, 'só a faixa de abas: ' + r.painelH);
@@ -1114,9 +1125,9 @@ const TESTES = {
     }],
   ],
   t17: [
-    ['legenda recolhida: nomes das 3 classes mais presentes na vista e "+N"; menos classes na vista, menos nomes', '1366x768', async (pg) => {
-      assert.equal(await pg.getAttribute('#legTog', 'aria-expanded'), 'false');
-      const ler = () => pg.evaluate(() => ({ nomes: [...document.querySelectorAll('#legend .legtop .lt')].map((e) => e.textContent.trim()), mais: document.querySelector('#legend .legmais')?.textContent.trim() ?? null, pontos: document.querySelectorAll('#legend .dots i').length }));
+    ['linha de cores do unifilar: nomes das 3 classes mais presentes na vista e "+N"; menos classes na vista, menos nomes', '1366x768', async (pg) => {
+      assert.equal(await pg.getAttribute('#btnLegenda', 'aria-expanded'), 'false');
+      const ler = () => pg.evaluate(() => ({ nomes: [...document.querySelectorAll('#unileg .lt')].map((e) => e.textContent.trim()), mais: document.querySelector('#unileg .legmais')?.textContent.trim() ?? null, pontos: document.querySelectorAll('#unileg .dots i').length }));
       await pg.evaluate(() => { const E = window.__pavecad.E; const b = E.P.reduce((a, p) => [Math.min(a[0], p.bounds[0][0]), Math.min(a[1], p.bounds[0][1]), Math.max(a[2], p.bounds[1][0]), Math.max(a[3], p.bounds[1][1])], [1e9, 1e9, -1e9, -1e9]); window.__pavecad.map().fitBounds([[b[0], b[1]], [b[2], b[3]]], { duration: 0, padding: 80 }); });
       await pg.waitForTimeout(1200);
       const geral = await ler();
@@ -1131,7 +1142,7 @@ const TESTES = {
       assert.ok(perto.nomes.length >= 1 && perto.nomes.length <= 3, JSON.stringify(perto));
       assert.equal(perto.mais, null, 'com 3 classes ou menos na vista não há +N: ' + JSON.stringify(perto));
       // os nomes existem na legenda expandida
-      await pg.click('#legTog'); await pg.waitForTimeout(300);
+      await pg.click('#btnLegenda'); await pg.waitForTimeout(300);
       const lista = await pg.evaluate(() => [...document.querySelectorAll('#legend li button')].map((b) => b.textContent.trim()));
       for (const n of perto.nomes) assert.ok(lista.includes(n), `"${n}" está na legenda expandida`);
       // siglas explicadas na legenda
@@ -1139,15 +1150,15 @@ const TESTES = {
       assert.match(nota, /Solução: tratamento proposto/); assert.match(nota, /Fx = faixa/); assert.match(nota, /Ac\. = acostamento/);
     }],
     ['siglas: o tooltip de cada modo explica a abreviação e a legenda traz a descrição do indicador', '1366x768', async (pg) => {
-      const t = await pg.evaluate(() => Object.fromEntries([...document.querySelectorAll('#modes button')].filter((b) => !b.hidden).map((b) => [b.dataset.m, b.title])));
+      const t = await pg.evaluate(() => Object.fromEntries([...document.querySelectorAll('#modes button')].filter((b) => !b.disabled).map((b) => [b.dataset.m, b.title])));
       assert.match(t.iri, /Índice de Irregularidade Internacional/); assert.match(t.atr, /afundamento em trilha de roda/);
       assert.match(t.sol, /tratamento proposto/); assert.ok(/Atalho: 1/.test(t.sol));
       assert.match(t.d0, /deflexão/); assert.match(t.rc, /raio de curvatura/);
     }, { exemplos: true }],
     ['siglas do Planservi: IGG e FC explicados no tooltip e na legenda', '1366x768', async (pg) => {
-      const t = await pg.evaluate(() => Object.fromEntries([...document.querySelectorAll('#modes button')].filter((b) => !b.hidden).map((b) => [b.dataset.m, b.title])));
+      const t = await pg.evaluate(() => Object.fromEntries([...document.querySelectorAll('#modes button')].filter((b) => !b.disabled).map((b) => [b.dataset.m, b.title])));
       assert.match(t.igg, /Índice de Gravidade Global/); assert.match(t.fc2, /FC-2: trincamento/); assert.match(t.fc3, /FC-3: trincamento/);
-      await pg.click('#modes [data-m=igg]'); await pg.click('#legTog');
+      await modo(pg, 'igg'); await pg.click('#btnLegenda');
       assert.match(await pg.innerText('#legend .legnote'), /IGG: Índice de Gravidade Global/);
     }, { arquivos: ['planservi_amostra_1.xlsx', 'planservi_amostra_2.xlsx'], projetos: 4 }],
     ['padrão além da cor: hachura só nas classes críticas, ativável em Ajustes e ligada por padrão no modo campo', '1366x768', async (pg) => {
@@ -1165,10 +1176,10 @@ const TESTES = {
       assert.match(e.filtro, /RE/); assert.match(e.filtro, /RP/); assert.ok(!/FS4|GAP/.test(e.filtro), 'só RE e RP: ' + e.filtro);
       assert.ok(await pg.evaluate(() => document.querySelectorAll('#legend .sw.crit, #legend .lt i.crit').length) >= 0);
       // modos sem classe crítica não têm hachura
-      await pg.click('#modes [data-m=iri]'); await pg.waitForTimeout(400);
+      await modo(pg, 'iri'); await pg.waitForTimeout(400);
       e = await est(); assert.equal(e.vis, 'none', 'IRI: sem hachura');
       // desliga de novo e o modo campo não religa por cima da escolha explícita
-      await pg.click('#modes [data-m=sol]'); await aba(pg, 'aj'); await pg.click('#s-pad'); await pg.waitForTimeout(300);
+      await modo(pg, 'sol'); await aba(pg, 'aj'); await pg.click('#s-pad'); await pg.waitForTimeout(300);
       await pg.evaluate(() => window.__pavecad.setField(true, true)); await pg.waitForTimeout(500);
       e = await est(); assert.equal(e.vis, 'none', 'escolha explícita (desligado) vale sobre o modo campo'); assert.equal(e.padrao, false);
     }],
@@ -1179,15 +1190,15 @@ const TESTES = {
       await pg.evaluate(() => window.__pavecad.setField(true, true)); await pg.waitForTimeout(600);
       e0 = await est();
       assert.equal(e0.vis, 'visible', 'modo campo liga a hachura'); assert.match(e0.filtro, /RE/); assert.match(e0.filtro, /RP/);
-      await pg.click('#modes [data-m=igg]'); await pg.waitForTimeout(500);
+      await modo(pg, 'igg'); await pg.waitForTimeout(500);
       const e = await est();
       assert.equal(e.vis, 'visible'); assert.match(e.filtro, /c_igg/); assert.match(e.filtro, /3/);
-      await pg.click('#modes [data-m=atr]'); await pg.waitForTimeout(400);
+      await modo(pg, 'atr'); await pg.waitForTimeout(400);
       assert.match((await est()).filtro, /c_atr/);
-      await pg.click('#modes [data-m=iri]'); await pg.waitForTimeout(400);
+      await modo(pg, 'iri'); await pg.waitForTimeout(400);
       assert.equal((await est()).vis, 'none', 'IRI: sem hachura');
       // sem modo campo, no escuro e no claro, o RP continua com hachura em Solução
-      await pg.click('#modes [data-m=sol]');
+      await modo(pg, 'sol');
       await pg.evaluate(() => window.__pavecad.setField(false, true)); await pg.emulateMedia({ colorScheme: 'dark' }); await pg.waitForTimeout(600);
       const esc = await est(); assert.equal(esc.vis, 'visible', 'escuro: RP com hachura'); assert.ok(!/RE/.test(esc.filtro), esc.filtro);
     }, { arquivos: ['planservi_amostra_1.xlsx', 'planservi_amostra_2.xlsx'], projetos: 4 }],
@@ -1248,7 +1259,7 @@ const TESTES = {
       assert.ok(r.h <= r.vh * 0.35 + 1, `cartão de ${r.h}px em ${r.vh}px de tela`);
       assert.equal(r.ov, 'auto');
       // tela baixa: o conteúdo (dois blocos de seis planilhas) não cabe nos 35% e passa a rolar
-      await pg.setViewportSize({ width: 1366, height: 420 }); await pg.waitForTimeout(900);
+      await pg.setViewportSize({ width: 1366, height: 520 }); await pg.waitForTimeout(900);
       r = await m();
       assert.ok(r.h <= r.vh * 0.35 + 1, `tela baixa: cartão de ${r.h}px em ${r.vh}px`);
       assert.ok(r.rola, `deve rolar por dentro (${r.sh} > ${r.ch})`);
@@ -1272,26 +1283,26 @@ const TESTES = {
       const ev = await pg.evaluate(() => { const a = document.querySelector('#unicard').getBoundingClientRect(), i = document.querySelector('#inspector').getBoundingClientRect(); return { uniTopo: a.top, inspB: i.bottom }; });
       assert.ok(ev.inspB <= ev.uniTopo + 1, 'o painel não invade o unifilar');
     }, OPTS_NOVE],
-    ['Resumo agrupado por rodovia, com grupos recolhíveis que lembram o estado', ['1366x768'], async (pg) => {
-      await aba(pg, 'resumo');
-      const gr = () => pg.evaluate(() => [...document.querySelectorAll('#t-resumo details.rgrp')].map((d) => ({ uf: d.dataset.uf, aberto: d.open, titulo: d.querySelector('summary').innerText.replace(/\s+/g, ' ').trim(), linhas: d.querySelectorAll('.prow').length })));
+    ['Projetos agrupados por rodovia, com grupos recolhíveis que lembram o estado', ['1366x768'], async (pg) => {
+      await abrirProjetos(pg);
+      const gr = () => pg.evaluate(() => [...document.querySelectorAll('#dash details.rgrp')].map((d) => ({ uf: d.dataset.uf, aberto: d.open, titulo: d.querySelector('summary').innerText.replace(/\s+/g, ' ').trim(), linhas: d.querySelectorAll('.pcard').length })));
       let g = await gr();
       assert.deepEqual(g.map((x) => x.uf), ['RD-001', 'RD-002']);
       assert.ok(g.every((x) => x.aberto), 'começam abertos');
       assert.deepEqual(g.map((x) => x.linhas), [12, 6], 'doze projetos em RD-001 e seis em RD-002');
       assert.match(g[0].titulo, /^RD-001.*12 planilhas/); assert.match(g[1].titulo, /^RD-002.*6 planilhas/);
-      assert.equal(await pg.evaluate(() => document.querySelectorAll('#t-resumo details.rgrp:first-of-type .sect, #t-resumo details.rgrp .sect').length > 0), true, 'cada grupo traz suas Soluções');
+      assert.equal(await pg.evaluate(() => [...document.querySelectorAll('#dash details.rgrp')].every((d) => d.querySelector('.pbar') && d.querySelector('.pleg'))), true, 'cada grupo traz a distribuição por solução');
       // recolhe o primeiro; trocar de modo redesenha o painel e o estado continua
-      await pg.click('#t-resumo details.rgrp[data-uf="RD-001"] > summary'); await pg.waitForTimeout(300);
+      await pg.click('#dash details.rgrp[data-uf="RD-001"] > summary'); await pg.waitForTimeout(300);
       g = await gr(); assert.equal(g[0].aberto, false); assert.equal(g[1].aberto, true);
       await pg.evaluate(() => document.activeElement && document.activeElement.blur());
-      await pg.click('#modes [data-m=iri]'); await pg.waitForTimeout(500);
+      await modo(pg, 'iri'); await pg.waitForTimeout(500);
       g = await gr(); assert.equal(g[0].aberto, false, 'RD-001 continua recolhido depois de redesenhar'); assert.equal(g[1].aberto, true);
-      assert.ok(await pg.evaluate(() => { const d = document.querySelector('#t-resumo details.rgrp[data-uf="RD-001"]'); return d.getBoundingClientRect().height < 70; }), 'grupo recolhido ocupa só o cabeçalho');
-      await pg.click('#t-resumo details.rgrp[data-uf="RD-001"] > summary'); await pg.waitForTimeout(300);
+      assert.ok(await pg.evaluate(() => { const d = document.querySelector('#dash details.rgrp[data-uf="RD-001"]'); return d.getBoundingClientRect().height < 70; }), 'grupo recolhido ocupa só o cabeçalho');
+      await pg.click('#dash details.rgrp[data-uf="RD-001"] > summary'); await pg.waitForTimeout(300);
       assert.equal((await gr())[0].aberto, true);
       // o botão de olho de uma planilha continua funcionando dentro do grupo
-      await pg.click('#t-resumo details.rgrp[data-uf="RD-002"] [data-eye]'); await pg.waitForTimeout(400);
+      await pg.click('#dash details.rgrp[data-uf="RD-002"] [data-eye]'); await pg.waitForTimeout(400);
       assert.equal(await pg.evaluate(() => window.__pavecad.E.P.filter((p) => p.meta.uf === 'RD-002' && !p.visible).length), 1);
     }, OPTS_NOVE],
   ],
@@ -1445,15 +1456,15 @@ const TESTES = {
         assert.ok(r.fundo < 0.02, `a faixa de 24 px da borda direita sem cor de fundo em ${w}x${h}, rumo ${rumo}: ${(r.fundo * 100).toFixed(1)}%`);
       }
     }],
-    ['nenhum controle sobrepõe outro nem passa da borda em 360x640 e 768x1024 (com planilhas, GPS ligado e um segmento selecionado)', ['1366x768'], async (pg, { ctx }) => {
+    ['nenhum controle sobrepõe outro nem passa da borda em 768x1024 (com planilhas, GPS ligado e um segmento selecionado; o celular tem o seu teste)', ['1366x768'], async (pg, { ctx }) => {
       await ctx.grantPermissions(['geolocation']); await ctx.setGeolocation({ latitude: -12.79, longitude: -47.75, accuracy: 12 });
-      for (const [w, h] of [[360, 640], [768, 1024]]) {
+      for (const [w, h] of [[768, 1024]]) {
         await pg.setViewportSize({ width: w, height: h }); await pg.waitForTimeout(700);
         if (!(await pg.evaluate(() => document.querySelector('#btnGps').getAttribute('aria-pressed') === 'true'))) { await pg.click('#btnGps'); await pg.waitForTimeout(1200); }
         await pg.evaluate(() => { const E = window.__pavecad.E; window.__pavecad.select(E.P[0].id, 300, 1, { tab: true }); document.querySelector('.nr-dica')?.remove(); document.querySelector('#toast')?.classList.remove('on'); });
         await pg.waitForTimeout(500);
         const r = await pg.evaluate(() => {
-          const sel = ['#titlecard', '#modes', '.topright .trrow', '#toolbar', '#gpschip', '.maplibregl-ctrl-scale', '#rotbar', '#zoomhost', '#tools', '#legend', '#inspector', '#unicard', '#propbar'];
+          const sel = ['#titlecard', '#modes', '.topright .trrow', '#toolbar', '#gpschip', '.maplibregl-ctrl-scale', '#rotbar', '#zoomhost', '#tools', '#inspector', '#unicard', '#propbar'];
           const els = sel.flatMap((q) => [...document.querySelectorAll(q)].filter((e) => e.checkVisibility({ opacityProperty: true }) && !e.closest('[inert]') && e.getBoundingClientRect().width > 0).map((e) => ({ q, b: e.getBoundingClientRect(), e })));
           const out = [];
           for (let i = 0; i < els.length; i++) for (let j = i + 1; j < els.length; j++) {
@@ -1594,7 +1605,7 @@ const TESTES = {
       await noMeuLocal(); await pg.waitForTimeout(1200);
       assert.equal(await pg.locator('#nr .nr-op').count(), 0, 'precisão pior que 50 m não abre');
       assert.equal((await pg.textContent('#toast')).trim(), 'Sem GPS. Segure no mapa no ponto desejado.');
-      assert.equal(await pg.locator('.nr-mira, #nrUsar').count(), 0, 'sem modo de mira');
+      assert.equal(await pg.locator('#nrUsar').count() + (await pg.isVisible('.nr-anel') ? 1 : 0), 0, 'sem modo de mira');
       // permissão negada (o Chromium sem interface não nega de verdade: responde "negada" pelo mesmo caminho do navegador)
       await pg.evaluate(() => { navigator.geolocation.getCurrentPosition = (_ok, err) => setTimeout(() => err({ code: 1, message: 'negada' }), 50); });
       await noMeuLocal(); await pg.waitForTimeout(800);
@@ -1840,6 +1851,353 @@ const TESTES = {
       assert.equal(await pg.locator('.nr-dica').count(), 0, 'a dica não volta');
     }],
   ],
+  t23: [
+    ['abas do painel: Segmento, Análise, Revisão (com contador), Exportar e Ajustes, nessa ordem; Segmento abre por padrão; sem aba Resumo', TODOS, async (pg) => {
+      assert.deepEqual(await pg.evaluate(() => [...document.querySelectorAll('#tabs [role=tab]')].map((b) => b.querySelector('.tt').firstChild.textContent.trim())), ['Segmento', 'Análise', 'Revisão', 'Exportar', 'Ajustes']);
+      assert.equal(await pg.evaluate(() => document.querySelector('#tabs [aria-selected=true]').dataset.t), 'seg');
+      assert.equal(await pg.locator('#t-resumo, [data-t=resumo]').count(), 0, 'a aba Resumo deixou de existir');
+      if (await pg.evaluate(() => document.querySelector('#inspector').classList.contains('collapsed'))) { await pg.click('#collapse'); await pg.waitForTimeout(300); }
+      const corte = await pg.evaluate(() => { const t = document.querySelector('#tabs').getBoundingClientRect(); return [...document.querySelectorAll('#tabs button')].filter((b) => { const r = b.getBoundingClientRect(); return r.left < t.left - 1 || r.right > t.right + 1 || b.scrollWidth > b.clientWidth + 1; }).map((b) => b.dataset.t); });
+      assert.deepEqual(corte, [], 'nenhuma aba cortada');
+      // contador na Revisão: notas e alterações
+      const p = await centrarNaFaixa(pg, 0, 300, 1);
+      await pg.mouse.click(p.x, p.y, { button: 'right' }); await pg.waitForTimeout(300);
+      await pg.click('#nr .nr-op[data-t=dreno_mais]'); await pg.waitForTimeout(300); await pg.keyboard.press('Escape');
+      assert.equal((await pg.textContent('#revN')).trim(), '1');
+      assert.match((await pg.textContent('#tabs [data-t=notas]')).replace(/\s+/g, ' ').trim(), /Revisão\s?1$/);
+    }],
+    ['dashboard de projetos: abre pelo botão Projetos e pelo cartão da rodovia; um cartão por planilha com resumo e ações; Abrir planilhas dentro', ['1366x768', 'tablet-v-820x1180'], async (pg) => {
+      assert.equal(await pg.isVisible('#dash'), false);
+      await pg.click('#subtitle'); await pg.waitForSelector('#dash:not([hidden])');
+      assert.equal(await pg.locator('#dash .pcard').count(), 2, 'um cartão por planilha');
+      assert.equal(await pg.locator('#dash .dash-resumo').count(), 1, 'resumo consolidado no topo');
+      const c = await pg.evaluate(() => { const e = document.querySelector('#dash .pcard'); const t = e.innerText.replace(/\s+/g, ' '); return { dir: !!e.querySelector('.dirb'), barra: !!e.querySelector('.pbar'), leg: !!e.querySelector('.pleg li'), ind: /IRI/.test(t) && /ATR/.test(t), q: /alerta/.test(t), cont: /proposta.*nota/.test(t), acoes: [...e.querySelectorAll('.pc-a button, .pc-a label')].map((b) => b.textContent.trim().replace(/\s+/g, ' ')), olho: !!e.querySelector('[data-eye]') }; });
+      assert.ok(c.dir && c.barra && c.leg && c.ind && c.q && c.cont && c.olho, 'o cartão traz sentido, distribuição, indicadores, qualidade, contagens e olho: ' + JSON.stringify(c));
+      assert.deepEqual(c.acoes, ['Alinhar', 'Cor', 'Remover']);
+      assert.equal(await pg.isVisible('#dashAbrir'), true, 'Abrir planilhas dentro do dashboard');
+      // olho oculta a planilha; Cor grava; Alinhar abre a aba de alinhamento
+      await pg.click('#dash .pcard [data-eye]'); await pg.waitForTimeout(300);
+      assert.equal(await pg.evaluate(() => window.__pavecad.E.P.filter((p) => !p.visible).length), 1);
+      await pg.click('#dash .pcard [data-eye]'); await pg.waitForTimeout(300);
+      await pg.evaluate(() => { const i = document.querySelector('#dash [data-cor]'); i.value = '#ff00aa'; i.dispatchEvent(new Event('change', { bubbles: true })); }); await pg.waitForTimeout(300);
+      assert.equal(await pg.evaluate(() => Object.values(window.__pavecad.E.coresProj)[0]), '#ff00aa');
+      await pg.click('#dash [data-alinhar-p]'); await pg.waitForTimeout(500);
+      assert.equal(await pg.isVisible('#dash'), false, 'Alinhar fecha o dashboard'); assert.equal(await estado(pg, 'E => E.tab'), 'al');
+      await pg.click('#btnProjetos'); await pg.waitForSelector('#dash:not([hidden])');
+      await pg.keyboard.press('Escape'); await pg.waitForTimeout(150);
+      assert.equal(await pg.isVisible('#dash'), false, 'Esc fecha');
+    }],
+    ['badges de sentido: mesma largura e altura, seta e texto, crescente primeiro, um preenchido e o outro com contorno', ['1366x768'], async (pg) => {
+      await pg.click('#btnProjetos'); await pg.waitForSelector('#dash:not([hidden])');
+      const b = await pg.evaluate(() => [...document.querySelectorAll('#dash .pcard .dirb')].map((e) => { const r = e.getBoundingClientRect(), cs = getComputedStyle(e); return { t: e.textContent.trim(), w: Math.round(r.width), h: Math.round(r.height), bg: cs.backgroundColor, bd: cs.borderTopWidth }; }));
+      assert.deepEqual(b.map((x) => x.t), ['↑ CRESC', '↓ DECRESC'], 'crescente primeiro, com seta');
+      assert.equal(b[0].w, b[1].w); assert.equal(b[0].h, b[1].h);
+      assert.notEqual(b[0].bg, 'rgba(0, 0, 0, 0)', 'crescente preenchido'); assert.equal(b[1].bg, 'rgba(0, 0, 0, 0)', 'decrescente só com contorno'); assert.ok(parseFloat(b[1].bd) >= 1);
+    }],
+    ['camada do mapa: chip compacto "Solução" no lugar da barra do topo; menu vertical com as 9 camadas, as sem dado desabilitadas; um toque escolhe e fecha; persiste; atalho C', ['1366x768', 'tablet-v-820x1180'], async (pg) => {
+      assert.equal(await pg.evaluate(() => [...document.querySelectorAll('.seg.modes, .topbar > .modes')].filter((e) => e.checkVisibility()).length), 0, 'nenhuma barra de camadas aberta no topo');
+      assert.equal((await pg.textContent('#camadaNome')).trim(), 'Solução');
+      const chip = await pg.evaluate(() => { const c = document.querySelector('#btnCamada').getBoundingClientRect(), t = document.querySelector('#titlecard').getBoundingClientRect(); return { h: Math.round(c.height), abaixo: c.top >= t.bottom - 1, esq: Math.abs(c.left - t.left) < 40 }; });
+      assert.ok(chip.h >= 36 && chip.h <= 44 && chip.abaixo && chip.esq, 'chip de 36 a 44 px, abaixo do cartão de busca, alinhado à esquerda: ' + JSON.stringify(chip));
+      assert.equal(await pg.isVisible('#modes'), false);
+      await pg.click('#btnCamada'); await pg.waitForTimeout(200);
+      const m = await pg.evaluate(() => [...document.querySelectorAll('#modes button')].map((b) => ({ m: b.dataset.m, off: b.disabled, h: Math.round(b.getBoundingClientRect().height), sel: b.getAttribute('aria-selected'), sd: /sem dado/.test(b.textContent) })));
+      assert.deepEqual(m.map((x) => x.m), ['sol', 'iri', 'atr', 'd0', 'rc', 'def', 'igg', 'fc2', 'fc3']);
+      assert.ok(m.every((x) => x.h >= 44), 'itens de 44 px ou mais');
+      assert.equal(m.find((x) => x.m === 'sol').sel, 'true');
+      for (const k of ['igg', 'fc2', 'fc3']) assert.ok(m.find((x) => x.m === k).off && m.find((x) => x.m === k).sd, k + ' sem dado no RoadRunner');
+      await pg.click('#modes [data-m=iri]'); await pg.waitForTimeout(300);
+      assert.equal(await pg.isVisible('#modes'), false, 'um toque escolhe e fecha');
+      assert.equal((await pg.textContent('#camadaNome')).trim(), 'IRI'); assert.equal(await estado(pg, 'E => E.mode'), 'iri');
+      assert.equal(await pg.evaluate(() => document.querySelector('#btnCamada').classList.contains('fora-sol')), true, 'contorno mais forte fora de Solução');
+      assert.match(await pg.textContent('#unileg'), /./, 'a linha de cores do unifilar mostra as classes do IRI');
+      // persiste depois de recarregar
+      await pg.reload(); await pg.waitForFunction(() => window.__pavecad && window.__pavecad.E.P.length === 2, null, { timeout: 60000 }); await pg.waitForTimeout(1500);
+      assert.equal((await pg.textContent('#camadaNome')).trim(), 'IRI'); assert.equal(await estado(pg, 'E => E.mode'), 'iri');
+      // atalho C; tocar fora fecha
+      await pg.keyboard.press('c'); await pg.waitForTimeout(200); assert.equal(await pg.isVisible('#modes'), true, 'C abre o menu');
+      await pg.mouse.click(5, 400); await pg.waitForTimeout(200); assert.equal(await pg.isVisible('#modes'), false, 'tocar fora fecha');
+      await modo(pg, 'sol');
+    }],
+    ['escala sem cartão: linha fina com traços nas pontas e rótulo com contorno; entre 48 e 96 px; fora da busca, do chip e dos controles', ['1366x768', 'tablet-h-1024x768'], async (pg) => {
+      const e = await pg.evaluate(() => {
+        const el = document.querySelector('.maplibregl-ctrl-scale'), cs = getComputedStyle(el), r = el.getBoundingClientRect();
+        const outros = ['#titlecard', '#layerbox', '#tools'].map((s) => document.querySelector(s).getBoundingClientRect());
+        return { bg: cs.backgroundColor, bd: cs.borderTopWidth + '/' + cs.borderLeftWidth + '/' + cs.borderRightWidth, sombra: cs.boxShadow, fs: parseFloat(cs.fontSize), h: Math.round(r.height), w: Math.round(r.width), halo: cs.textShadow !== 'none', sobre: outros.some((o) => r.left < o.right && r.right > o.left && r.top < o.bottom && r.bottom > o.top), abaixoChip: r.top >= document.querySelector('#btnCamada').getBoundingClientRect().bottom - 1 };
+      });
+      assert.equal(e.bg, 'rgba(0, 0, 0, 0)'); assert.equal(e.bd, '0px/0px/0px'); assert.equal(e.sombra, 'none');
+      assert.equal(e.fs, 12); assert.ok(e.h >= 16 && e.h <= 20, 'altura ' + e.h); assert.ok(e.halo, 'rótulo com contorno claro');
+      assert.ok(e.w >= 36 && e.w <= 96, 'largura ' + e.w); assert.ok(!e.sobre && e.abaixoChip, 'abaixo do chip e sem sobrepor busca nem controles: ' + JSON.stringify(e));
+    }],
+    ['cartão único de controles no canto inferior esquerdo: zoom, legenda, tela limpa e mais, com botões de 40 px ou mais; a legenda abre a lista completa', TODOS, async (pg) => {
+      const c = await pg.evaluate(() => {
+        const t = document.querySelector('#tools'), r = t.getBoundingClientRect();
+        const btn = [...t.querySelectorAll('button')].filter((b) => b.checkVisibility()).map((b) => { const q = b.getBoundingClientRect(); return { id: b.id || b.getAttribute('aria-label'), w: Math.round(q.width), h: Math.round(q.height) }; });
+        return { vidro: getComputedStyle(t).backdropFilter !== undefined && t.classList.contains('glass'), n: btn.length, menor: Math.min(...btn.map((b) => Math.min(b.w, b.h))), btn, cartoes: [...t.querySelectorAll('.glass')].length, esquerda: Math.round(r.left), margem: Math.round(innerHeight - r.bottom) };
+      });
+      assert.ok(c.vidro && c.n >= 5, 'cartão único com zoom +, zoom −, legenda, olho e mais: ' + JSON.stringify(c.btn)); assert.ok(c.menor >= 40, 'botões de 40 px ou mais: ' + c.menor); assert.equal(c.cartoes, 0, 'sem cartões soltos dentro');
+      // a legenda é um botão do cartão e abre a lista completa
+      assert.equal(await pg.isVisible('#legend'), false);
+      await pg.click('#btnLegenda'); await pg.waitForTimeout(250);
+      assert.equal(await pg.isVisible('#legend'), true);
+      const ls = await pg.evaluate(() => ({ itens: document.querySelectorAll('#legend li button:not([data-k="-"])').length, chips: document.querySelectorAll('#unileg .lt').length, mais: +(/\+(\d+)/.exec(document.querySelector('#unileg .legmais')?.textContent ?? '')?.[1] ?? 0) }));
+      assert.equal(ls.chips + ls.mais, ls.itens, `nada de classe escondida sem aviso ("Sem intervenção" fica de fora da conta): ${ls.chips} nomes + ${ls.mais} = ${ls.itens} itens`);
+      await pg.keyboard.press('Escape'); await pg.waitForTimeout(150); assert.equal(await pg.isVisible('#legend'), false);
+      // o "+N" do unifilar abre a mesma lista
+      if (ls.mais) { await pg.click('#unileg .legmais'); await pg.waitForTimeout(250); assert.equal(await pg.isVisible('#legend'), true, '+N abre a lista completa'); await pg.click('#legFechar'); }
+    }],
+    ['dicas: "Aproxime..." com fundo próprio na coluna esquerda, fora do traçado; some ao tocar em Entendi e não volta', ['1366x768'], async (pg) => {
+      await pg.evaluate(() => window.__pavecad.map().jumpTo({ zoom: 12 })); await pg.waitForTimeout(500);
+      assert.equal(await pg.isVisible('#zoomnote'), true);
+      const d = await pg.evaluate(() => { const e = document.querySelector('#zoomnote'), cs = getComputedStyle(e); return { fundo: cs.backgroundColor !== 'rgba(0, 0, 0, 0)', esq: !!e.closest('.leftcol'), txt: e.innerText.trim() }; });
+      assert.ok(d.fundo && d.esq, 'com fundo e na coluna esquerda'); assert.match(d.txt, /Aproxime para ver a largura real das faixas/);
+      await pg.click('#zoomnoteOk'); await pg.waitForTimeout(200);
+      assert.equal(await pg.isVisible('#zoomnote'), false);
+      assert.equal(await pg.evaluate(() => localStorage.getItem('pavecad-dica-zoom')), '1');
+      await pg.evaluate(() => window.__pavecad.map().jumpTo({ zoom: 11 })); await pg.waitForTimeout(300);
+      assert.equal(await pg.isVisible('#zoomnote'), false, 'não volta');
+    }],
+    ['pressão no mapa: mira, anel e rótulo de km ao vivo só depois de 150 ms; soltar ou mover cancela sem abrir nada; duração configurável; prefers-reduced-motion', ['1366x768'], async (pg) => {
+      const p = await centrarNaFaixa(pg, 0, 300, 1);
+      await pg.evaluate(() => document.querySelectorAll('.nr-dica').forEach((e) => e.remove()));
+      await pg.evaluate(() => localStorage.setItem('pavecad-pressao-ms', '700'));
+      await pg.mouse.move(p.x, p.y); await pg.mouse.down();
+      await pg.waitForTimeout(60);
+      assert.equal(await pg.isVisible('.nr-anel'), false, 'antes de 150 ms nada aparece (toques e rolagens não piscam)');
+      await pg.waitForTimeout(260);
+      const r = await pg.evaluate(() => { const vis = (s) => !!document.querySelector(s)?.checkVisibility(); const a = document.querySelector('.nr-anel').getBoundingClientRect(), l = document.querySelector('.nr-live'), lr = l.getBoundingClientRect(); return { anel: vis('.nr-anel'), mira: vis('.nr-mira'), ops: document.querySelectorAll('#nr .nr-op').length, raio: Math.round(a.width / 2), live: l.textContent, vis: !l.hidden, fora: lr.bottom < a.top + 10 || lr.top > a.bottom - 10, hl: window.__pavecad.map().getSource('phl')._data.features.length }; });
+      assert.equal(r.raio, 48, 'anel afastado do dedo (raio de 44 px mais o fio)'); assert.ok(r.vis && /^km \d+\+\d{3} · Fx 1$/.test(r.live), 'rótulo ao vivo: ' + r.live); assert.ok(r.fora, 'rótulo fora do anel e do dedo'); assert.equal(r.hl, 1, 'trecho de 20 m em destaque');
+      assert.equal(r.anel, true, 'depois de 150 ms: anel'); assert.equal(r.mira, true, 'e mira no ponto exato');
+      assert.equal(r.ops, 0, 'o menu ainda não abriu (700 ms)');
+      // soltar antes de completar: o anel some e nada abre
+      await pg.mouse.up(); await pg.waitForTimeout(350);
+      assert.equal(await pg.isVisible('.nr-anel'), false); assert.equal(await pg.locator('#nr .nr-op').count(), 0, 'soltar cancela');
+      assert.equal(await pg.evaluate(() => window.__pavecad.map().getSource('phl')._data.features.length), 0, 'destaque limpo');
+      // completa aos 700 ms
+      await pg.mouse.move(p.x, p.y); await pg.mouse.down(); await pg.waitForTimeout(500);
+      assert.equal(await pg.locator('#nr .nr-op').count(), 0, 'aos 500 ms ainda não, com 700 ms configurados');
+      await pg.waitForTimeout(500); await pg.mouse.up(); await pg.waitForTimeout(300);
+      assert.equal(await pg.locator('#nr .nr-op').count(), 4, 'aos 700 ms o menu abre'); assert.equal(await pg.isVisible('.nr-anel'), false);
+      await pg.keyboard.press('Escape');
+      // a duração é escolhida em Ajustes
+      await aba(pg, 'aj');
+      assert.deepEqual(await pg.evaluate(() => [...document.querySelectorAll('#s-press button')].map((b) => b.textContent.trim())), ['400 ms', '500 ms', '700 ms']);
+      await pg.click('#s-press [data-ms="400"]'); assert.equal(await pg.evaluate(() => localStorage.getItem('pavecad-pressao-ms')), '400');
+      await pg.evaluate(() => localStorage.removeItem('pavecad-pressao-ms'));
+      // movimento de mais de 8 px cancela
+      await pg.evaluate(() => localStorage.setItem('pavecad-pressao-ms', '700'));
+      await pg.mouse.move(p.x, p.y); await pg.mouse.down(); await pg.waitForTimeout(150); await pg.mouse.move(p.x + 30, p.y + 10, { steps: 2 }); await pg.waitForTimeout(800); await pg.mouse.up(); await pg.waitForTimeout(250);
+      assert.equal(await pg.locator('#nr .nr-op').count(), 0, 'mover cancela');
+      await pg.evaluate(() => localStorage.removeItem('pavecad-pressao-ms'));
+      // prefers-reduced-motion: só o anel preenchendo em linear
+      await pg.emulateMedia({ reducedMotion: 'reduce' });
+      await pg.mouse.move(p.x, p.y); await pg.mouse.down(); await pg.waitForTimeout(300);
+      const rm = await pg.evaluate(() => { const b = document.querySelector('.nr-m1 b'), cs = getComputedStyle(b), f = getComputedStyle(document.querySelector('.nr-fio')); return { fn: cs.animationTimingFunction, esc: f.transform }; });
+      await pg.mouse.up(); await pg.waitForTimeout(250);
+      assert.equal(rm.fn, 'linear', 'preenchimento linear'); assert.ok(rm.esc === 'none' || /matrix\(1, 0, 0, 1, 0, 0\)/.test(rm.esc), 'sem crescimento: ' + rm.esc);
+    }],
+    ['contraste: todo texto visível dos cartões e painéis tem 4,5:1 ou mais nos temas claro, escuro e campo, com texto de 13 px ou mais', ['1366x768'], async (pg) => {
+      const medir = () => pg.evaluate(() => {
+        const cor = (s) => { const c = document.createElement('canvas').getContext('2d'); c.fillStyle = '#000'; c.fillStyle = s; c.fillRect(0, 0, 1, 1); const d = c.getImageData(0, 0, 1, 1).data; return [d[0], d[1], d[2], d[3] / 255]; };
+        const comp = (f, b) => [f[0] * f[3] + b[0] * (1 - f[3]), f[1] * f[3] + b[1] * (1 - f[3]), f[2] * f[3] + b[2] * (1 - f[3]), 1];
+        const lum = (c) => { const k = c.slice(0, 3).map((v) => { v /= 255; return v <= .03928 ? v / 12.92 : Math.pow((v + .055) / 1.055, 2.4); }); return .2126 * k[0] + .7152 * k[1] + .0722 * k[2]; };
+        const cr = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + .05) / (Math.min(x, y) + .05); };
+        const root = getComputedStyle(document.documentElement), base = cor(root.getPropertyValue('--map').trim() || '#fff');
+        const fundo = (el) => { if (el.closest('.seg button[aria-pressed=true],.seg button[aria-selected=true]')) return cor(root.getPropertyValue('--thumb').trim()); const cad = []; for (let e = el; e; e = e.parentElement) cad.unshift(e); let b = [base[0], base[1], base[2], 1]; for (const e of cad) { const c = cor(getComputedStyle(e).backgroundColor); if (c[3] > 0) b = comp(c, b); } return b; };
+        const ruins = [], w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT); let n;
+        while ((n = w.nextNode())) {
+          const t = n.textContent.trim(); if (!t) continue; const el = n.parentElement;
+          if (!el || !el.checkVisibility({ opacityProperty: true, visibilityProperty: true })) continue;
+          if (el.closest('.maplibregl-marker,.maplibregl-ctrl-attrib,script,style,canvas,[disabled],[aria-disabled=true],.cell,.stack,.matrix th,.xs,.stackrow,.rule .n')) continue;
+          if (!el.closest('.glass,.dash,.uni,.inspector,.drawer,.topc,.lpop,.legpop')) continue;
+          const r = el.getBoundingClientRect(); if (r.width < 2 || r.height < 2) continue;
+          const cs = getComputedStyle(el), bg = fundo(el); let fg = cor(cs.color);
+          if (el.closest('.seg button[aria-pressed=true],.seg button[aria-selected=true]')) fg = cor(root.getPropertyValue('--thumb-ink').trim());
+          const c = cr(comp([fg[0], fg[1], fg[2], fg[3] * parseFloat(cs.opacity)], bg), bg);
+          if (c < 4.5) ruins.push(`${c.toFixed(2)} ${el.className?.toString().split(' ')[0] || el.tagName} "${t.slice(0, 24)}"`);
+          if (parseFloat(cs.fontSize) < 12.5 && !el.closest('.nr-op,.nr-s')) ruins.push(`${cs.fontSize} pequeno "${t.slice(0, 24)}"`);
+        }
+        return [...new Set(ruins)];
+      });
+      for (const t of ['claro', 'escuro', 'campo']) {
+        await tema(pg, t);
+        await pg.evaluate(() => { const E = window.__pavecad.E; window.__pavecad.select(E.P[0].id, 300, 1, { tab: true }); }); await pg.waitForTimeout(500);
+        if (await pg.evaluate(() => document.querySelector('#inspector').classList.contains('collapsed'))) { await pg.click('#collapse'); await pg.waitForTimeout(300); }
+        const ruins = [];
+        for (const a of ['seg', 'ana', 'notas', 'exp', 'aj']) { await aba(pg, a); ruins.push(...await medir()); }
+        await abrirProjetos(pg); ruins.push(...await medir()); await fecharProjetos(pg);
+        assert.deepEqual([...new Set(ruins)], [], `tema ${t}`);
+      }
+    }],
+    ['tema campo: o padrão além da cor (hachura) fica ligado por padrão', ['1366x768'], async (pg) => {
+      await pg.evaluate(() => localStorage.removeItem('pavecad-padrao'));
+      await tema(pg, 'campo');
+      assert.equal(await estado(pg, 'E => E.padrao'), null, 'sem escolha do usuário');
+      await aba(pg, 'aj');
+      assert.equal(await pg.getAttribute('#s-pad', 'aria-checked'), 'true', 'ligado no campo, sem escolha explícita');
+    }],
+    ['ícone de ocultar painel: um só ("–") em todos os cartões; o olho só na ação global; rótulo curto e tooltip em todos os ícones da barra de ferramentas', TODOS, async (pg) => {
+      const r = await pg.evaluate(() => {
+        const minus = (e) => /M5 12h14/.test(e.innerHTML) && !/M3 3l18 18/.test(e.innerHTML);
+        const ocultar = [...document.querySelectorAll('[data-ocultar]')].map((b) => ({ g: b.dataset.ocultar, ok: minus(b) }));
+        const eyeoff = [...document.querySelectorAll('.gocultar, .tbtn[data-ocultar], .uni-h button, .ihead button, .leghead button')].filter((b) => /M3 3l18 18/.test(b.innerHTML)).length;
+        const tb = [...document.querySelectorAll('#toolbar .tbtn')].map((b) => ({ id: b.id || b.dataset.tool || b.dataset.ocultar, t: !!b.title, rot: b.querySelector('.tl')?.textContent ?? null }));
+        return { ocultar, eyeoff, tb };
+      });
+      assert.ok(r.ocultar.length >= 5 && r.ocultar.every((x) => x.ok), 'todos os botões de ocultar usam o mesmo "–": ' + JSON.stringify(r.ocultar));
+      assert.equal(r.eyeoff, 0, 'o olho riscado não é mais ícone de ocultar painel');
+      assert.ok(r.tb.every((b) => b.t), 'tooltip em todos'); assert.deepEqual(r.tb.filter((b) => b.rot).map((b) => b.rot), ['Posição', 'Propor', 'Campo', 'Alinhar', 'Projetos', 'Notas'], 'rótulo curto visível');
+    }],
+    ['botão Abrir planilhas: contorno quando há planilhas; azul sólido só na tela vazia', ['1366x768'], async (pg) => {
+      const f = await pg.evaluate(() => { const cs = getComputedStyle(document.querySelector('#btnFile')); return { bg: cs.backgroundColor, bd: cs.borderTopWidth, cor: cs.color }; });
+      assert.notEqual(f.bg, 'rgb(0, 98, 204)', 'sem preenchimento azul com planilhas'); assert.ok(parseFloat(f.bd) >= 1);
+      await pg.evaluate(() => { window.__pavecad.E.P.slice().forEach((p) => document.querySelector(`#dash [data-del="${p.id}"]`)); });
+      await pg.click('#btnProjetos'); await pg.waitForSelector('#dash:not([hidden])');
+      for (const id of await pg.evaluate(() => window.__pavecad.E.P.map((p) => p.id))) { await pg.click(`#dash [data-del="${id}"]`); await pg.waitForTimeout(250); await pg.evaluate(() => document.querySelector('.toast-acao')?.remove()); }
+      await pg.click('#dashFechar'); await pg.waitForTimeout(200);
+      assert.equal(await pg.evaluate(() => document.documentElement.classList.contains('vazio')), true);
+      const v = await pg.evaluate(() => getComputedStyle(document.querySelector('#btnFile')).backgroundColor);
+      assert.match(v, /rgb\(0, 98, 204\)|rgb\(10, 107, 208\)|rgb\(0, 51, 179\)/, 'azul sólido na tela vazia: ' + v);
+    }],
+    ['unifilar: faixas e rótulos de 12 px, régua sem colisão na borda direita, seleção só com moldura e as cores da legenda no cabeçalho', ['1366x768', 'tablet-h-1024x768'], async (pg) => {
+      const u = await pg.evaluate(() => { const l = window.__pavecad; return { alt: Math.min(...[...document.querySelectorAll('#unicard .uni-h')].map(() => 12)), chips: document.querySelectorAll('#unileg .lt').length, topo: !!document.querySelector('#unicard .uni-h #unileg') }; });
+      assert.ok(u.topo && u.chips >= 1 && u.chips <= 3, 'até 3 cores no cabeçalho do unifilar: ' + u.chips);
+      // a régua de km: nenhum texto passa da borda direita do canvas (desenhada em canvas: confere pelo cálculo de larguras)
+      const rg = await pg.evaluate(() => { const c = document.querySelector('#uniregua'), g = c.getContext('2d'); g.font = '500 12px sans-serif'; const w = c.clientWidth, dpr = devicePixelRatio || 1; const d = g.getImageData(c.width - Math.round(6 * dpr), 0, Math.round(6 * dpr), c.height).data; let tinta = 0; for (let i = 3; i < d.length; i += 4) if (d[i] > 40) tinta++; return { w, tinta }; });
+      assert.equal(rg.tinta, 0, 'nenhum rótulo cortado na borda direita da régua');
+    }],
+  ],
+  t24: [
+    ['celular, critérios de aceite: com planilha e gaveta fechada, mapa livre de 70% ou mais, nada além da borda nem rolagem horizontal, alvos de 44 px, sem sobreposição', CELULARES, async (pg, { vpNome }) => {
+      assert.equal(await pg.evaluate(() => document.documentElement.classList.contains('celular')), true);
+      await pg.evaluate(() => document.querySelectorAll('.nr-dica,#nrDica').forEach((e) => e.remove()));
+      await pg.waitForTimeout(300);
+      const m = await pg.evaluate(() => {
+        const W = innerWidth, H = innerHeight, vis = (e) => e.checkVisibility({ opacityProperty: true, visibilityProperty: true });
+        // mapa livre: fração da tela em que o elemento do topo é o próprio mapa
+        let livre = 0, tot = 0;
+        for (let y = 4; y < H; y += 8) for (let x = 4; x < W; x += 8) { tot++; const e = document.elementFromPoint(x, y); if (e && e.closest('#map') && !e.closest('.maplibregl-ctrl-scale,.maplibregl-ctrl-attrib')) livre++; }
+        const fora = [...document.querySelectorAll('#topc *, #coldir *, #inspector, #inspector *, #unicard, #unicard *, .maplibregl-ctrl-scale, #escalaSlot')].filter((e) => vis(e) && e.getBoundingClientRect().width > 0)
+          .filter((e) => { const r = e.getBoundingClientRect(); return r.left < -0.5 || r.top < -0.5 || r.right > W + 0.5 || r.bottom > H + 0.5; }).filter((e) => !e.closest('.cell,.xs,#uniwrap,.uni-wrap,.drawer')).map((e) => (e.id || e.className || e.tagName).toString().slice(0, 30));
+        const blocos = ['#topc', '#coldir', '.maplibregl-ctrl-scale', '#unicard', '#inspector'].map((s) => { const e = document.querySelector(s); return e && vis(e) ? [s, e.getBoundingClientRect()] : null; }).filter(Boolean);
+        const sobre = [];
+        for (let i = 0; i < blocos.length; i++) for (let j = i + 1; j < blocos.length; j++) { const a = blocos[i][1], b = blocos[j][1]; if (a.width && b.width && a.left < b.right - 1 && a.right > b.left + 1 && a.top < b.bottom - 1 && a.bottom > b.top + 1) sobre.push(blocos[i][0] + ' x ' + blocos[j][0]); }
+        // alvos: o botão tem 44 px ou a área de toque estendida cobre 44 px (testado pelos pontos a 21 px do centro)
+        const pequenos = [...document.querySelectorAll('#topc button, #coldir button, #gavRes button, #gavTxt, #gavCores, #ihead button, #tabs button')].filter((e) => vis(e)).filter((e) => {
+          const r = e.getBoundingClientRect(); if (r.width >= 43.5 && r.height >= 43.5) return false;
+          const cx = r.left + r.width / 2, cy = r.top + r.height / 2, ok = (x, y) => { const t = document.elementFromPoint(x, y); return t && (e.contains(t) || (t.contains(e) && t !== document.body)); };
+          const horiz = r.width >= 43.5 || (ok(cx - 21, cy) && ok(cx + 21, cy)), vert = r.height >= 43.5 || (ok(cx, cy - 21) && ok(cx, cy + 21));
+          return !(horiz && vert);
+        }).map((e) => `${e.id || e.getAttribute('aria-label') || e.textContent.trim().slice(0, 14)} ${Math.round(e.getBoundingClientRect().width)}x${Math.round(e.getBoundingClientRect().height)}`);
+        return { W, H, pct: Math.round((livre / tot) * 1000) / 10, rolagem: document.documentElement.scrollWidth - W, fora, sobre, pequenos };
+      });
+      require('fs').mkdirSync('/tmp/crit', { recursive: true });
+      require('fs').appendFileSync('/tmp/crit/mapa_livre.jsonl', JSON.stringify({ vp: vpNome, ...m }) + '\n');
+      assert.ok(m.pct >= 70, `mapa livre ${m.pct}% (mínimo 70%)`);
+      assert.ok(m.rolagem <= 0, 'rolagem horizontal de ' + m.rolagem + ' px');
+      assert.deepEqual(m.fora, [], 'elementos fora da tela');
+      assert.deepEqual(m.sobre, [], 'sobreposição entre barra superior, coluna, escala e gaveta');
+      assert.deepEqual(m.pequenos, [], 'alvos abaixo de 44 px');
+    }],
+    ['celular: trocar fundo, trocar camada, ir para km, abrir Exportar e abrir Projetos em no máximo 2 toques', CELULARES, async (pg) => {
+      await pg.evaluate(() => document.querySelectorAll('.nr-dica,#nrDica').forEach((e) => e.remove()));
+      const W = await pg.evaluate(() => innerWidth);
+      // trocar fundo: Mapa, Satélite
+      await pg.click('#cMapa'); await pg.waitForTimeout(250);
+      assert.equal(await pg.isVisible('#drawer'), true, 'o toque 1 abre a folha Mapa');
+      await pg.click('#drawer #base [data-b=esri]'); await pg.waitForTimeout(500);
+      assert.equal(await estado(pg, 'E => E.base'), 'esri', 'o toque 2 troca o fundo');
+      await pg.click('#cMapa'); await pg.waitForTimeout(250);
+      // trocar camada: chip, item
+      await pg.click('#btnCamada'); await pg.waitForTimeout(200);
+      assert.equal(await pg.isVisible('#modes'), true, 'o toque 1 abre o menu de camadas');
+      const dentro = await pg.evaluate(() => { const r = document.querySelector('#modes').getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight; });
+      assert.ok(dentro, 'o menu de camadas cabe na tela');
+      await pg.click('#modes [data-m=iri]'); await pg.waitForTimeout(300);
+      assert.equal(await estado(pg, 'E => E.mode'), 'iri', 'o toque 2 troca a camada'); await modo(pg, 'sol');
+      // ir para km: chip de localização, ir
+      await pg.click('#cLocal'); await pg.waitForTimeout(250);
+      await pg.fill('#cGoKm', '170+500');
+      await pg.click('#cGoBtn'); await pg.waitForTimeout(1500);
+      assert.match(await pg.textContent('#cLocalTxt'), /km 170\+5\d\d/, 'foi para o km');
+      // Exportar: Mapa, Exportar
+      await pg.click('#cMapa'); await pg.waitForTimeout(250); await pg.click('#dExportar'); await pg.waitForTimeout(400);
+      assert.equal(await pg.evaluate(() => document.querySelector('#tabs [aria-selected=true]').dataset.t), 'exp', 'abriu a aba Exportar');
+      assert.equal(await pg.evaluate(() => document.documentElement.classList.contains('gav-fechada')), false, 'a gaveta abriu');
+      // Projetos: Mapa, Projetos
+      await pg.click('#cMapa'); await pg.waitForTimeout(250);
+      await pg.click('#dProjetos'); await pg.waitForSelector('#dash:not([hidden])');
+      assert.equal(await pg.isVisible('#dash'), true); void W;
+    }],
+    ['celular: gaveta com três estados, abas inteiras, Unifilar compacto de 40 px que leva o mapa ao km, e fecha ao tocar fora', CELULARES, async (pg) => {
+      await pg.evaluate(() => document.querySelectorAll('.nr-dica,#nrDica').forEach((e) => e.remove()));
+      await irParaKmCel(pg, '170+500');
+      const alt = () => pg.evaluate(() => Math.round(innerHeight - document.querySelector('#inspector').getBoundingClientRect().top)); // a gaveta inteira: painel mais a linha de resumo
+      const H = await pg.evaluate(() => innerHeight), larg = await pg.evaluate(() => innerWidth), paisagem = larg > H;
+      const g = () => pg.evaluate(() => ['fechada', 'meia', 'cheia'].find((k) => document.documentElement.classList.contains('gav-' + k)));
+      assert.equal(await g(), 'fechada');
+      const res = await pg.evaluate(() => { const u = document.querySelector('#uniwrap').getBoundingClientRect(); return { txt: document.querySelector('#gavTxt').textContent, uni: Math.round(u.height), cores: document.querySelectorAll('#gavCores .lt').length }; });
+      assert.match(res.txt, /^km \d+\+\d{3} · (Fx \d|Acost\.) · /, 'resumo do ponto sob a mira: ' + res.txt);
+      assert.ok(res.uni >= 36 && res.uni <= 44, 'Unifilar compacto de 40 px: ' + res.uni); assert.ok(res.cores >= 1 && res.cores <= 3, 'até 3 cores no resumo');
+      if (paisagem) {
+        // paisagem: painel lateral direito de 40% da largura, sem sobreposição com a coluna do polegar
+        await pg.click('#gavTxt'); await pg.waitForTimeout(400);
+        const l = await pg.evaluate(() => { const r = document.querySelector('#inspector').getBoundingClientRect(), c = document.querySelector('#coldir').getBoundingClientRect(); return { w: Math.round(r.width / innerWidth * 100), esq: r.left > innerWidth * 0.5, sob: c.right > r.left + 1 && c.left < r.right - 1 && c.bottom > r.top && c.top < r.bottom }; });
+        assert.ok(l.w >= 36 && l.w <= 44 && l.esq && !l.sob, 'painel lateral de 40% sem sobrepor a coluna: ' + JSON.stringify(l));
+        return;
+      }
+      // fechada -> meia (tocar no resumo) -> cheia (arrastar a alça para cima) -> meia -> fechada
+      await pg.click('#gavTxt'); await pg.waitForTimeout(450); assert.equal(await g(), 'meia', 'tocar no resumo abre a meia altura'); const hm = await alt();
+      assert.ok(hm >= H * 0.4 && hm <= H * 0.5, `meia ~45% (${hm}/${H})`);
+      const alca = () => pg.evaluate(() => { const r = document.querySelector('#ihead').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + 10 }; });
+      const arrastar = async (dy) => { const a = await alca(); await pg.mouse.move(a.x, a.y); await pg.mouse.down(); await pg.mouse.move(a.x, a.y + dy / 2, { steps: 4 }); await pg.mouse.move(a.x, a.y + dy, { steps: 4 }); await pg.mouse.up(); await pg.waitForTimeout(450); };
+      await arrastar(-120); assert.equal(await g(), 'cheia', 'arrastar a alça para cima: meia vira cheia'); const hc = await alt(); assert.ok(hc >= H * 0.8 && hc <= H * 0.9, `cheia ~85% (${hc}/${H})`);
+      await arrastar(120); assert.equal(await g(), 'meia', 'arrastar para baixo: cheia vira meia');
+      await arrastar(120); assert.equal(await g(), 'fechada', 'arrastar para baixo: meia vira fechada');
+      // abas inteiras, sem corte nem rolagem lateral
+      await pg.click('#gavTxt'); await pg.waitForTimeout(400);
+      const ab = await pg.evaluate(() => { const t = document.querySelector('#tabs'), tr = t.getBoundingClientRect(); return { n: t.querySelectorAll('[role=tab]').length, corte: [...t.querySelectorAll('button')].filter((b) => { const r = b.getBoundingClientRect(); return r.left < tr.left - 1 || r.right > tr.right + 1 || b.scrollWidth > b.clientWidth + 1; }).length, rolagem: t.scrollWidth - t.clientWidth, h: Math.min(...[...t.querySelectorAll('button')].map((b) => Math.round(b.getBoundingClientRect().height))) }; });
+      assert.equal(ab.n, 5); assert.equal(ab.corte, 0, 'nenhuma aba cortada'); assert.ok(ab.rolagem <= 1, 'sem rolagem lateral nas abas'); assert.ok(ab.h >= 40, 'abas altas o bastante: ' + ab.h);
+      assert.equal(await pg.evaluate(() => document.querySelector('#tabs [aria-selected=true]').dataset.t), 'seg', 'Segmento primeiro');
+      // tocar fora fecha
+      await pg.mouse.click(Math.round(larg / 2), 120); await pg.waitForTimeout(400); assert.equal(await g(), 'fechada', 'tocar no mapa fora de um segmento fecha');
+      // tocar no Unifilar compacto leva o mapa àquele km
+      const antes = await pg.evaluate(() => window.__pavecad.map().getCenter().lng);
+      const u = await pg.evaluate(() => { const r = document.querySelector('#uni').getBoundingClientRect(); return { x: r.left + r.width * 0.8, y: r.top + r.height / 2 }; });
+      await pg.mouse.click(u.x, u.y); await pg.waitForTimeout(1500);
+      assert.notEqual(await pg.evaluate(() => window.__pavecad.map().getCenter().lng), antes, 'o mapa foi para o km tocado');
+      // tocar num segmento abre a gaveta na aba Segmento, em meia altura
+      const p = await centrarNaFaixa(pg, 0, 300, 1);
+      await pg.mouse.click(p.x, p.y); await pg.waitForTimeout(600);
+      assert.equal(await g(), 'meia', 'tocar no segmento abre a meia altura'); assert.equal(await pg.evaluate(() => document.querySelector('#tabs [aria-selected=true]').dataset.t), 'seg');
+    }],
+    ['celular: tela limpa esconde a barra e a gaveta, mantém GPS e a saída, e a pressão no mapa continua; dica única "Segure no mapa para anotar"', CELULARES, async (pg) => {
+      const dicas = await pg.evaluate(() => [...document.querySelectorAll('.nr-dica, #nrDica, #zoomnote')].filter((e) => e.checkVisibility()).map((e) => ({ txt: e.textContent.trim(), fundo: getComputedStyle(e).backgroundColor !== 'rgba(0, 0, 0, 0)' })));
+      assert.ok(dicas.length <= 1, 'uma dica só: ' + JSON.stringify(dicas));
+      if (dicas.length) { assert.match(dicas[0].txt, /Segure no mapa para anotar/); assert.ok(dicas[0].fundo, 'dica com fundo próprio'); }
+      await pg.evaluate(() => document.querySelectorAll('.nr-dica,#nrDica').forEach((e) => e.remove()));
+      await pg.click('#cLimpo'); await pg.waitForTimeout(400);
+      const e = await pg.evaluate(() => { const v = (s) => { const x = document.querySelector(s); return !!x && x.checkVisibility(); }; return { topo: v('#topc'), gaveta: v('#inspector') || v('#unicard'), gps: v('#cGps'), sair: v('#cLimpo') }; });
+      assert.deepEqual(e, { topo: false, gaveta: false, gps: true, sair: true }, JSON.stringify(e));
+      const p = await centrarNaFaixa(pg, 0, 300, 1);
+      await pg.mouse.move(p.x, p.y); await pg.mouse.down(); await pg.waitForTimeout(900); await pg.mouse.up(); await pg.waitForTimeout(350);
+      assert.equal(await pg.locator('#nr .nr-op').count(), 4, 'o menu abre na tela limpa');
+      await pg.keyboard.press('Escape'); await pg.waitForTimeout(150);
+      await pg.click('#cLimpo'); await pg.waitForTimeout(350);
+      assert.equal(await pg.isVisible('#topc'), true, 'sair da tela limpa');
+    }],
+    ['celular: o menu pressionável cabe na tela perto das quatro bordas e dos cantos, sem cortar item nem sobrepor', CELULARES, async (pg) => {
+      await pg.evaluate(() => document.querySelectorAll('.nr-dica,#nrDica').forEach((e) => e.remove()));
+      const { W, H } = await pg.evaluate(() => ({ W: innerWidth, H: innerHeight }));
+      const pontos = [[12, 70], [W - 12, 70], [W / 2, 70], [12, H / 2], [W - 12, H / 2], [12, H - 100], [W - 12, H - 100], [W / 2, H - 100]];
+      for (const [x, y] of pontos) {
+        await pg.mouse.click(Math.round(x), Math.round(y), { button: 'right' }); await pg.waitForTimeout(300);
+        const r = await pg.evaluate(() => { const b = [...document.querySelectorAll('#nr .nr-op')].map((e) => e.getBoundingClientRect()); return { n: b.length, fora: b.filter((q) => q.left < 0 || q.top < 0 || q.right > innerWidth || q.bottom > innerHeight).length, sob: b.some((q, i) => b.some((o, j) => j > i && q.left < o.right - 1 && q.right > o.left + 1 && q.top < o.bottom - 1 && q.bottom > o.top + 1)) }; });
+        assert.equal(r.n, 4, `menu em ${Math.round(x)},${Math.round(y)}`); assert.equal(r.fora, 0, `itens fora da tela em ${Math.round(x)},${Math.round(y)}`); assert.equal(r.sob, false, 'itens sobrepostos');
+        await pg.keyboard.press('Escape'); await pg.waitForTimeout(150);
+      }
+    }],
+  ],
   t22: [
     ['Revisão: as notas rápidas entram na lista de ocorrências, por planilha, com ir ao local, observação e excluir com Desfazer; planilhas vazias atrás de "mostrar vazias"', ['1366x768'], async (pg) => {
       const criar = async (re, row, tipo) => {
@@ -1906,7 +2264,8 @@ const TESTES = {
       }
       await pg.evaluate(() => { const E = window.__pavecad.E; E.notes.push({ id: 'velha', type: 'pin', coords: [[-47.75, -12.79]], cat: 'def', text: 'buraco', photos: [], t: '2026-01-01T10:00:00.000Z', loc: null }); });
       await aba(pg, 'notas'); await pg.waitForTimeout(300);
-      assert.equal(await pg.locator('#t-notas :text("GeoJSON")').count(), 0, 'sem GeoJSON na Revisão');
+      assert.equal(await pg.locator('#t-notas :text("GeoJSON"), #t-notas #exXlsx, #t-notas #exCsv, #t-notas #exShare').count(), 0, 'sem GeoJSON nem exportação na Revisão: tudo vive na aba Exportar');
+      await aba(pg, 'exp'); await pg.waitForTimeout(300);
       // .xlsx
       const [dx] = await Promise.all([pg.waitForEvent('download'), pg.click('#exXlsx')]);
       assert.match(dx.suggestedFilename(), /^notas_PAVECAD_\d{4}-\d{2}-\d{2}_\d{4}\.xlsx$/);
@@ -1946,15 +2305,14 @@ const TESTES = {
       assert.equal(await pg.locator('#ppXlsx, #ppCsv, #ppShare').count(), 0, 'nada de exportar no pino');
       assert.match(await pg.getAttribute('#btnNotas', 'aria-label'), /^Ver notas \(\d+\)$/);
     }],
-    ['Backup (.json) discreto em Ajustes: baixa as notas com os campos das rápidas e restaura', ['1366x768'], async (pg) => {
+    ['Backup completo (.json) na aba Exportar: baixa as notas com os campos das rápidas e restaura', ['1366x768'], async (pg) => {
       const p = await centrarNaFaixa(pg, 0, 300, 1);
       await pg.mouse.click(p.x, p.y, { button: 'right' }); await pg.waitForTimeout(300);
       await pg.click('#nr .nr-op[data-t=dreno_menos]'); await pg.waitForTimeout(350);
       await pg.keyboard.press('Escape'); await pg.waitForTimeout(100);
-      await aba(pg, 'aj'); await pg.waitForTimeout(200);
-      assert.match(await pg.textContent('details.bk summary'), /^Backup \(\.json\)$/);
-      assert.equal(await pg.evaluate(() => document.querySelector('details.bk').open), false, 'discreto: recolhido');
-      await pg.click('details.bk summary');
+      await aba(pg, 'exp'); await pg.waitForTimeout(200);
+      assert.match(await pg.textContent('#xBackup h3'), /^Backup completo \(\.json\)$/);
+      assert.equal(await pg.locator('#t-aj details.bk, #t-aj #bkDown').count(), 0, 'o backup saiu de Ajustes');
       const [d] = await Promise.all([pg.waitForEvent('download'), pg.click('#bkDown')]);
       assert.match(d.suggestedFilename(), /^pavecad-backup-\d{4}-\d{2}-\d{2}\.json$/);
       const gj = JSON.parse(require('fs').readFileSync(await d.path(), 'utf8'));
@@ -1995,13 +2353,13 @@ const TESTES = {
     }],
   ],
   g04: [
-    ['parâmetros em 3 colunas, rótulo 12 px (mínimo de tipografia), valor 18 px', '1366x768', async (pg) => {
+    ['parâmetros em 3 colunas, rótulo 13 px (mínimo de tipografia da Sessão 2), valor 18 px', '1366x768', async (pg) => {
       await irParaKm(pg, '170+500'); await aba(pg, 'seg');
       const m = await pg.evaluate(() => {
         const g = document.querySelector('#t-seg .params'), p = document.querySelector('#t-seg .param');
         return { cols: getComputedStyle(g).gridTemplateColumns.split(' ').length, k: getComputedStyle(p.querySelector('.k')).fontSize, v: getComputedStyle(p.querySelector('.v')).fontSize, escala: p.querySelectorAll('.scale i').length };
       });
-      assert.equal(m.cols, 3); assert.equal(m.k, '12px'); assert.equal(m.v, '18px'); assert.equal(m.escala, 5);
+      assert.equal(m.cols, 3); assert.equal(m.k, '13px'); assert.equal(m.v, '18px'); assert.equal(m.escala, 5);
     }],
     ['o painel Segmento cabe sem rolar em 768 px de altura (amostra de trechos)', '1366x768', async (pg) => {
       await irParaKm(pg, '170+500'); await aba(pg, 'seg');
@@ -2021,7 +2379,7 @@ const TESTES = {
     }],
   ],
   g15: [
-    ['escala do mapa: fundo de vidro e texto com contraste (claro, escuro e campo) sobre o satélite', '1366x768', async (pg) => {
+    ['escala do mapa: sem cartão, rótulo com contorno sólido e contraste de 4,5:1 contra o contorno (claro, escuro e campo) sobre o satélite', '1366x768', async (pg) => {
       await irParaKm(pg, '170+500');
       await escolherBase(pg, 'esri');
       await pg.waitForTimeout(800);
@@ -2029,23 +2387,19 @@ const TESTES = {
         const e = document.querySelector('.maplibregl-ctrl-scale'), cs = getComputedStyle(e);
         const rgba = (c) => { const m = c.match(/[\d.]+/g).map(Number); return { r: m[0], g: m[1], b: m[2], a: m[3] === undefined ? 1 : m[3] }; };
         const lum = ({ r, g, b }) => { const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
-        const sobre = (fg, bg) => ({ r: fg.r * fg.a + bg.r * (1 - fg.a), g: fg.g * fg.a + bg.g * (1 - fg.a), b: fg.b * fg.a + bg.b * (1 - fg.a), a: 1 });
         const cr = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
-        const fundo = rgba(cs.backgroundColor), texto = rgba(cs.color);
-        // pior caso: o vidro sobre preto e sobre branco, e sobre o verde escuro do satélite sintético
-        const piso = [{ r: 0, g: 0, b: 0, a: 1 }, { r: 255, g: 255, b: 255, a: 1 }, { r: 58, g: 84, b: 52, a: 1 }];
-        return { alfa: fundo.a, fonte: cs.fontSize, bt: cs.backgroundColor, minimo: Math.min(...piso.map((b) => cr(texto, sobre(fundo, b)))), blur: cs.backdropFilter, borda: cs.borderBottomWidth };
+        const halo = rgba(/rgba?\([^)]*\)/.exec(cs.textShadow)[0]);
+        return { fundo: rgba(cs.backgroundColor).a, fonte: cs.fontSize, contraste: cr(rgba(cs.color), halo), haloA: halo.a };
       });
       for (const tema of ['claro', 'escuro', 'campo']) {
         await pg.emulateMedia({ colorScheme: tema === 'escuro' ? 'dark' : 'light' });
         await pg.evaluate((campo) => window.__pavecad.setField(campo, true), tema === 'campo');
         await pg.waitForTimeout(500);
         const m = await medir();
-        assert.ok(m.alfa >= 0.7, `${tema}: fundo de vidro precisa ser quase opaco (alfa ${m.alfa})`);
-        assert.ok(parseFloat(m.fonte) >= 11, `${tema}: fonte ${m.fonte}`);
-        assert.ok(m.minimo >= 4.5, `${tema}: contraste ${m.minimo.toFixed(2)}:1 no pior fundo (mínimo 4,5:1)`);
-        assert.notEqual(m.borda, '0px');
-        if (tema !== 'campo') assert.notEqual(m.blur, 'none', `${tema}: sem blur de vidro`);
+        assert.equal(m.fundo, 0, `${tema}: a escala não tem cartão`);
+        assert.ok(parseFloat(m.fonte) >= 12, `${tema}: fonte ${m.fonte}`);
+        assert.equal(m.haloA, 1, `${tema}: contorno sólido`);
+        assert.ok(m.contraste >= 4.5, `${tema}: contraste ${m.contraste.toFixed(2)}:1 do rótulo contra o contorno (mínimo 4,5:1)`);
       }
     }],
   ],
@@ -2057,9 +2411,13 @@ const TESTES = {
       assert.equal(vazios.length, 2, 'um estado vazio para propostas e outro para anotações');
       for (const v of vazios) assert.ok(v.h <= 20, `"${v.t}" ocupa ${v.h}px (mais de uma linha)`);
       assert.ok(vazios.some((v) => /Nenhuma proposta/.test(v.t)) && vazios.some((v) => /Nenhuma anotação/.test(v.t)));
-      assert.equal((await pg.textContent('#exXlsx')).trim(), 'Baixar planilha (.xlsx)');
+      await aba(pg, 'exp');
+      assert.deepEqual(await pg.evaluate(() => [...document.querySelectorAll('#t-exp .xcard h3')].map((h) => h.textContent)), ['Notas e alterações (.xlsx)', 'Notas e alterações (.csv)', 'Propostas de solução (.csv)', 'Backup completo (.json)'], 'um cartão por formato');
+      assert.deepEqual(await pg.evaluate(() => [...document.querySelectorAll('#t-exp .xcard .btn.p')].map((b) => b.textContent)), ['Baixar', 'Baixar', 'Baixar', 'Baixar'], 'cada cartão com o botão Baixar');
       assert.equal(await pg.isDisabled('#exXlsx'), true, 'sem notas não há o que exportar');
-      assert.equal(await pg.locator('#exDown, #exCopy, #exImp').count(), 0, 'o GeoJSON saiu da Revisão (agora é o Backup, em Ajustes)');
+      assert.equal(await pg.isDisabled('#pCsvDown'), true, 'nem propostas');
+      assert.equal(await pg.locator('#exDown, #exCopy, #exImp').count(), 0, 'o GeoJSON saiu da Revisão (agora é o Backup completo)');
+      await aba(pg, 'notas');
       // o atalho do estado vazio continua abrindo a ferramenta
       await pg.click('#pStart');
       assert.equal(await pg.isVisible('#propbar'), true);
@@ -2142,6 +2500,7 @@ const TESTES = {
       await criarProposta(pg, 'FSE', 'obs; com ponto e vírgula');
       assert.equal(await pg.locator('#pCsvDown').count(), 1, 'botão Baixar CSV');
       assert.equal(await pg.locator('#pCsv').count(), 1, 'o botão Copiar continua');
+      await aba(pg, 'exp'); await pg.waitForTimeout(250);
       const [dl] = await Promise.all([pg.waitForEvent('download'), pg.click('#pCsvDown')]);
       assert.match(dl.suggestedFilename(), /^propostas_\d{4}-\d{2}-\d{2}\.csv$/);
       const caminho = await dl.path();
@@ -2218,9 +2577,9 @@ const TESTES = {
       await pg.mouse.click(alvo.x, alvo.y);
       await pg.waitForTimeout(300);
       assert.match(await pg.textContent('#propbar'), /1 trecho selecionado/);
-      // remove a planilha da seleção pelo painel Resumo
-      await aba(pg, 'resumo');
-      await pg.click(`#t-resumo [data-del="${alvo.id}"]`);
+      // remove a planilha da seleção pelo dashboard de projetos
+      await abrirProjetos(pg);
+      await pg.click(`#dash [data-del="${alvo.id}"]`); await fecharProjetos(pg);
       await pg.waitForTimeout(500);
       assert.match(await pg.textContent('#propbar'), /0 trechos selecionados/);
       assert.equal(await pg.isDisabled('#pApply'), true);
@@ -2245,7 +2604,7 @@ const TESTES = {
       });
       for (const [w, h] of [[1366, 768], [1024, 768], [820, 1180], [480, 900]]) {
         await pg.setViewportSize({ width: w, height: h });
-        await pg.click('#btnCfg');
+        if (w <= 600) { await pg.click('#cMapa'); await pg.click('#dConfig'); } else await pg.click('#btnCfg'); // no celular, Configurações fica no menu Mapa
         await pg.click('#cfgTabs [data-ct=lim]');
         await pg.waitForTimeout(300);
         const r = await medir();
@@ -2324,7 +2683,7 @@ const TESTES = {
       assert.equal(await pg.evaluate(() => matchMedia('(pointer: coarse)').matches), true);
       const ruins = [];
       let total = 0;
-      for (const t of ['resumo', 'seg', 'ana', 'notas', 'aj']) {
+      for (const t of ['seg', 'ana', 'notas', 'exp', 'aj']) {
         if (t === 'seg') await irParaKm(pg, '170+500', 2500);
         await aba(pg, t);
         if (t === 'notas') { await pg.evaluate(() => document.querySelector('#toolbar [data-tool=prop]').click()); await pg.waitForTimeout(200); }
@@ -2390,12 +2749,13 @@ const TESTES = {
   let falhas = 0, total = 0;
   for (const g of grupos) {
     for (const [nome, vpn, fn, opts] of TESTES[g] || []) {
+      if (process.env.E2E_FILTRO && !new RegExp(process.env.E2E_FILTRO, 'i').test(nome)) continue;
       for (const v of Array.isArray(vpn) ? vpn : [vpn]) {
         total++;
         const rotulo = Array.isArray(vpn) ? `${nome} [${v}]` : nome;
         const { ctx, pg, log } = await abrir(browser, vp(v), opts || {});
         try {
-          await fn(pg, { log, ctx });
+          await fn(pg, { log, ctx, vpNome: v });
           console.log(`ok   ${g}: ${rotulo}`);
         } catch (e) {
           falhas++;

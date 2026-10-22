@@ -1,6 +1,9 @@
 import { registerSW } from 'virtual:pwa-register';
 import './estilos/app.css';
 import './estilos/config.css';
+import './estilos/painel.css';
+import './estilos/controles.css';
+import './estilos/celular.css';
 import { E, H } from './app/estado';
 import {
   agendarReaplicar, marcosInfo, alignToRoad, applyLayers, clearSel, fitAll, getMap, goLabel, initMap, north, rotate, select, setBase, setNitidez, stepSel, syncNitidezUi, updateStakes,
@@ -13,10 +16,14 @@ import { abrirArquivos, abrirLidas, carregarConfig, restaurarProjetos } from './
 import { abrirConfig, atualizarAviso, configAberta, initConfig } from './app/config';
 import { focarAjustes, modosVisiveis, renderAll, renderSeg, setField, setMode, setTab, syncBaseSeg } from './app/paineis';
 import { blocosDoUnifilar, drawUni, lacunasDoUnifilar, planilhasDoUnifilar, initUnifilar } from './app/unifilar';
-import { ehCompacto, initLayout, setPainel } from './app/layout';
+import { ehCelular, ehCompacto, initLayout, setPainel } from './app/layout';
 import { alternarAlinhar } from './app/alinhar';
 import { alternarLimpo, initGrupos } from './app/grupos';
 import { initPinoNotas, verNotas } from './app/pinoNotas';
+import { alternarDash, fecharDash, initDash } from './app/dashboard';
+import { abrirCamadas, camadaSalva, fecharCamadas, initCamadas } from './app/camadas';
+import { fecharLegenda, initControles } from './app/controles';
+import { initCelular } from './app/celular';
 import { fecharNotaRapida, initNotaRapida, notaNoMeuLocal } from './app/notaRapida';
 import { clearFocus } from './app/mapa';
 import { $, observarHud, observarRolagem, observarRolagemH, syncAllSegs, syncSeg, toast } from './app/ui';
@@ -46,7 +53,6 @@ if (import.meta.env.DEV) {
 } else {
   $('#btnExample').remove(); // só existe em desenvolvimento
 }
-document.querySelectorAll<HTMLButtonElement>('#modes button').forEach((b) => b.addEventListener('click', () => setMode(b.dataset.m as ModeKey)));
 document.querySelectorAll<HTMLButtonElement>('#tabs button').forEach((b) => b.addEventListener('click', () => setTab(b.dataset.t as typeof E.tab)));
 document.querySelectorAll<HTMLButtonElement>('#base button').forEach((b) =>
   b.addEventListener('click', () => { setBase(b.dataset.b as typeof E.base); syncBaseSeg(); renderAll(); }));
@@ -91,7 +97,7 @@ window.addEventListener('keydown', (e) => {
   if (k >= '1' && k <= '9') { const v = modosVisiveis(); if (+k - 1 < v.length) setMode(v[+k - 1]); return; }
   if (k === '/') { e.preventDefault(); $('#gokm').focus(); return; }
   if (k === 'Escape') {
-    if (fecharNotaRapida()) return;
+    if (fecharNotaRapida() || fecharCamadas() || fecharLegenda() || fecharDash()) return;
     if (E.tool) { setTool(null); return; }
     if (E.editing) { E.editing = null; refreshNotesLayer(); renderAll(); return; }
     if (E.focus) { clearFocus(); return; }
@@ -101,6 +107,8 @@ window.addEventListener('keydown', (e) => {
   const lk = k.toLowerCase();
   if (lk === 'h') { alternarLimpo(); return; }
   if (lk === 'p') { verNotas(); return; }
+  if (lk === 'j') { alternarDash(); return; }
+  if (lk === 'c') { abrirCamadas(true); return; }
   if (lk === 'n') { setTool('prop'); return; }
   if (lk === 'q') { rotate(-15); return; }
   if (lk === 'e') { rotate(15); return; }
@@ -119,7 +127,7 @@ window.addEventListener('keydown', (e) => {
 /* ---- ganchos entre mapa e painéis ---- */
 H.onSelect = (opt) => {
   if (E.sel) focarAjustes(E.sel.pid);
-  if (E.sel && ehCompacto()) setPainel(false, false); // selecionar um segmento abre o painel recolhido
+  if (E.sel && (ehCompacto() || ehCelular()) && !opt.semGaveta) setPainel(false, false); // selecionar um segmento abre o painel recolhido (celular: a gaveta em meia altura)
   renderSeg();
   drawUni();
   if (opt.tab) setTab('seg');
@@ -136,6 +144,7 @@ if (import.meta.env.DEV) {
 }
 
 async function boot() {
+  E.mode = camadaSalva();
   try { E.field = localStorage.getItem('pavecad-field') === '1'; } catch { /* sem storage */ }
   try { E.privacidade = localStorage.getItem('pavecad-privacidade') === '1'; } catch { /* sem storage */ }
   try { const v = localStorage.getItem('pavecad-padrao'); E.padrao = v === null ? null : v === '1'; } catch { /* sem storage */ }
@@ -163,8 +172,11 @@ async function boot() {
   });
   initNotaRapida(); // depois do initMap: precisa da instância do mapa
   initPinoNotas();
+  initDash();
+  initCamadas();
+  initControles();
+  initCelular();
   syncAllSegs();
-  syncSeg($('#modes'));
   const n = await restaurarProjetos();
   if (n) toast(`${n} planilha(s) reaberta(s) deste aparelho`);
   atualizarAviso();

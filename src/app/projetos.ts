@@ -26,6 +26,7 @@ export async function carregarConfig() {
       if (it.id === 'catalogo') catalogo.importar(it.json);
       else if (it.id === 'limiares') setLimites(it.limites as Limites);
       else if (it.id.startsWith('larguras:')) E.ajustesSalvos[it.pname as string] = it.ajustes as AjusteLargura[];
+      else if (it.id.startsWith('cor:')) E.coresProj[it.pname as string] = String(it.cor);
       else if (it.id.startsWith('desloc:')) E.deslocSalvos[it.pname as string] = { l: +(it.l as number) || 0, t: +(it.t as number) || 0 };
     } catch { /* registro inválido: ignora */ }
   }

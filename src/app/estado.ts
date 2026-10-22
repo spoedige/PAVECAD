@@ -97,7 +97,9 @@ export const E = {
   /** Planilhas marcadas na aba Ajustes: geometria e deslocamento valem para todas. */
   settingsSel: new Set<string>(),
   uniCollapsed: false,
-  tab: 'resumo' as 'resumo' | 'seg' | 'ana' | 'notas' | 'aj' | 'al',
+  tab: 'seg' as 'seg' | 'ana' | 'notas' | 'exp' | 'aj' | 'al',
+  /** Cor de identificação de cada planilha, por nome (escolhida no dashboard de projetos). */
+  coresProj: {} as Record<string, string>,
   /** Ajustes de largura salvos, por nome de planilha. Valem quando a planilha é aberta. */
   ajustesSalvos: {} as Record<string, AjusteLargura[]>,
   /** Deslocamento salvo, por nome de planilha. */
@@ -106,7 +108,7 @@ export const E = {
 
 /** Ganchos para os módulos de interface, sem import circular com o mapa. */
 export const H = {
-  onSelect: (_opt: { tab?: boolean }) => {},
+  onSelect: (_opt: { tab?: boolean; semGaveta?: boolean }) => {},
   onNoteHit: (_id: string) => {},
   /** Ferramentas ativas consomem o clique; devolve true quando consumiu. */
   onClick: (_e: MapMouseEvent): boolean => false,
@@ -126,6 +128,10 @@ export const projName = (p: Pick<AppProj, 'meta'>) => {
   }
   return p.meta.format === 'planservi' ? p.meta.name : `${p.meta.uf.split('/')[1] || p.meta.uf} ${short(p)}`;
 };
+
+/** Paleta de identificação das planilhas, na ordem em que foram abertas. */
+const PALETA_PROJ = ['#0a84ff', '#ff9500', '#34c759', '#af52de', '#ff2d55', '#00c7be', '#a2845e', '#5856d6'];
+export const corDoProjeto = (p: Pick<AppProj, 'meta'>) => E.coresProj[p.meta.name] ?? PALETA_PROJ[Math.max(0, E.P.findIndex((q) => q.meta.name === p.meta.name)) % PALETA_PROJ.length];
 
 /** Hachura ativa? A escolha explícita vale; sem escolha, liga junto com o modo campo. */
 export const padraoAtivo = () => E.padrao ?? E.field;

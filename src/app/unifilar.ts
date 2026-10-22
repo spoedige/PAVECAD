@@ -5,13 +5,23 @@ import { E, H, kmVis, projName, rodoviaNome, type AppProj } from './estado';
 import { IC } from './icones';
 import { getMap, grupoAtivo, select } from './mapa';
 import { $, cssv, esc, fmt, gestoVertical, toast } from './ui';
-import { ehUnico } from './layout';
+import { ehCelular, ehUnico } from './layout';
+import { localDoCentro } from './celular';
 
 interface Linha { y: number; h: number; lane: number }
 interface Bloco { ps: AppProj[]; titulo: string; sentido: 1 | -1; lacunas: Lacuna[]; titleY: number; rows: Linha[] }
 interface Layout { x0: number; x1: number; kmi: number; kmf: number; blocks: Bloco[]; top: number }
 let lay: Layout | null = null;
 let ultimaSel = '';
+/** Celular: o unifilar completo abre numa folha; fechado, a gaveta traz só a faixa compacta de 40 px. */
+let expandido = false;
+export const uniExpandido = () => expandido;
+export function setUniExpandido(v: boolean) {
+  expandido = v;
+  $('#unicard').classList.toggle('expandido', v);
+  document.documentElement.classList.toggle('uni-exp', v);
+  drawUni();
+}
 
 const Q = () => (E.field ? Q5F : Q5);
 const maxLanes = (ps: AppProj[]) => ps.reduce((m, p) => Math.max(m, p.rows.reduce((n, r) => Math.max(n, r.widths.length), 1)), 1);
@@ -51,10 +61,10 @@ export function renderGroups() {
 export function drawUni() {
   const cv = document.getElementById('uni') as HTMLCanvasElement | null, wrap = document.getElementById('uniwrap'), card = document.getElementById('unicard');
   if (!cv || !wrap || !card) return;
-  const G = grupoAtivo(), root = document.documentElement;
+  const G = grupoAtivo(), root = document.documentElement, compacto = ehCelular() && !expandido;
   // oculto (por grupo ou pelo mapa limpo): sem altura, para o painel e o resto descerem para a base
   if (root.classList.contains('h-unifilar') || root.classList.contains('limpo')) { root.style.setProperty('--uni-h', '0px'); return; }
-  if (E.uniCollapsed) { root.style.setProperty('--uni-h', '44px'); card.classList.add('collapsed'); return; }
+  if (E.uniCollapsed && !ehCelular()) { root.style.setProperty('--uni-h', '44px'); card.classList.add('collapsed'); return; }
   card.classList.remove('collapsed');
   if (!G.length) {
     root.style.setProperty('--uni-h', '90px');
@@ -63,11 +73,17 @@ export function drawUni() {
     $('#unisub').textContent = 'Sem planilhas visíveis';
     return;
   }
-  // Rótulos de 11 px no mínimo: linhas de 11 px, título da planilha com 18 px de respiro até a primeira faixa.
-  const rhL = 11, gap = 2, shH = 9, titleH = 18, bgap = 6, top = 18;
+  // Faixas e rótulos de 12 px: linhas de 12 px, título da planilha com 18 px de respiro até a primeira faixa.
+  const rhL = compacto ? 8 : 12, gap = compacto ? 1 : 2, shH = compacto ? 6 : 10, titleH = compacto ? 0 : 18, bgap = compacto ? 2 : 6, top = compacto ? 2 : 18;
   let y = top;
   const blocks: Bloco[] = [];
-  for (const gb of agruparBlocos(G)) {
+  // compacto (gaveta fechada do celular): só o bloco da planilha sob a mira, para caber em 40 px
+  let todosBlocos = agruparBlocos(G);
+  if (compacto && todosBlocos.length > 1) {
+    const lc = localDoCentro(), alvo = lc ? todosBlocos.find((b) => b.ps.some((q) => q.id === (lc.p as unknown as AppProj).id)) : null;
+    todosBlocos = [alvo ?? todosBlocos[0]];
+  }
+  for (const gb of todosBlocos) {
     const um = gb.ps.length === 1;
     const sent = gb.sentido > 0 ? 'Crescente' : 'Decrescente';
     const via = rodoviaNome(gb.ps[0].meta.uf);
@@ -80,10 +96,10 @@ export function drawUni() {
   }
   const chH = Math.ceil(y);
   // área visível: o que passa de 35% da tela rola dentro do cartão
-  const visH = Math.max(60, Math.min(chH, Math.floor(innerHeight * FRACAO_MAX) - MOLDURA));
+  const visH = compacto ? 40 : Math.max(60, Math.min(chH, Math.floor(innerHeight * (expandido ? 0.85 : FRACAO_MAX)) - MOLDURA));
   wrap.style.height = visH + 'px';
   cv.style.height = chH + 'px';
-  const target = visH + MOLDURA;
+  const target = compacto ? 72 : visH + MOLDURA;
   if (root.style.getPropertyValue('--uni-h') !== target + 'px') root.style.setProperty('--uni-h', target + 'px');
   const hov = document.getElementById('unihover');
   if (hov) hov.style.height = chH + 'px';
@@ -93,7 +109,7 @@ export function drawUni() {
   const g = cv.getContext('2d')!;
   g.setTransform(dpr, 0, 0, dpr, 0, 0);
   g.clearRect(0, 0, W, H0);
-  const lab = 44, x0 = lab, x1 = W - 2;
+  const lab = compacto ? 0 : 44, x0 = lab, x1 = compacto ? W : W - 2;
   let kmi = 1e9, kmf = -1e9;
   for (const p of G) { kmi = Math.min(kmi, p.rows[0].hod); kmf = Math.max(kmf, p.rows[p.rows.length - 1].hod + 0.02); }
   kmi = Math.floor(kmi); kmf = Math.ceil(kmf);
@@ -108,10 +124,20 @@ export function drawUni() {
     gr.setTransform(dpr, 0, 0, dpr, 0, 0); gr.clearRect(0, 0, W, top);
     gr.font = `500 ${fm}px ` + sans; gr.textBaseline = 'alphabetic';
   }
-  for (let k = Math.ceil(kmi / step) * step; k <= kmf; k += step) {
+  // grade: linha forte só nos km cheios (os rotulados) e fina nos intermediários; o último rótulo some se encostar na borda direita ou no anterior
+  const sub = step >= 5 ? step / 5 : step / 2;
+  if (!compacto && sub * pxKm >= 14) for (let k = Math.ceil(kmi / sub) * sub; k <= kmf; k += sub) {
+    if (Math.abs(k / step - Math.round(k / step)) < 1e-6) continue;
+    g.globalAlpha = 0.45; g.fillStyle = cssv('--hair'); g.fillRect(Math.round(sx(k)), top - 2, 1, bottom - top + 4); g.globalAlpha = 1;
+  }
+  let fimAnterior = -1e9;
+  if (!compacto) for (let k = Math.ceil(kmi / step) * step; k <= kmf; k += step) {
     const x = Math.round(sx(k)), txt = kmVis(k) + ' km';
-    if (gr) { const tw = gr.measureText(txt).width; gr.fillStyle = muted; gr.fillText(txt, Math.min(x - 8, W - tw - 1), top - 5); }
-    g.fillStyle = cssv('--hair'); g.fillRect(x, top - 2, 1, bottom - top + 4);
+    if (gr) {
+      const tw = gr.measureText(txt).width, lx = x - 8;
+      if (lx + tw <= W - 1 && lx >= fimAnterior + 8) { gr.fillStyle = muted; gr.fillText(txt, lx, top - 5); fimAnterior = lx + tw; }
+    }
+    g.fillStyle = cssv('--muted'); g.globalAlpha = 0.5; g.fillRect(x, top - 2, 1, bottom - top + 4); g.globalAlpha = 1;
   }
   const keys = [...trOrder(), '-'], tc = (k: string) => trColor(k, E.field, none);
   const M = E.mode === 'sol' ? null : IND[E.mode];
@@ -119,11 +145,11 @@ export function drawUni() {
     g.textBaseline = 'alphabetic';
     g.font = `600 ${fm}px ` + sans;
     g.fillStyle = muted;
-    g.fillText(b.titulo + (b.sentido > 0 ? '  ↑' : '  ↓'), 0, b.titleY + 11);
+    if (!compacto) g.fillText(b.titulo + (b.sentido > 0 ? '  ↑' : '  ↓'), 0, b.titleY + 11);
     g.font = `500 ${fm}px ` + sans;
     g.textBaseline = 'middle';
     for (const rw of b.rows) {
-      g.fillStyle = muted; g.fillText(rw.lane ? 'Fx ' + rw.lane : 'Ac.', 0, rw.y + rw.h / 2);
+      if (!compacto) { g.fillStyle = muted; g.fillText(rw.lane ? 'Fx ' + rw.lane : 'Ac.', 0, rw.y + rw.h / 2); }
       g.fillStyle = fill; g.globalAlpha = 0.55; rr(g, x0, rw.y, x1 - x0, rw.h, Math.min(4, rw.h / 2)); g.fill(); g.globalAlpha = 1;
     }
     // lacuna: planilha que falta entre duas do mesmo sentido, tracejada e com o tamanho no título
@@ -168,7 +194,12 @@ export function drawUni() {
       g.globalAlpha = 1;
     });
   }
-  if (E.mapReady) {
+  if (compacto) {
+    // cursor na posição da mira (centro do mapa)
+    const lc = localDoCentro();
+    if (lc) { const x = sx(lc.p.rows[lc.i].hod); g.fillStyle = cssv('--accent'); g.fillRect(Math.round(x) - 1, 0, 2.5, H0); }
+    $('#unisub').textContent = '';
+  } else if (E.mapReady) {
     const bb = getMap().getBounds();
     let lo = 1e9, hi = -1e9;
     for (const p of G) for (let i = 0; i < p.rows.length; i += 2) {
@@ -177,7 +208,6 @@ export function drawUni() {
     }
     if (hi >= lo) {
       const xa = sx(lo), xb = Math.max(sx(hi + 0.02), xa + 6);
-      g.fillStyle = cssv('--accent'); g.globalAlpha = 0.14; rr(g, xa, top - 4, xb - xa, bottom - top + 8, 6); g.fill(); g.globalAlpha = 1;
       g.strokeStyle = cssv('--accent'); g.lineWidth = 1.5; rr(g, xa, top - 4, xb - xa, bottom - top + 8, 6); g.stroke();
       $('#unisub').textContent = `Vista atual: km ${fmt(kmVis(lo), 1)} a ${fmt(kmVis(hi + 0.02), 1)}`;
     } else $('#unisub').textContent = 'Clique para voar até o trecho';
@@ -265,7 +295,7 @@ export function initUnifilar() {
     drawUni();
   };
   recolher(E.uniCollapsed);
-  tg.addEventListener('click', (e) => { e.stopPropagation(); recolher(!E.uniCollapsed); });
+  tg.addEventListener('click', (e) => { e.stopPropagation(); if (ehCelular() && expandido) { setUniExpandido(false); return; } recolher(!E.uniCollapsed); });
   // o cabeçalho é o puxador (para baixo recolhe até a barra de posição, para cima ou um toque reabre)
   gestoVertical(cab, { ativo: ehUnico, aoBaixo: () => recolher(true), aoCima: () => recolher(false) });
   cab.addEventListener('click', (e) => { if (E.uniCollapsed && ehUnico() && !(e.target as HTMLElement).closest('button')) recolher(false); });
