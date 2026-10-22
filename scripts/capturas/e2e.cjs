@@ -1440,6 +1440,7 @@ const TESTES = {
       await ctx.setGeolocation({ latitude: alvo.lat, longitude: alvo.lon, accuracy: 1800 });
       await pg.click('#btnGps'); await pg.waitForSelector('#gSemSat', { timeout: 8000 });
       assert.equal((await pg.textContent('#gSemSat')).trim(), 'Sem GPS por satélite (só localização por rede)');
+      await pg.waitForFunction(() => /±1800 m/.test(document.querySelector('#gpschip').textContent), null, { timeout: 8000 });
       assert.match(await pg.textContent('#gpschip'), /±1800 m · rede · há \d+ s/);
       assert.equal((await pg.textContent('#gManual')).trim(), 'Definir posição por km');
       await pg.click('#gManual');
