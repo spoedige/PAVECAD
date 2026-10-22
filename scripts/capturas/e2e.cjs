@@ -1420,7 +1420,7 @@ const TESTES = {
       assert.equal(await estado(pg, 'E => E.tab'), 'notas', 'um toque abre a aba Revisão');
       assert.equal(await pg.isVisible('#t-notas'), true);
     }],
-    ['barra de GPS: uma linha curta (status e precisão), sem Abrir e sem Nota, abaixo da barra de ferramentas; escala no canto superior esquerdo, abaixo do cartão de busca', ['1366x768', 'tablet-h-1024x768'], async (pg, { ctx }) => {
+    ['barra de GPS: duas linhas curtas (origem e precisão, km e distância ao eixo), sem Abrir e sem Nota, abaixo da barra de ferramentas; escala no canto superior esquerdo, abaixo do cartão de busca', ['1366x768', 'tablet-h-1024x768'], async (pg, { ctx }) => {
       const esc = await pg.evaluate(() => { const e = document.querySelector('.maplibregl-ctrl-scale'), t = document.querySelector('#titlecard'); const a = e.getBoundingClientRect(), b = t.getBoundingClientRect(); return { dentroLeft: !!e.closest('.leftcol'), abaixo: a.top >= b.bottom - 1, alinhada: Math.abs(a.left - b.left) < 40, top: Math.round(a.top), w: Math.round(a.width) }; });
       assert.ok(esc.dentroLeft && esc.abaixo && esc.alinhada && esc.top < 260, 'escala logo abaixo do cartão de busca: ' + JSON.stringify(esc));
       const alvo = await centrarNaFaixa(pg, 0, 300, 1);
@@ -1428,10 +1428,66 @@ const TESTES = {
       await ctx.setGeolocation({ latitude: alvo.lat, longitude: alvo.lon, accuracy: 12 });
       await pg.click('#btnGps'); await pg.waitForSelector('#gpschip:not([hidden])', { timeout: 8000 }); await pg.waitForTimeout(500);
       const g = await pg.evaluate(() => { const c = document.querySelector('#gpschip'), tb = document.querySelector('#toolbar').getBoundingClientRect(), r = c.getBoundingClientRect(); return { txt: c.innerText.replace(/\s+/g, ' ').trim(), botoes: [...c.querySelectorAll('button')].map((b) => b.textContent), abaixo: r.top >= tb.bottom - 1, dentro: r.right <= innerWidth && r.left >= 0, alt: Math.round(r.height), naTopright: !!c.closest('.topright') }; });
-      assert.match(g.txt, /^GPS · km \d+\+\d{3} · Fx \d · ±12 m/, g.txt);
+      assert.match(g.txt, /^GPS · ±12 m · satélite · há \d+ s Seguindo km \d+\+\d{3} · a \d+ m do eixo · Fx \d$/, g.txt);
       assert.deepEqual(g.botoes, ['Seguindo'], 'sem Abrir e sem Nota');
       assert.ok(g.abaixo && g.dentro && g.naTopright, 'abaixo da barra de ferramentas, dentro da tela: ' + JSON.stringify(g));
-      assert.ok(g.alt <= 56, 'uma linha: ' + g.alt + ' px');
+      assert.ok(g.alt <= 84, 'duas linhas: ' + g.alt + ' px');
+      await pg.click('#btnGps');
+    }],
+    ['GPS só por rede: avisa "Sem GPS por satélite", define a posição por toque no mapa, sobe e desce 20 m e o GPS de satélite a substitui', ['1366x768'], async (pg, { ctx }) => {
+      const alvo = await centrarNaFaixa(pg, 0, 300, 1);
+      await ctx.grantPermissions(['geolocation']);
+      await ctx.setGeolocation({ latitude: alvo.lat, longitude: alvo.lon, accuracy: 1800 });
+      await pg.click('#btnGps'); await pg.waitForSelector('#gSemSat', { timeout: 8000 });
+      assert.equal((await pg.textContent('#gSemSat')).trim(), 'Sem GPS por satélite (só localização por rede)');
+      assert.match(await pg.textContent('#gpschip'), /±1800 m · rede · há \d+ s/);
+      assert.equal((await pg.textContent('#gManual')).trim(), 'Definir posição por km');
+      await pg.click('#gManual');
+      assert.ok(await pg.isVisible('#gKm'), 'o campo de km é a alternativa ao toque');
+      await pg.mouse.click(alvo.x, alvo.y); await pg.waitForSelector('#gMais', { timeout: 4000 });
+      assert.match(await pg.textContent('#gpschip'), /Posição manual · há \d+ s/);
+      const km = async () => { const t = await pg.textContent('#gRef'); const m = /km (\d+)\+(\d{3}) · a (\d+) m do eixo/.exec(t); assert.ok(m, t); return { m: Number(m[1]) * 1000 + Number(m[2]), d: Number(m[3]) }; };
+      const k0 = await km(); assert.ok(k0.d <= 1, 'a posição manual fica no eixo: ' + k0.d);
+      await pg.click('#gMais'); const k1 = await km(); assert.ok(Math.abs(k1.m - k0.m - 20) <= 1, `+20 m: ${k0.m} -> ${k1.m}`);
+      await pg.click('#gMenos'); await pg.click('#gMenos'); const k2 = await km(); assert.ok(Math.abs(k1.m - k2.m - 40) <= 1, `-40 m: ${k1.m} -> ${k2.m}`);
+      // posição por km digitado
+      await pg.click('#gAltera'); await pg.fill('#gKm', '170+500'); await pg.click('#gKmIr');
+      assert.match(await pg.textContent('#gRef'), /^km 170\+500 · a \d+ m do eixo/);
+      // GPS de satélite volta: substitui a manual e avisa
+      await ctx.setGeolocation({ latitude: alvo.lat, longitude: alvo.lon, accuracy: 9 });
+      await pg.waitForFunction(() => !/Posição manual/.test(document.querySelector('#gpschip').textContent), null, { timeout: 8000 });
+      assert.match(await pg.textContent('#gpschip'), /±9 m · satélite/);
+      assert.equal(await pg.locator('#gSemSat').count(), 0, 'com satélite não há aviso');
+      await pg.click('#btnGps');
+    }],
+    ['GPS: alta precisão, timeout de 120 s na primeira busca, falha não apaga a última posição (fica cinza) e nova tentativa automática', ['1366x768'], async (pg) => {
+      const alvo = await centrarNaFaixa(pg, 0, 300, 1);
+      await pg.evaluate((a) => {
+        window.__geo = { chamadas: [], limpas: 0 };
+        const fake = {
+          watchPosition(ok, err, opts) {
+            const n = window.__geo.chamadas.push(opts);
+            if (n === 1) { setTimeout(() => ok({ coords: { latitude: a.lat, longitude: a.lon, accuracy: 10 } }), 100); setTimeout(() => err({ code: 3 }), 700); }
+            else setTimeout(() => err({ code: 2 }), 300);
+            return n;
+          },
+          clearWatch() { window.__geo.limpas++; },
+          getCurrentPosition(_ok, err) { err({ code: 3 }); },
+        };
+        Object.defineProperty(navigator, 'geolocation', { value: fake, configurable: true });
+      }, alvo);
+      await pg.click('#btnGps'); await pg.waitForFunction(() => /±10 m/.test(document.querySelector('#gpschip').textContent), null, { timeout: 5000 });
+      const o1 = await pg.evaluate(() => window.__geo.chamadas[0]);
+      assert.equal(o1.enableHighAccuracy, true); assert.equal(o1.timeout, 120000); assert.ok(o1.maximumAge <= 2000, 'maximumAge baixo: ' + o1.maximumAge);
+      await pg.waitForFunction(() => /sem sinal/.test(document.querySelector('#gpschip').textContent), null, { timeout: 5000 });
+      const t = await pg.textContent('#gpschip');
+      assert.match(t, /±10 m/, 'a última posição continua depois da falha: ' + t);
+      assert.match(t, /km \d+\+\d{3}/, 'o referencial continua: ' + t);
+      const cor = await pg.evaluate(() => window.__pavecad.map().getSource('gps')._data.features[0].properties.tipo);
+      assert.equal(cor, 'cinza', 'o ponto fica cinza');
+      await pg.waitForFunction(() => window.__geo.chamadas.length >= 2, null, { timeout: 9000 });
+      assert.equal(await pg.evaluate(() => window.__geo.limpas >= 1), true, 'a busca anterior foi encerrada antes de tentar de novo');
+      assert.match(await pg.textContent('#gpschip'), /±10 m/, 'segue com a última posição enquanto tenta');
       await pg.click('#btnGps');
     }],
     ['satélite: o canvas acompanha o contêiner em qualquer tamanho e rotação, e a borda direita fica coberta pela imagem (sem faixas do fundo)', ['1366x768'], async (pg) => {

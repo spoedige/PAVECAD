@@ -87,8 +87,8 @@ export function initMap(onReady: () => void) {
     map.addLayer({ id: 'draft-line', type: 'line', source: 'draft', filter: ['!=', ['geometry-type'], 'Point'], paint: { 'line-color': '#0a84ff', 'line-width': 3, 'line-dasharray': [2, 1.5] } });
     map.addLayer({ id: 'draft-pt', type: 'circle', source: 'draft', filter: ['==', ['geometry-type'], 'Point'], paint: { 'circle-radius': 5, 'circle-color': '#ffffff', 'circle-stroke-color': '#0a84ff', 'circle-stroke-width': 2.5 } });
     map.addSource('gps', { type: 'geojson', data: EMPTY });
-    map.addLayer({ id: 'gps-acc', type: 'fill', source: 'gps', filter: ['==', ['geometry-type'], 'Polygon'], paint: { 'fill-color': '#0a84ff', 'fill-opacity': 0.15 } });
-    map.addLayer({ id: 'gps-pt', type: 'circle', source: 'gps', filter: ['==', ['geometry-type'], 'Point'], paint: { 'circle-radius': 8, 'circle-color': '#0a84ff', 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 3 } });
+    map.addLayer({ id: 'gps-acc', type: 'fill', source: 'gps', filter: ['==', ['geometry-type'], 'Polygon'], paint: { 'fill-color': ['match', ['get', 'tipo'], 'cinza', '#8e8e93', '#0a84ff'], 'fill-opacity': 0.15 } });
+    map.addLayer({ id: 'gps-pt', type: 'circle', source: 'gps', filter: ['==', ['geometry-type'], 'Point'], paint: { 'circle-radius': 8, 'circle-color': ['match', ['get', 'tipo'], 'cinza', '#8e8e93', 'manual', '#ff9500', '#0a84ff'], 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 3 } });
     E.mapReady = true;
     E.P.forEach(addProjectToMap);
     applyPaint();
@@ -575,6 +575,7 @@ export function stepSel(dr: number, dl: number) {
 
 function onMapClick(e: MapMouseEvent) {
   if (Date.now() < E.cliqueSuprimidoAte) return; // o clique que sobra de uma pressão longa não seleciona nada
+  if (H.onPosManual(e)) return;
   if (H.onClick(e)) return;
   const h = hitAt(e.point);
   if (!h) return;

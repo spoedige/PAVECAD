@@ -131,7 +131,9 @@ svg.i{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.8;stro
 .pb-in:focus{box-shadow:0 0 0 2px var(--accent)}
 .pb-row .btn{flex:none}
 .drawbar,.gpschip{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(var(--uni-h) + 28px);z-index:7;padding:8px 10px 8px 14px;border-radius:999px;display:flex;align-items:center;gap:10px;font-size:var(--fs-meta);max-width:92%}
-.gpschip{bottom:auto;top:110px;border-radius:14px}
+.gpschip{bottom:auto;top:110px;border-radius:14px;flex-direction:column;align-items:stretch;gap:6px;max-width:min(420px,calc(100vw - 24px))}
+.gc-l{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.gc-l .in{min-height:var(--tap)}
 .drawbar[hidden],.gpschip[hidden]{display:none}
 .drawbar button,.gpschip button{border:0;border-radius:999px;padding:5px 11px;background:var(--fill);font-weight:500;min-height:var(--tap)}
 .drawbar button.p,.gpschip button.p{background:var(--accent);color:var(--accent-ink)}

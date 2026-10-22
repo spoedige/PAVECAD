@@ -110,6 +110,8 @@ export const E = {
 export const H = {
   onSelect: (_opt: { tab?: boolean; semGaveta?: boolean }) => {},
   onNoteHit: (_id: string) => {},
+  /** Define a posição manual por toque no mapa; devolve true quando consumiu o clique. */
+  onPosManual: (_e: MapMouseEvent): boolean => false,
   /** Ferramentas ativas consomem o clique; devolve true quando consumiu. */
   onClick: (_e: MapMouseEvent): boolean => false,
   onView: () => {},
