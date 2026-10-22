@@ -28,7 +28,8 @@ const CAPTURAS = !argv.includes('--sem-capturas');
 function detectar(toque) {
   const W = innerWidth, H = innerHeight, out = [];
   const vis = (e) => e.checkVisibility({ opacityProperty: true, visibilityProperty: true });
-  const modal = document.querySelector('#cfg:not([hidden]), #ajuda:not([hidden]), #dash:not([hidden])');
+  // com um diálogo ou o menu pressionável aberto, o resto da tela está sob o fundo escurecido: só vale o que está dentro dele
+  const modal = document.querySelector('#cfg:not([hidden]), #ajuda:not([hidden]), #dash:not([hidden])') || (() => { const m = document.querySelector('#nr'); return m && m.checkVisibility() ? m : null; })();
   const nome = (e) => {
     if (e.id) return '#' + e.id;
     const c = typeof e.className === 'string' ? e.className.trim().split(/\s+/).slice(0, 2).join('.') : '';
