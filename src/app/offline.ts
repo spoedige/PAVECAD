@@ -11,8 +11,7 @@ let anterior: BaseKey | null = null;
 export const estaOffline = () => typeof navigator !== 'undefined' && navigator.onLine === false;
 
 function mostrarSelo(off: boolean) {
-  const b = document.getElementById('offBadge');
-  if (b) b.hidden = !off;
+  for (const id of ['offBadge', 'cOff']) { const b = document.getElementById(id); if (b) b.hidden = !off; }
   document.documentElement.classList.toggle('offline', off);
 }
 
@@ -49,5 +48,6 @@ export function initOffline(aoClicarSelo: () => void) {
   window.addEventListener('offline', () => aplicarConexao(true));
   window.addEventListener('online', () => aplicarConexao(false));
   $('#offBadge').addEventListener('click', aoClicarSelo);
+  $('#cOff').addEventListener('click', aoClicarSelo);
   mostrarSelo(estaOffline());
 }

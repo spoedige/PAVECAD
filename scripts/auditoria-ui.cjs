@@ -115,7 +115,10 @@ function detectar(toque) {
   for (const e of inter) {
     const r = R(e), v = visivel(e);
     if (v.w < 4 || v.h < 4) continue;
-    const x = Math.min(Math.max(r.left + r.width / 2, 1), W - 1), y = Math.min(Math.max(r.top + r.height / 2, 1), H - 1);
+    // o ponto testado é o centro da parte que aparece (o que um contêiner rolável recorta não conta)
+    const c = recorte(e);
+    const il = Math.max(r.left, c.l, 0), it = Math.max(r.top, c.t, 0), ir = Math.min(r.right, c.r, W), ib = Math.min(r.bottom, c.b, H);
+    const x = Math.min(Math.max((il + ir) / 2, 1), W - 1), y = Math.min(Math.max((it + ib) / 2, 1), H - 1);
     const t = document.elementFromPoint(x, y);
     if (!t || e.contains(t) || t.contains(e)) continue;
     if (modal && !modal.contains(t)) continue;
@@ -243,13 +246,13 @@ const ESTADOS = [
     if (ctx.celular) await gavetaPara(pg, 'fechada');
     const p = await centrar(pg);
     await limparDicas(pg);
-    await pg.mouse.click(p.x, p.y, { button: 'right' });
+    await pg.mouse.move(p.x, p.y); await pg.mouse.down(); await pg.waitForTimeout(700); await pg.mouse.up();
     await pg.waitForSelector('#nr .nr-op', { timeout: 5000 }); await pausa(pg, 500);
   }, desfazer: async (pg) => { await pg.keyboard.press('Escape'); await pausa(pg, 250); } },
   { id: 'configuracoes-solucoes', aplicar: async (pg) => { await pg.evaluate(() => document.querySelector('#btnCfg')?.click()); await pg.waitForSelector('#cfg:not([hidden])'); await pausa(pg, 500); }, desfazer: async (pg) => { await pg.evaluate(() => document.querySelector('#cfgClose')?.click()); await pausa(pg, 250); } },
   { id: 'configuracoes-campo', aplicar: async (pg) => { await pg.evaluate(() => document.querySelector('#btnCfg')?.click()); await pg.waitForSelector('#cfg:not([hidden])'); await pg.click('#cfgTabs [data-ct=campo]'); await pausa(pg, 700); }, desfazer: async (pg) => { await pg.evaluate(() => document.querySelector('#cfgClose')?.click()); await pausa(pg, 250); } },
   { id: 'offline', aplicar: async (pg, ctx) => {
-    await ctx.contexto.setOffline(true); await pg.waitForSelector('#offBadge:not([hidden])', { timeout: 5000 }); await pausa(pg, 500);
+    await ctx.contexto.setOffline(true); await pg.waitForSelector(ctx.celular ? '#cOff:not([hidden])' : '#offBadge:not([hidden])', { timeout: 5000 }); await pausa(pg, 500);
   }, desfazer: async (pg, ctx) => { await ctx.contexto.setOffline(false); await pausa(pg, 300); } },
 ];
 

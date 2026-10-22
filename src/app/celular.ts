@@ -35,7 +35,7 @@ export function atualizarCentro() {
     if (!l) { chip.textContent = rodoviaNome(E.P[0].meta.uf).replace('/', ' · '); res.textContent = 'Fora do trecho'; return; }
     const p = l.p as unknown as AppProj, km = p.kmLab[l.i], lane = l.lane ?? 1;
     const md = p.model[l.i], tr = lane ? md.tr[lane - 1] : md.sh;
-    chip.textContent = `${rodoviaNome(p.meta.uf).replace('/', ' · ')}  km ${km}`;
+    chip.innerHTML = `<span class="cl-via">${esc(rodoviaNome(p.meta.uf).replace('/', ' · '))}</span><span>km ${esc(km)}</span>`;
     res.textContent = `km ${km} · ${lane ? 'Fx ' + lane : 'Acost.'} · ${tr && tr.main !== '-' ? trShort(tr.main) : 'Sem intervenção'}`;
   });
 }

@@ -91,3 +91,14 @@ html.cel-paisagem .inspector{left:60%!important;top:0!important;bottom:0!importa
 html.cel-paisagem.gav-meia .coldir,html.cel-paisagem.gav-cheia .coldir{right:calc(40% + 12px)}
 html.cel-paisagem .drawer{right:calc(40% + 8px)!important}
 html.cel-paisagem .nr-dica{right:calc(40% + 84px)}
+
+/* gaveta cheia (retrato): a coluna do polegar subiria para fora da tela e sobre a barra superior; a gaveta já cobre o mapa */
+html.celular.gav-cheia:not(.cel-paisagem):not(.limpo) .coldir{display:none}
+/* rodovia no chip de localização só quando cabe */
+.cl-via{margin-right:6px}
+@media (max-width:400px){.cl-via{display:none}}
+/* selo Offline no celular: logo abaixo da barra superior, à direita */
+.cel-off{display:none}
+html.celular .cel-off{position:absolute;top:60px;right:max(12px,env(safe-area-inset-right,0px));z-index:6}
+html.celular .cel-off[hidden]{display:none}
+html.celular #offBadge{display:none}

@@ -53,6 +53,7 @@ details.ana-sec>.ana-c{display:flex;flex-direction:column;gap:14px;padding:4px 0
 @media (max-width:1100px){.dash{inset:0;width:auto;border-radius:0}}
 .dash-resumo{display:flex;flex-direction:column;gap:8px;padding:12px;border-radius:14px;background:var(--fill)}
 .dash-resumo .h1{font-size:22px}
+.dash-resumo>.num{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 8px}
 .pbar{display:flex;height:12px;border-radius:6px;overflow:hidden;background:var(--fill2)}
 .pbar i{display:block;min-width:2px}
 .pleg{display:flex;flex-wrap:wrap;gap:4px 14px;margin:0;padding:0;list-style:none;font-size:var(--fs-meta)}
@@ -65,7 +66,7 @@ details.ana-sec>.ana-c{display:flex;flex-direction:column;gap:14px;padding:4px 0
 .pc-h{display:flex;align-items:center;gap:8px;min-width:0}
 .pc-h .nm{flex:1;min-width:0;background:transparent;border:0;text-align:left;padding:0;color:inherit;font:inherit;cursor:pointer}
 .pc-h .nm b{display:block;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.pc-h .nm span{display:block;font-size:var(--fs-meta);color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pc-h .nm span{display:block;font-size:var(--fs-meta);color:var(--muted);white-space:normal;overflow-wrap:anywhere}
 .pcor{width:6px;align-self:stretch;border-radius:3px;flex:none}
 .pc-m{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:var(--fs-meta);color:var(--muted)}
 .pc-m b{color:var(--fg)}

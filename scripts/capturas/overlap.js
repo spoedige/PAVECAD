@@ -2,7 +2,7 @@
 (() => {
   const nos = [], cortes = [];
   // com um diálogo modal aberto, só vale o texto do próprio diálogo (o resto está coberto e escurecido)
-  const modal = document.querySelector('#cfg:not([hidden]), #ajuda:not([hidden]), #dash:not([hidden])');
+  const modal = document.querySelector('#cfg:not([hidden]), #ajuda:not([hidden]), #dash:not([hidden])') || (() => { const m = document.querySelector('#nr'); return m && m.checkVisibility() ? m : null; })();
   const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
   let n;
   while ((n = w.nextNode())) {
@@ -42,7 +42,7 @@
     if (a.el === c.el) continue;
     const w2 = Math.min(a.rect.r, c.rect.r) - Math.max(a.rect.l, c.rect.l);
     const h2 = Math.min(a.rect.b, c.rect.b) - Math.max(a.rect.t, c.rect.t);
-    if (w2 > 2 && h2 > 2) out.push({ tipo: 'sobrepoe', mk: a.mk || c.mk, a: a.t, b: c.t, w: Math.round(w2), h: Math.round(h2), x: Math.round(Math.max(a.rect.l, c.rect.l)), y: Math.round(Math.max(a.rect.t, c.rect.t)) });
+    if (w2 > 3 && h2 > 3) out.push({ tipo: 'sobrepoe', mk: a.mk || c.mk, a: a.t, b: c.t, w: Math.round(w2), h: Math.round(h2), x: Math.round(Math.max(a.rect.l, c.rect.l)), y: Math.round(Math.max(a.rect.t, c.rect.t)) });
   }
   return out.concat(cortes);
 })()
