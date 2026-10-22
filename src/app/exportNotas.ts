@@ -36,16 +36,16 @@ function contextoDaProposta(r: Proposta): ContextoProp | undefined {
 }
 
 /** Notas (drenos e as da primeira versão) e alterações de solução, juntas e da mais antiga para a mais nova. */
-export const linhasAtuais = () => juntarLinhas(
-  linhasDeNotas(E.notes as NotaExport[], { rotuloCat: (c) => NOTE_CATS[c as keyof typeof NOTE_CATS]?.l ?? c, contexto: contextoDe }),
+export const linhasAtuais = (comNotas = true) => juntarLinhas(
+  comNotas ? linhasDeNotas(E.notes as NotaExport[], { rotuloCat: (c) => NOTE_CATS[c as keyof typeof NOTE_CATS]?.l ?? c, contexto: contextoDe }) : [],
   linhasDePropostas(E.props, (r) => contextoDaProposta(r as Proposta)),
 );
 
 const MIME_XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
-async function gerarXlsx(): Promise<Uint8Array> {
+async function gerarXlsx(comNotas: boolean): Promise<Uint8Array> {
   const [X, F] = await Promise.all([import('xlsx-js-style'), import('fflate')]);
-  return montarXlsx(X as unknown as XlsxLib, F as unknown as FflateLib, linhasAtuais());
+  return montarXlsx(X as unknown as XlsxLib, F as unknown as FflateLib, linhasAtuais(comNotas));
 }
 
 function baixar(blob: Blob, nome: string) {
@@ -60,33 +60,33 @@ function aposExportar() {
   if (E.tab === 'notas') renderNotes();
 }
 
-const semNotas = () => { if (!linhasAtuais().length) { toast('Nenhuma nota para exportar'); return true; } return false; };
+const semNotas = (comNotas: boolean) => { if (!linhasAtuais(comNotas).length) { toast(comNotas ? 'Nenhuma nota para exportar' : 'Nenhuma alteração para exportar'); return true; } return false; };
 
 /** "Baixar planilha (.xlsx)". */
-export async function baixarXlsx() {
-  if (semNotas()) return;
+export async function baixarXlsx(comNotas = true) {
+  if (semNotas(comNotas)) return;
   try {
     const nome = nomeArquivoNotas('xlsx');
-    baixar(new Blob([await gerarXlsx() as BlobPart], { type: MIME_XLSX }), nome);
+    baixar(new Blob([await gerarXlsx(comNotas) as BlobPart], { type: MIME_XLSX }), nome);
     aposExportar(); toast(`${nome} gerado`, 4000);
   } catch { toast('Não foi possível gerar a planilha'); }
 }
 
 /** "Baixar CSV": UTF-8 com BOM, ";" e vírgula decimal. */
-export function baixarCsv() {
-  if (semNotas()) return;
+export function baixarCsv(comNotas = true) {
+  if (semNotas(comNotas)) return;
   try {
     const nome = nomeArquivoNotas('csv');
-    baixar(new Blob([csvDeLinhas(linhasAtuais())], { type: 'text/csv;charset=utf-8' }), nome);
+    baixar(new Blob([csvDeLinhas(linhasAtuais(comNotas))], { type: 'text/csv;charset=utf-8' }), nome);
     aposExportar(); toast(`${nome} gerado`, 4000);
   } catch { toast('Não foi possível gerar o CSV'); }
 }
 
 /** "Compartilhar": Web Share com o arquivo .xlsx quando o aparelho aceita; senão, baixa. */
-export async function compartilharNotas() {
-  if (semNotas()) return;
+export async function compartilharNotas(comNotas = true) {
+  if (semNotas(comNotas)) return;
   try {
-    const nome = nomeArquivoNotas('xlsx'), blob = new Blob([await gerarXlsx() as BlobPart], { type: MIME_XLSX });
+    const nome = nomeArquivoNotas('xlsx'), blob = new Blob([await gerarXlsx(comNotas) as BlobPart], { type: MIME_XLSX });
     const arq = new File([blob], nome, { type: MIME_XLSX });
     if (navigator.canShare?.({ files: [arq] })) {
       await navigator.share({ files: [arq], title: 'Notas PAVECAD' });

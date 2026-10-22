@@ -266,3 +266,6 @@ export function nomeArquivo(base: string, ext: string, nome: string, d: Date = n
   return `${base}_${limpo}_${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}_${z(d.getHours())}${z(d.getMinutes())}.${ext}`;
 }
 
+
+/** Feições que o KML escreve: uma por trecho, dreno, estaca e nota. */
+export const totalFeicoes = (m: ModeloExport, nNotas = 0) => m.faixas.length + m.patologias.length + m.propostas.length + m.drenos.length + m.estacas.length + nNotas;

@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { estimarIfc, gerarIfc, geradorIds, globalId, globalIdValido, stepTexto, real, LIMITACAO_Z, type InfoSolucaoIfc } from '../src/formats/ifc';
-import { montarModelo, opcoesPadrao } from '../src/dominio/exportGeo';
+import { montarModelo, opcoesPadrao, totalFeicoes } from '../src/dominio/exportGeo';
 import { fonte } from './helpers';
 
 const info = (c: string): InfoSolucaoIfc => ({ nome: `Solução ${c} é "boa"`, categoria: 'Reparo', nivel: c === 'RP' ? 7 : null, espessura: 0.05 });
@@ -114,5 +114,31 @@ describe('IFC: arquivo', () => {
     expect(j.globalIdsUnicos).toBe(true);
     expect(j.orfas).toEqual([]);
     if (!j.ifctester.indisponivel) expect(j.ifctester.aprovado).toBe(true);
+  });
+});
+
+import { verificarIfc } from '../src/formats/ifc';
+import { verificarKml, gerarKml } from '../src/formats/kml';
+
+describe('verificação interna', () => {
+  it('IFC gerado passa; referência quebrada e GlobalId repetido são detectados', async () => {
+    const { saida } = await gerar();
+    expect(verificarIfc(saida.texto, saida).ok).toBe(true);
+    const quebrado = saida.texto.replace(/IFCRELAGGREGATES\('([^']+)',\$,\$,\$,#\d+/, "IFCRELAGGREGATES('$1',$,$,$,#99999999");
+    expect(verificarIfc(quebrado, saida).ok).toBe(false);
+    const g = /IFCROAD\('([^']{22})'/.exec(saida.texto)![1];
+    const repetido = saida.texto.replace(/IFCSITE\('[^']{22}'/, `IFCSITE('${g}'`);
+    expect(verificarIfc(repetido, saida).problemas.join()).toContain('GlobalId repetido');
+  });
+
+  it('KML gerado passa; estilo ausente e anel aberto são detectados', async () => {
+    const o = opcoesPadrao('kmz');
+    const modelo = montarModelo([f], o);
+    const kml = await gerarKml({ titulo: 't', modelo, opcoes: o, info: (c) => ({ nome: c, cor: '#ff0000', categoria: 'x' }) });
+    const n = totalFeicoes(modelo);
+    expect(verificarKml(kml, n).ok).toBe(true);
+    expect(verificarKml(kml, n + 1).ok).toBe(false);
+    expect(verificarKml(kml.replace(/<Style id="s_[^"]+"/, '<Style id="zz"'), n).problemas.join()).toContain('não definido');
+    expect(verificarKml(kml.replace(/ [^ <]+<\/coordinates><\/LinearRing>/, '</coordinates></LinearRing>'), n).problemas.join()).toContain('anel');
   });
 });

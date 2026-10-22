@@ -26,6 +26,16 @@ details.ana-sec>.ana-c{display:flex;flex-direction:column;gap:14px;padding:4px 0
 .xcard .btns{display:flex;gap:8px;flex-wrap:wrap}
 .xcard .btn{min-height:40px}
 #t-exp .nrl-lembrete{margin:0 0 10px}
+.xg{display:flex;flex-direction:column;gap:4px}
+.xg-l{font-size:var(--fs-meta);color:var(--muted);font-weight:600}
+.xchips{display:flex;flex-wrap:wrap;gap:6px}
+.xchip{min-height:var(--tap);padding:0 12px;border-radius:999px;border:var(--bw) solid var(--hair);background:var(--glass);color:var(--fg);font-size:var(--fs-meta);font-weight:500}
+.xchip[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+.xest{margin:0}
+.xrel{font-size:var(--fs-meta);line-height:1.5;border-top:var(--bw) solid var(--hair);padding-top:8px}
+.xrel[hidden]{display:none}
+.xok{font-weight:600}
+.xerr{color:var(--warn-ink);font-weight:700}
 
 /* badges de sentido: mesma largura e altura, seta e texto iguais aos do Unifilar; crescente preenchido, decrescente só com contorno */
 .dirb{display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;min-width:100px;height:22px;padding:0 8px;border-radius:6px;font-size:var(--fs-meta);font-weight:700;letter-spacing:.01em;border:1.5px solid var(--accent)}

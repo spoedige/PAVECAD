@@ -317,3 +317,38 @@ export async function gerarIfc(e: EntradaIfc): Promise<SaidaIfc> {
   const texto = [...cab, ...S.linhas, 'ENDSEC;', 'END-ISO-10303-21;', ''].join('\n');
   return { texto, pavimentos: nPav, propostas: nProp, anotacoes: anot.length, roads: roads.size, roadParts: [...roads.values()].reduce((s, r) => s + r.partes.size, 0), entidades: S.n, avisos };
 }
+
+export interface VerificacaoIfc { ok: boolean; problemas: string[]; detalhe: string }
+
+/** Verificação interna do IFC gerado: toda referência aponta para uma entidade existente, nada fica solto,
+ *  os GlobalIds são válidos e únicos e a contagem de pavimentos confere. A validação completa (esquema e regras) roda com ifcopenshell. */
+export function verificarIfc(texto: string, saida: Pick<SaidaIfc, 'pavimentos' | 'propostas'>): VerificacaoIfc {
+  const problemas: string[] = [];
+  const ent = new Map<number, string>();
+  const refs = new Map<number, number>();
+  const gids: string[] = [];
+  for (const l of texto.split('\n')) {
+    const m = /^#(\d+)=([A-Z0-9]+)\((.*)\);$/.exec(l);
+    if (!m) continue;
+    ent.set(Number(m[1]), m[2]);
+  }
+  for (const l of texto.split('\n')) {
+    const m = /^#(\d+)=([A-Z0-9]+)\((.*)\);$/.exec(l);
+    if (!m) continue;
+    for (const r of m[3].matchAll(/#(\d+)/g)) refs.set(Number(r[1]), (refs.get(Number(r[1])) ?? 0) + 1);
+    const g = /^'([^']{22})'/.exec(m[3]);
+    if (g && m[2] !== 'IFCCARTESIANPOINT') gids.push(g[1]);
+  }
+  let inexistentes = 0;
+  for (const id of refs.keys()) if (!ent.has(id)) inexistentes++;
+  if (inexistentes) problemas.push(`${inexistentes} referência(s) a entidade inexistente`);
+  const raizes = new Set(['IFCPROJECT', 'IFCMAPCONVERSION']);
+  let soltas = 0;
+  for (const [id, tipo] of ent) if (!refs.has(id) && !raizes.has(tipo) && !tipo.startsWith('IFCREL')) soltas++;
+  if (soltas) problemas.push(`${soltas} entidade(s) solta(s)`);
+  if (gids.some((g) => !globalIdValido(g))) problemas.push('GlobalId inválido');
+  if (new Set(gids).size !== gids.length) problemas.push('GlobalId repetido');
+  const pav = (texto.match(/=IFCPAVEMENT\(/g) ?? []).length;
+  if (pav !== saida.pavimentos + saida.propostas) problemas.push(`${pav} pavimentos escritos, ${saida.pavimentos + saida.propostas} esperados`);
+  return { ok: !problemas.length, problemas, detalhe: problemas.length ? problemas.join('; ') : 'Referências, GlobalIds e contagem conferidos' };
+}

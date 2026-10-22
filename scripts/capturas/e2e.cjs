@@ -2316,12 +2316,39 @@ const TESTES = {
       const [d] = await Promise.all([pg.waitForEvent('download'), pg.click('#bkDown')]);
       assert.match(d.suggestedFilename(), /^pavecad-backup-\d{4}-\d{2}-\d{2}\.json$/);
       const gj = JSON.parse(require('fs').readFileSync(await d.path(), 'utf8'));
-      assert.equal(gj.features.length, 1); assert.equal(gj.features[0].properties.rapida.tipo, 'dreno_menos');
+      assert.equal(gj.tipo, 'pavecad-backup'); assert.equal(gj.notas.length, 1); assert.equal(gj.notas[0].rapida.tipo, 'dreno_menos');
+      assert.ok(Array.isArray(gj.planilhas) && Array.isArray(gj.propostas) && gj.catalogo, 'o backup é completo');
       // apaga e restaura
       await pg.evaluate(() => { const E = window.__pavecad.E; E.notes.length = 0; });
       await pg.setInputFiles('#importIn', await d.path()); await pg.waitForTimeout(500);
       const n = await pg.evaluate(() => window.__pavecad.E.notes.map((x) => x.rapida && x.rapida.tipo));
       assert.deepEqual(n, ['dreno_menos'], 'a nota rápida volta com os campos');
+    }],
+    ['Exportar: XLSX, CSV, KMZ, KML e IFC baixam e abrem; notas só entram com o chip', ['1366x768'], async (pg) => {
+      const fs = require('fs'), { unzipSync, strFromU8 } = require('fflate');
+      const p = await centrarNaFaixa(pg, 0, 300, 1);
+      await pg.mouse.click(p.x, p.y, { button: 'right' }); await pg.waitForTimeout(300);
+      await pg.click('#nr .nr-op[data-t=dreno_menos]'); await pg.waitForTimeout(350);
+      await pg.keyboard.press('Escape'); await pg.waitForTimeout(100);
+      await aba(pg, 'exp'); await pg.waitForTimeout(500);
+      const baixa = async (sel) => { const [d] = await Promise.all([pg.waitForEvent('download', { timeout: 60000 }), pg.click(sel)]); return { nome: d.suggestedFilename(), buf: fs.readFileSync(await d.path()) }; };
+      const x = await baixa('#exXlsx'); assert.match(x.nome, /\.xlsx$/); assert.equal(x.buf.slice(0, 2).toString(), 'PK');
+      const c = await baixa('#exCsv'); assert.match(c.nome, /\.csv$/);
+      const kz = await baixa('#exKmz');
+      assert.match(kz.nome, /^PAVECAD_.+_\d{4}-\d{2}-\d{2}_\d{4}\.kmz$/);
+      const kml = strFromU8(unzipSync(new Uint8Array(kz.buf))['doc.kml']);
+      assert.ok(kml.startsWith('<?xml') && kml.includes('xmlns="http://www.opengis.net/kml/2.2"') && /<Placemark>/.test(kml));
+      assert.ok(!kml.includes('Notas de campo'), 'KMZ sem notas por padrão');
+      assert.match(await pg.textContent('#xRelKmz'), /Verificação interna aprovada/);
+      const k2 = await baixa('#exKml'); assert.match(k2.nome, /\.kml$/); assert.ok(k2.buf.toString().startsWith('<?xml'));
+      await pg.click('#xKmz .xchip[data-g=notas]'); await pg.waitForTimeout(400);
+      const k3 = await baixa('#exKml'); assert.ok(k3.buf.toString().includes('<Folder><name>Notas de campo</name>'), 'o chip liga as notas');
+      const ifc = await baixa('#exIfc'); assert.match(ifc.nome, /\.ifc$/);
+      const t = ifc.buf.toString();
+      assert.ok(t.startsWith('ISO-10303-21;') && t.includes("FILE_SCHEMA(('IFC4X3_ADD2'))") && t.includes('IFCPAVEMENT(') && !t.includes('IFCANNOTATION('), 'IFC sem notas por padrão');
+      assert.match(await pg.textContent('#xRelIfc'), /Verificação interna aprovada/);
+      await pg.click('#xIfc .xchip[data-g=notas]'); await pg.waitForTimeout(400);
+      assert.ok((await baixa('#exIfc')).buf.toString().includes('IFCANNOTATION('), 'o chip liga as notas no IFC');
     }],
   ],
   g03: [
@@ -2412,8 +2439,8 @@ const TESTES = {
       for (const v of vazios) assert.ok(v.h <= 20, `"${v.t}" ocupa ${v.h}px (mais de uma linha)`);
       assert.ok(vazios.some((v) => /Nenhuma proposta/.test(v.t)) && vazios.some((v) => /Nenhuma anotação/.test(v.t)));
       await aba(pg, 'exp');
-      assert.deepEqual(await pg.evaluate(() => [...document.querySelectorAll('#t-exp .xcard h3')].map((h) => h.textContent)), ['Notas e alterações (.xlsx)', 'Notas e alterações (.csv)', 'Propostas de solução (.csv)', 'Backup completo (.json)'], 'um cartão por formato');
-      assert.deepEqual(await pg.evaluate(() => [...document.querySelectorAll('#t-exp .xcard .btn.p')].map((b) => b.textContent)), ['Baixar', 'Baixar', 'Baixar', 'Baixar'], 'cada cartão com o botão Baixar');
+      assert.deepEqual(await pg.evaluate(() => [...document.querySelectorAll('#t-exp .xcard h3')].map((h) => h.textContent)), ['Backup completo (.json)', 'CSV e XLSX', 'Propostas de solução (.csv)', 'KMZ / KML', 'IFC (IFC4X3_ADD2)'], 'um cartão por formato');
+      assert.deepEqual(await pg.evaluate(() => [...document.querySelectorAll('#t-exp .xcard .btn.p')].map((b) => b.textContent)), ['Baixar', 'Baixar XLSX', 'Baixar CSV', 'Baixar', 'Baixar KMZ', 'Baixar IFC'], 'cada cartão com o botão Baixar');
       assert.equal(await pg.isDisabled('#exXlsx'), true, 'sem notas não há o que exportar');
       assert.equal(await pg.isDisabled('#pCsvDown'), true, 'nem propostas');
       assert.equal(await pg.locator('#exDown, #exCopy, #exImp').count(), 0, 'o GeoJSON saiu da Revisão (agora é o Backup completo)');

@@ -9,6 +9,7 @@ import { E, H, NOTE_CATS, getP, kmFmt, kmReal, projName, type AppProj, type Nota
 import { IC } from './icones';
 import { getMap, hitAt, renderLegend, select, setData } from './mapa';
 import * as db from './persist';
+import { restaurarBackup } from './backup';
 import { setTab } from './paineis';
 import { bindItensNotas, itemNotaHtml } from './notasItens';
 import { atualizarContadorNotas } from './pinoNotas';
@@ -435,18 +436,6 @@ export function openNote(id: string) {
 }
 
 /** "Backup (.json)": as notas deste aparelho em GeoJSON, com fotos e os campos das notas rápidas, para restaurar depois. */
-export function baixarBackup() {
-  if (!E.notes.length) { toast('Nenhuma nota para fazer backup'); return; }
-  try {
-    const d = new Date(), z = (v: number) => String(v).padStart(2, '0');
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([JSON.stringify(notesGeoJSON(true))], { type: 'application/json' }));
-    a.download = `pavecad-backup-${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}.json`;
-    document.body.appendChild(a); a.click(); a.remove();
-    toast('Backup gerado');
-  } catch { toast('Download indisponível aqui'); }
-}
-
 export function notesGeoJSON(withPhotos: boolean) {
   return {
     type: 'FeatureCollection',
@@ -486,9 +475,16 @@ export async function initRevisao() {
     const input = e.target as HTMLInputElement, f = input.files?.[0];
     if (!f) return;
     const fr = new FileReader();
-    fr.onload = () => {
-      try { const c = importarNotas(JSON.parse(String(fr.result))); refreshNotesLayer(); renderNotes(); toast(`${c} anotação(ões) importada(s)`); }
-      catch { toast('Arquivo inválido'); }
+    fr.onload = async () => {
+      try {
+        const j = JSON.parse(String(fr.result));
+        const completo = await restaurarBackup(j);
+        if (completo !== null) {
+          refreshNotesLayer(); renderNotes();
+          toast(`Backup restaurado: ${completo.resumo}${completo.recarregar ? '. Recarregando para abrir as planilhas' : ''}`, 4500);
+          if (completo.recarregar) setTimeout(() => location.reload(), 2200);
+        } else { const c = importarNotas(j); refreshNotesLayer(); renderNotes(); toast(`${c} anotação(ões) importada(s)`); }
+      } catch { toast('Arquivo inválido'); }
       input.value = '';
     };
     fr.readAsText(f);

@@ -174,3 +174,25 @@ export function estimarKml(m: ModeloExport, nNotas = 0): { kml: number; kmz: num
   const kml = Math.round(pts * 28 + pm * 760 + 2000);
   return { kml, kmz: Math.round(kml / 5) };
 }
+
+export interface Verificacao { ok: boolean; problemas: string[]; detalhe: string }
+
+/** Verificação interna do KML gerado: XML bem formado (quando o navegador tem DOMParser), estilos definidos, anéis fechados e contagem de feições. */
+export function verificarKml(kml: string, esperadas: number): Verificacao {
+  const problemas: string[] = [];
+  if (typeof DOMParser !== 'undefined') {
+    const doc = new DOMParser().parseFromString(kml, 'application/xml');
+    if (doc.getElementsByTagName('parsererror').length) problemas.push('XML mal formado');
+  }
+  const definidos = new Set([...kml.matchAll(/<Style id="([^"]+)"/g)].map((m) => m[1]));
+  for (const m of kml.matchAll(/<styleUrl>#([^<]+)<\/styleUrl>/g)) if (!definidos.has(m[1])) { problemas.push(`estilo ${m[1]} não definido`); break; }
+  let abertos = 0;
+  for (const m of kml.matchAll(/<Polygon>.*?<coordinates>([^<]+)<\/coordinates>/g)) {
+    const c = m[1].trim().split(' ');
+    if (c.length < 4 || c[0] !== c[c.length - 1]) abertos++;
+  }
+  if (abertos) problemas.push(`${abertos} anel(is) aberto(s) ou degenerado(s)`);
+  const n = (kml.match(/<Placemark>/g) ?? []).length;
+  if (n !== esperadas) problemas.push(`${n} feições escritas, ${esperadas} esperadas`);
+  return { ok: !problemas.length, problemas, detalhe: problemas.length ? problemas.join('; ') : 'XML, estilos, anéis e contagem conferidos' };
+}
