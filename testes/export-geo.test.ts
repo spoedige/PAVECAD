@@ -1,21 +1,11 @@
-import { createRequire } from 'node:module';
 import { describe, expect, it } from 'vitest';
-import { parseSpreadsheetAll, kmLabel } from '../src/formats';
-import { prepareProject } from '../src/geometry/project';
-import { buildGeometry, DEFAULT_OPTS } from '../src/geometry/build';
+import { kmLabel } from '../src/formats';
+import { fonte } from './helpers';
+import { buildGeometry } from '../src/geometry/build';
 import { fromUtm, toUtm } from '../src/geometry/utm';
-import { modelOf } from '../src/dominio/modelo';
 import {
-  anelSimples, areaAnel, montarModelo, nomeArquivo, NOTAS_POR_PADRAO, opcoesEfetivas, opcoesPadrao, relatorioDe, type FonteExport,
+  anelSimples, areaAnel, montarModelo, nomeArquivo, NOTAS_POR_PADRAO, opcoesEfetivas, opcoesPadrao, relatorioDe,
 } from '../src/dominio/exportGeo';
-
-const { gerarPlanservi } = createRequire(import.meta.url)('../scripts/sinteticos.cjs') as { gerarPlanservi: (o: Record<string, unknown>) => Buffer };
-
-export function fonte(o: Record<string, unknown> = {}): FonteExport {
-  const [cr] = parseSpreadsheetAll(new Uint8Array(gerarPlanservi({ rodovia: 'RD-001', codigo: 'TH01', kmIni: 10, ...o })));
-  const base = prepareProject(cr, { zone: 22 });
-  return { id: 'p1', planilha: base.meta.name, rodovia: base.meta.uf, sentido: base.meta.travel > 0 ? 'Crescente' : 'Decrescente', base, opts: { ...DEFAULT_OPTS, travel: base.meta.travel }, model: modelOf(base.rows), km: (i) => base.kmLab[i] };
-}
 
 describe('núcleo da exportação', () => {
   const f = fonte();

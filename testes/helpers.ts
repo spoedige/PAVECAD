@@ -1,3 +1,9 @@
+import { createRequire } from 'node:module';
+import { parseSpreadsheetAll } from '../src/formats';
+import { prepareProject } from '../src/geometry/project';
+import { DEFAULT_OPTS } from '../src/geometry/build';
+import { modelOf } from '../src/dominio/modelo';
+import type { FonteExport } from '../src/dominio/exportGeo';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { ParsedProject, Row } from '../src/formats/types';
@@ -27,3 +33,14 @@ export function projetoDeReferencia(nome: string): ParsedProject {
   const d = dado(nome);
   return { meta: { ...d.meta, format: 'roadrunner' }, rows: d.rows.map(fromLegacy), log: [], codes: {} };
 }
+
+const { gerarPlanservi } = createRequire(import.meta.url)('../scripts/sinteticos.cjs') as { gerarPlanservi: (o: Record<string, unknown>) => Buffer };
+
+
+/** Planilha sintética Planservi pronta para a exportação (fuso 22S fixo). */
+export function fonte(o: Record<string, unknown> = {}): FonteExport {
+  const [cr] = parseSpreadsheetAll(new Uint8Array(gerarPlanservi({ rodovia: 'RD-001', codigo: 'TH01', kmIni: 10, ...o })));
+  const base = prepareProject(cr, { zone: 22 });
+  return { id: 'p1', planilha: base.meta.name, rodovia: base.meta.uf, sentido: base.meta.travel > 0 ? 'Crescente' : 'Decrescente', base, opts: { ...DEFAULT_OPTS, travel: base.meta.travel }, model: modelOf(base.rows), km: (i) => base.kmLab[i] };
+}
+
