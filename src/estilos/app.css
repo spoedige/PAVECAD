@@ -640,3 +640,7 @@ html.limpo .nr-dica{display:none}
 .nrl-lembrete{margin:0;padding:6px 10px;border-radius:10px;background:var(--warn-bg);border:var(--bw) solid var(--warn-bd);font-size:var(--fs-meta)}
 details.bk{margin-top:6px;opacity:.85}
 @media (pointer: coarse){.nri .iconbtn{width:44px;height:44px}}
+
+/* selo Offline na barra superior */
+.offbadge{height:max(28px,var(--tap));padding:0 11px;border-radius:999px;border:var(--bw) solid var(--warn-bd);background:var(--warn-bg);color:var(--warn-ink);font-size:var(--fs-meta);font-weight:700}
+.offbadge[hidden]{display:none}

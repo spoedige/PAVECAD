@@ -11,6 +11,7 @@ import {
 import type { ModeKey } from './dominio/indicadores';
 import { abrirDb } from './app/persist';
 import { gpsToggle } from './app/gps';
+import { initOffline } from './app/offline';
 import { initRevisao, onToolClick, refreshNotesLayer, refreshPropLayers, resolveProps, setTool } from './app/revisao';
 import { abrirArquivos, abrirLidas, carregarConfig, restaurarProjetos } from './app/projetos';
 import { abrirConfig, atualizarAviso, configAberta, initConfig } from './app/config';
@@ -154,6 +155,7 @@ async function boot() {
   await initRevisao();
   initUnifilar();
   initConfig();
+  initOffline(() => abrirConfig('dados'));
   initLayout();
   syncNitidezUi();
   initGrupos(() => { drawUni(); agendarReaplicar(); });

@@ -1490,6 +1490,34 @@ const TESTES = {
       assert.match(await pg.textContent('#gpschip'), /±10 m/, 'segue com a última posição enquanto tenta');
       await pg.click('#btnGps');
     }],
+    ['Offline: o selo aparece, o fundo troca para Liso e volta ao escolhido; km e distância ao eixo continuam sem rede', ['1366x768'], async (pg, { ctx }) => {
+      const alvo = await centrarNaFaixa(pg, 0, 300, 1);
+      await pg.evaluate(() => document.querySelector('#btnMore')?.click()); await pg.waitForTimeout(300);
+      await pg.click('[data-b=esri]'); await pg.waitForTimeout(400);
+      assert.equal(await pg.evaluate(() => window.__pavecad.E.base), 'esri');
+      assert.equal(await pg.isHidden('#offBadge'), true, 'online: sem selo');
+      await ctx.grantPermissions(['geolocation']);
+      await ctx.setGeolocation({ latitude: alvo.lat, longitude: alvo.lon, accuracy: 10 });
+      await ctx.setOffline(true);
+      await pg.waitForFunction(() => window.__pavecad.E.base === 'none', null, { timeout: 5000 });
+      assert.equal((await pg.textContent('#offBadge')).trim(), 'Offline');
+      assert.equal(await pg.isVisible('#offBadge'), true);
+      assert.equal(await pg.evaluate(() => document.querySelector('#base [data-b=none]').getAttribute('aria-pressed')), 'true', 'o seletor mostra Liso');
+      assert.equal((await pg.textContent('#toast')).trim(), 'Sem internet, fundo simples');
+      await pg.click('#btnGps'); await pg.waitForSelector('#gRef', { timeout: 8000 });
+      assert.match(await pg.textContent('#gRef'), /^km \d+\+\d{3} · a \d+ m do eixo · Fx \d$/, 'km e distância ao eixo sem rede');
+      await pg.click('#btnGps');
+      await ctx.setOffline(false);
+      await pg.waitForFunction(() => window.__pavecad.E.base === 'esri', null, { timeout: 5000 });
+      assert.equal(await pg.isHidden('#offBadge'), true, 'o selo some ao voltar');
+      assert.equal(await pg.evaluate(() => document.querySelector('#base [data-b=esri]').getAttribute('aria-pressed')), 'true');
+      // se a pessoa escolheu outro fundo sem rede, a escolha dela vale ao voltar
+      await ctx.setOffline(true); await pg.waitForFunction(() => window.__pavecad.E.base === 'none');
+      await pg.click('[data-b=osm]'); await pg.waitForTimeout(200);
+      await ctx.setOffline(false); await pg.waitForTimeout(400);
+      assert.equal(await pg.evaluate(() => window.__pavecad.E.base), 'osm', 'a escolha manual não é desfeita');
+      await pg.click('[data-b=none]');
+    }],
     ['satélite: o canvas acompanha o contêiner em qualquer tamanho e rotação, e a borda direita fica coberta pela imagem (sem faixas do fundo)', ['1366x768'], async (pg) => {
       await pg.evaluate(() => document.querySelector('#btnMore')?.click()); await pg.waitForTimeout(300);
       await pg.click('[data-b=esri]'); await pg.waitForTimeout(800);
