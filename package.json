@@ -9,7 +9,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "e2e": "node scripts/capturas/e2e.cjs",
-    "capturas": "node scripts/capturas/run.cjs"
+    "capturas": "node scripts/capturas/run.cjs",
+    "auditoria-ui": "node scripts/auditoria-ui.cjs"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",

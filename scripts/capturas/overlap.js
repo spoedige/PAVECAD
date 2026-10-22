@@ -2,7 +2,7 @@
 (() => {
   const nos = [], cortes = [];
   // com um diálogo modal aberto, só vale o texto do próprio diálogo (o resto está coberto e escurecido)
-  const modal = document.querySelector('#cfg:not([hidden]), #ajuda:not([hidden])');
+  const modal = document.querySelector('#cfg:not([hidden]), #ajuda:not([hidden]), #dash:not([hidden])');
   const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
   let n;
   while ((n = w.nextNode())) {
