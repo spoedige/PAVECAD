@@ -22,6 +22,8 @@ const EMPTY: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: 
  *  Sem chave, a base cai no OpenStreetMap (ruas) e na Esri (satélite). */
 const MT_KEY: string = (import.meta.env.VITE_MAPTILER_KEY ?? '').trim();
 export const temMapTiler = () => !!MT_KEY;
+/** Modelos de URL das fontes de tiles em uso (com a chave do MapTiler, se houver). */
+export const fontesDeTiles = () => baseSources(MT_KEY, nitidez);
 let nitidez: Nitidez = nitidezSalva();
 export const getNitidez = () => nitidez;
 

@@ -4,6 +4,7 @@ import { LARGURA_ACOSTAMENTO, LARGURA_FAIXA, larguraPadrao, planejarCopia, valid
 import { trColor } from '../dominio/solucoes';
 import { parseKmTexto } from '../formats/km';
 import { E, H, getP, kmFmt, kmReal, projName, type AppProj } from './estado';
+import { renderCampo } from './campo';
 import { applyPaint } from './mapa';
 import { renderAll } from './paineis';
 import * as db from './persist';
@@ -12,7 +13,7 @@ import { selecionarPlanilhas } from './seletor';
 import { $, cssv, esc, fmt, syncSeg, toast, toastAcao } from './ui';
 import { Q5, Q5F } from '../dominio/indicadores';
 
-type Aba = 'sol' | 'larg' | 'lim' | 'dados';
+type Aba = 'sol' | 'larg' | 'lim' | 'dados' | 'campo';
 let aba: Aba = 'sol';
 let pidLarg: string | null = null;
 let kmPrevia: number | null = null;
@@ -45,6 +46,7 @@ function render() {
   if (aba === 'sol') renderSolucoes(body);
   else if (aba === 'larg') renderLarguras(body);
   else if (aba === 'lim') renderLimiares(body);
+  else if (aba === 'campo') void renderCampo(body);
   else void renderDados(body);
 }
 

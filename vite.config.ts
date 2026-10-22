@@ -33,13 +33,14 @@ export default defineConfig({
         cleanupOutdatedCaches: true,
         runtimeCaching: [
           {
-            // Tiles já vistos continuam disponíveis offline. Não há download em massa: as políticas
-            // do OpenStreetMap e da Esri proíbem, e o MapTiler depende do plano.
+            // Tiles já vistos continuam disponíveis offline. O limite em MB (Ajustes > Campo e offline) poda os mais antigos
+            // pelo app (app/tilesCache); maxEntries é só o teto de segurança. O "Preparar para campo" pede os tiles pelo
+            // caminho normal de requisição, com poucas requisições por segundo e teto menor no OpenStreetMap.
             urlPattern: TILES,
             handler: 'CacheFirst',
             options: {
               cacheName: 'mapa-tiles',
-              expiration: { maxEntries: 3000, maxAgeSeconds: 60 * 60 * 24 * 30, purgeOnQuotaError: true },
+              expiration: { maxEntries: 40000, maxAgeSeconds: 60 * 60 * 24 * 180, purgeOnQuotaError: true },
               cacheableResponse: { statuses: [0, 200] },
             },
           },

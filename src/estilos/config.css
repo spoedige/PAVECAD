@@ -71,3 +71,9 @@
 .sel-item .note{display:block}
 .sel-rod{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
 .sel-rod .num{font-weight:600}
+
+/* aba Campo e offline */
+.cp-lista{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:4px}
+.cp-barra{height:10px;border-radius:999px;background:var(--fill);overflow:hidden}
+.cp-barra>div{height:100%;width:0;background:var(--accent);transition:width .15s linear}
+.cp-barra[hidden]{display:none}

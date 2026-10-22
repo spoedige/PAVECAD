@@ -12,6 +12,7 @@ import type { ModeKey } from './dominio/indicadores';
 import { abrirDb } from './app/persist';
 import { gpsToggle } from './app/gps';
 import { initOffline } from './app/offline';
+import { agendarPoda } from './app/tilesCache';
 import { initRevisao, onToolClick, refreshNotesLayer, refreshPropLayers, resolveProps, setTool } from './app/revisao';
 import { abrirArquivos, abrirLidas, carregarConfig, restaurarProjetos } from './app/projetos';
 import { abrirConfig, atualizarAviso, configAberta, initConfig } from './app/config';
@@ -155,7 +156,9 @@ async function boot() {
   await initRevisao();
   initUnifilar();
   initConfig();
-  initOffline(() => abrirConfig('dados'));
+  initOffline(() => abrirConfig('campo'));
+  agendarPoda();
+  try { void navigator.storage?.persist?.(); } catch { /* sem a API */ }
   initLayout();
   syncNitidezUi();
   initGrupos(() => { drawUni(); agendarReaplicar(); });

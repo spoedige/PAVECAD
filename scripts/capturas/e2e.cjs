@@ -1518,6 +1518,46 @@ const TESTES = {
       assert.equal(await pg.evaluate(() => window.__pavecad.E.base), 'osm', 'a escolha manual não é desfeita');
       await pg.click('[data-b=none]');
     }],
+    ['Campo e offline em Ajustes: confirma o que está salvo, mostra o provedor, estima o tamanho e cancela o Preparar para campo', ['1366x768'], async (pg, { ctx }) => {
+      await centrarNaFaixa(pg, 0, 300, 1);
+      let pedidos = 0;
+      await ctx.route(/server\.arcgisonline\.com/, async (rota) => {
+        pedidos++;
+        await new Promise((r) => setTimeout(r, 60));
+        await rota.fulfill({ status: 200, contentType: 'image/png', headers: { 'access-control-allow-origin': '*' }, body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64') });
+      });
+      await pg.click('#btnCfg'); await pg.click('#cfgTabs [data-ct=campo]'); await pg.waitForSelector('#cpArmaz');
+      const salvo = await pg.textContent('#cpArmaz');
+      assert.match(salvo, /Planilhas: \d+/); assert.match(salvo, /Notas: \d+/); assert.match(salvo, /Propostas: \d+/); assert.match(salvo, /Tiles de mapa: \d+/);
+      assert.match(await pg.textContent('#cpProv'), /Liso não tem tiles/, 'no Liso não há o que preparar');
+      assert.equal(await pg.isDisabled('#cpPrep'), true);
+      assert.match(await pg.textContent('#cpAjuda'), /ative a localização simulada/);
+      assert.equal(await pg.evaluate(() => [...document.querySelectorAll('#cpLimite [data-mb]')].map((b) => b.textContent + ':' + b.getAttribute('aria-pressed')).join()), '100 MB:false,300 MB:true,600 MB:false,1000 MB:false', 'limite padrão de 300 MB');
+      await pg.click('#cfgClose');
+      await pg.evaluate(() => document.querySelector('#btnMore')?.click()); await pg.waitForTimeout(300);
+      await pg.click('[data-b=esri]'); await pg.waitForTimeout(300);
+      await pg.click('#btnCfg'); await pg.click('#cfgTabs [data-ct=campo]'); await pg.waitForSelector('#cpEst:not(:empty)', { timeout: 5000 });
+      assert.match(await pg.textContent('#cpProv'), /Esri World Imagery \(satélite\)/, 'registra o provedor');
+      const est1 = await pg.textContent('#cpEst'); assert.match(est1, /^[\d.]+ tiles, cerca de \d+ (MB|KB)\.$/, est1);
+      const n1 = Number(est1.match(/^([\d.]+) tiles/)[1].replace(/\./g, ''));
+      await pg.click('#cpBuf [data-buf="2000"]'); await pg.waitForTimeout(300);
+      const n2 = Number((await pg.textContent('#cpEst')).match(/^([\d.]+) tiles/)[1].replace(/\./g, ''));
+      assert.ok(n2 > n1, `corredor maior, mais tiles: ${n1} -> ${n2}`);
+      await pg.click('#cpBuf [data-buf="500"]'); await pg.waitForTimeout(200);
+      await pg.click('#cpPrep'); await pg.waitForSelector('#cpCancela:not([hidden])');
+      await pg.waitForFunction(() => /^[1-9][\d.]* de [\d.]+ tiles/.test(document.querySelector('#cpStatus').textContent), null, { timeout: 8000 });
+      assert.equal(await pg.isVisible('#cpBarra'), true, 'barra de progresso');
+      await pg.click('#cpCancela'); await pg.waitForSelector('#cpPrep:not([hidden])', { timeout: 5000 });
+      const aposCancelar = pedidos; await pg.waitForTimeout(800);
+      assert.ok(pedidos - aposCancelar <= 2, `parou de pedir depois de cancelar: ${aposCancelar} -> ${pedidos}`);
+      assert.match(await pg.textContent('#cpUltimo'), /Esri World Imagery.*Cancelada antes de terminar/, await pg.textContent('#cpUltimo'));
+      assert.ok(pedidos < n1, `cancelou antes de baixar tudo: ${pedidos} de ${n1}`);
+      await pg.click('#cfgClose'); await pg.click('[data-b=none]');
+      // o selo Offline leva a esta aba
+      await ctx.setOffline(true); await pg.waitForSelector('#offBadge:not([hidden])');
+      await pg.click('#offBadge'); await pg.waitForSelector('#cpArmaz', { timeout: 4000 });
+      await pg.click('#cfgClose'); await ctx.setOffline(false);
+    }],
     ['satélite: o canvas acompanha o contêiner em qualquer tamanho e rotação, e a borda direita fica coberta pela imagem (sem faixas do fundo)', ['1366x768'], async (pg) => {
       await pg.evaluate(() => document.querySelector('#btnMore')?.click()); await pg.waitForTimeout(300);
       await pg.click('[data-b=esri]'); await pg.waitForTimeout(800);
