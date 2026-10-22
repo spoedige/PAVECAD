@@ -227,7 +227,7 @@ button.row:hover{background:var(--fill)}
 .prow .nm b{display:block;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .prow .nm span{display:block;font-size:var(--fs-meta);color:var(--muted)}
 
-.field{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 12px;min-height:max(42px,var(--tap))}
+.field{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 12px;padding:8px 12px;min-height:max(42px,var(--tap))}
 .field+.field{border-top:var(--bw) solid var(--hair)}
 .field label{flex:none}
 .field select,.field input[type=number]{border:0;background:transparent;color:var(--accent-text);font-weight:500;text-align:right;text-align-last:right;max-width:58%;padding:4px 2px;border-radius:6px}
@@ -648,3 +648,6 @@ details.bk{margin-top:6px;opacity:.85}
 /* alvo de 44 px no aviso de zoom e respiro entre o subtítulo (com área de toque estendida) e a busca por km */
 #zoomnoteOk{min-height:44px;min-width:72px}
 .titlecard .search{margin-top:6px}
+
+/* botões dos controles segmentados nunca encolhem abaixo do texto: o controle rola por dentro quando falta largura */
+.seg button{flex:0 0 auto}

@@ -132,15 +132,16 @@ function detectar(toque) {
     vistos.add(chave);
     add('coberto', e, `coberto por ${nome(t)} (${rotulo(t)})`);
   }
+  // caixas visíveis (já recortadas pelos contêineres e pela tela)
+  const caixa = (e) => { const r = R(e), c = recorte(e); return { l: Math.max(r.left, c.l, 0), t: Math.max(r.top, c.t, 0), r: Math.min(r.right, c.r, W), b: Math.min(r.bottom, c.b, H) }; };
+  const caixas = inter.map(caixa);
   for (let i = 0; i < inter.length; i++) {
     for (let j = i + 1; j < inter.length; j++) {
       const a = inter[i], b = inter[j];
       if (a.contains(b) || b.contains(a)) continue;
-      const ra = R(a), rb = R(b);
-      const w = Math.min(ra.right, rb.right) - Math.max(ra.left, rb.left), h = Math.min(ra.bottom, rb.bottom) - Math.max(ra.top, rb.top);
+      const ca = caixas[i], cb = caixas[j];
+      const w = Math.min(ca.r, cb.r) - Math.max(ca.l, cb.l), h = Math.min(ca.b, cb.b) - Math.max(ca.t, cb.t);
       if (w > 3 && h > 3) {
-        const va = visivel(a), vb = visivel(b);
-        if (va.w < 4 || vb.w < 4 || va.h < 4 || vb.h < 4) continue;
         const chave = [nome(a), nome(b)].sort().join('|');
         if (vistos.has(chave)) continue;
         vistos.add(chave);
@@ -199,13 +200,26 @@ async function centrar(pg, row = 300, lane = 1, zoom = 18.5) {
     const E = window.__pavecad.E, m = window.__pavecad.map(), p = E.P[0], f = p.polyByFid.get(row * 8 + lane);
     const ring = f.geometry.coordinates[0], n = ring.length - 1;
     const lon = ring.slice(0, n).reduce((a, c) => a + c[0], 0) / n, lat = ring.slice(0, n).reduce((a, c) => a + c[1], 0) / n;
-    m.jumpTo({ center: [lon, lat], zoom, bearing: 0 });
+    // em tela estreita o painel e o unifilar ocupam a parte de baixo: o ponto vai para o centro da parte livre do mapa
+    const larga = [...document.querySelectorAll('#inspector, #uni, .uni')].map((e) => e.getBoundingClientRect()).filter((r) => r.width > innerWidth * 0.6 && r.height > 0 && r.top > innerHeight / 3);
+    const baixo = larga.length ? Math.max(0, innerHeight - Math.min(...larga.map((r) => r.top))) : 0;
+    m.jumpTo({ center: [lon, lat], zoom, bearing: 0, padding: { top: 0, left: 0, right: 0, bottom: baixo } });
     return { lon, lat };
   }, { row, lane, zoom });
   await pg.waitForTimeout(900);
   await pg.evaluate(() => new Promise((res) => { const m = window.__pavecad.map(); const t = setTimeout(res, 4000); m.once('idle', () => { clearTimeout(t); res(); }); m.triggerRepaint(); }));
   return pg.evaluate((a) => { const m = window.__pavecad.map(), q = m.project([a.lon, a.lat]), b = m.getCanvas().getBoundingClientRect(); return { x: b.left + q.x, y: b.top + q.y }; }, r);
 }
+
+/** Fecha o que sobrou aberto do estado anterior. */
+const limparTela = async (pg) => {
+  await pg.evaluate(() => {
+    if (document.querySelector('#dash:not([hidden])')) document.querySelector('#dashFechar')?.click();
+    if (document.querySelector('#cfg:not([hidden])')) document.querySelector('#cfgClose')?.click();
+  });
+  await pg.keyboard.press('Escape');
+  await pg.waitForTimeout(300);
+};
 
 const gavetaPara = async (pg, alvo) => {
   const atual = () => pg.evaluate(() => ['fechada', 'meia', 'cheia'].find((k) => document.documentElement.classList.contains('gav-' + k)));
@@ -337,6 +351,7 @@ async function rodarViewport(browser, vp) {
   for (const e of ESTADOS.slice(1)) {
     if (!querEstado(e)) continue;
     try {
+      await limparTela(pg);
       await e.aplicar(pg, ctx);
       await medir(e.id);
     } catch (erro) {
