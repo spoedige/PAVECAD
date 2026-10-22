@@ -1437,7 +1437,7 @@ const TESTES = {
     }],
   ],
   t21: [
-    ['nota rápida: segurar 500 ms abre o menu circular e um toque grava, sem digitar nada; clique simples seleciona; Desfazer; persistência', ['1366x768'], async (pg) => {
+    ['menu de campo: segurar 500 ms abre o menu circular com 4 opções e um toque grava, sem digitar nada; clique simples seleciona; Desfazer; persistência', ['1366x768'], async (pg) => {
       const ponto = await centrarNaFaixa(pg, 0, 300, 1);
       const n0 = await pg.evaluate(() => window.__pavecad.E.notes.length);
       // clique simples: seleciona o segmento, sem menu
@@ -1456,24 +1456,25 @@ const TESTES = {
       assert.equal(await pg.locator('#nr input, #nr textarea, #nr select, #nr [role=switch]').count(), 0, 'o menu não tem campo, seletor nem chave');
       assert.equal(await pg.locator('#nr button').count(), 4, 'só as quatro opções');
       const op = await pg.evaluate(() => [...document.querySelectorAll('#nr .nr-op')].map((e) => { const r = e.getBoundingClientRect(), s = document.querySelector('.stage').getBoundingClientRect(); return { t: e.dataset.t, w: Math.round(r.width), h: Math.round(r.height), dentro: r.left >= s.left && r.right <= s.right && r.top >= s.top && r.bottom <= s.bottom, txt: e.innerText.replace(/\s+/g, ' ').trim(), svg: !!e.querySelector('svg') }; }));
-      assert.deepEqual(op.map((x) => x.t), ['melhorar', 'retirar', 'dreno_mais', 'dreno_menos']);
+      assert.deepEqual(op.map((x) => x.t), ['alterar', 'dreno_mais', 'dreno_menos', 'parametros']);
       assert.ok(op.every((x) => x.w === 64 && x.h === 64 && x.dentro && x.svg), 'quatro alvos de 64 px, com ícone, dentro da tela: ' + JSON.stringify(op));
-      assert.deepEqual(op.map((x) => x.txt), ['Melhorar solução', 'Retirar solução', 'Colocar dreno', 'Retirar dreno']);
+      assert.deepEqual(op.map((x) => x.txt), ['Alterar solução', 'Colocar dreno', 'Retirar dreno', 'Ver parâmetros']);
       assert.match(await pg.textContent('#nr .nr-cap'), /km \d+\+\d{3} · Fx 1/);
-      await pg.click('#nr .nr-op[data-t=melhorar]'); await pg.waitForTimeout(400);
-      assert.equal(await pg.locator('#nr .nr-op').count(), 0, 'um toque grava e fecha');
+      await pg.click('#nr .nr-op[data-t=dreno_menos]'); await pg.waitForTimeout(400);
+      assert.equal(await pg.locator('#nr .nr-op[data-t]').count(), 0, 'um toque grava e o menu principal sai');
       const nota = await pg.evaluate(() => window.__pavecad.E.notes.at(-1));
       assert.equal(await pg.evaluate(() => window.__pavecad.E.notes.length), n0 + 1);
-      assert.ok(nota.rapida, 'nota rápida'); assert.equal(nota.rapida.tipo, 'melhorar'); assert.equal(nota.rapida.origem, 'pressao'); assert.equal(nota.rapida.precisao, null);
+      assert.ok(nota.rapida, 'nota rápida'); assert.equal(nota.rapida.tipo, 'dreno_menos'); assert.equal(nota.rapida.origem, 'pressao'); assert.equal(nota.rapida.precisao, null);
       assert.equal(nota.rapida.estado, 'dentro'); assert.equal(nota.rapida.faixa, 1); assert.equal(nota.rapida.sentido, 'Crescente'); assert.equal(nota.rapida.rodovia, 'BR-900/GO'); assert.match(nota.rapida.km, /^\d+\+\d{3}$/);
       assert.equal(nota.text, '', 'sem observação: nada digitado');
       assert.ok(nota.id && nota.t && Math.abs(nota.coords[0][1] - ponto.lat) < 1e-3);
-      const toastBotoes = await pg.evaluate(() => [...document.querySelectorAll('.toast-nota button')].map((b) => b.textContent));
-      assert.match(await pg.textContent('.toast-nota'), /Nota salva/);
-      assert.deepEqual(toastBotoes, ['Desfazer', 'Observação'], 'sentido sem dúvida: sem "Trocar sentido"');
+      // depois de gravar, a própria roda continua com Salvo e as ações; nada de toast fora do menu
+      assert.match(await pg.textContent('#nr .nr-centro'), /Salvo/);
+      assert.deepEqual(await pg.evaluate(() => [...document.querySelectorAll('#nr .nr-op')].map((b) => b.dataset.a)), ['obs', 'desfazer'], 'dreno: Observação e Desfazer (sem Trocar sentido, sem dúvida de sentido)');
+      assert.equal(await pg.locator('.toast-nota').count(), 0, 'sem toast');
       assert.equal(await pg.evaluate(() => window.__pavecad.map().getSource('notes')._data.features.length), n0 + 1, 'marcador no mapa');
       // Desfazer
-      await pg.click('.toast-nota [data-a=desfazer]'); await pg.waitForTimeout(400);
+      await pg.click('#nr .nr-op[data-a=desfazer]'); await pg.waitForTimeout(400);
       assert.equal(await pg.evaluate(() => window.__pavecad.E.notes.length), n0, 'Desfazer remove a nota');
       // grava de novo e confere a persistência depois de recarregar
       await pg.mouse.click(ponto.x, ponto.y, { button: 'right' }); await pg.waitForTimeout(300);
@@ -1482,16 +1483,17 @@ const TESTES = {
       const salvas = await pg.evaluate(() => window.__pavecad.E.notes.filter((n) => n.rapida).map((n) => n.rapida.tipo));
       assert.deepEqual(salvas, ['dreno_mais'], 'a nota sobrevive ao recarregar');
     }],
-    ['nota rápida: Observação é opcional e só aparece depois, no toast, com o teclado do aparelho', ['1366x768'], async (pg) => {
+    ['menu de campo: Observação é opcional e só aparece depois de gravar, dentro da roda, com o teclado do aparelho', ['1366x768'], async (pg) => {
       const ponto = await centrarNaFaixa(pg, 0, 300, 1);
       await pg.mouse.click(ponto.x, ponto.y, { button: 'right' }); await pg.waitForTimeout(300);
-      await pg.click('#nr .nr-op[data-t=retirar]'); await pg.waitForTimeout(300);
-      await pg.click('.toast-nota [data-a=obs]'); await pg.waitForTimeout(200);
+      await pg.click('#nr .nr-op[data-t=dreno_menos]'); await pg.waitForTimeout(300);
+      assert.equal(await pg.locator('#nr input').count(), 0, 'sem campo até o usuário tocar em Observação');
+      await pg.click('#nr .nr-op[data-a=obs]'); await pg.waitForTimeout(200);
       assert.equal(await pg.evaluate(() => document.activeElement.tagName), 'INPUT', 'o campo abre já com o foco (teclado do aparelho)');
-      assert.equal(await pg.getAttribute('.toast-nota input', 'enterkeyhint'), 'done');
+      assert.equal(await pg.getAttribute('#nr .nr-obs input', 'enterkeyhint'), 'done');
       await pg.keyboard.type('trinca longitudinal'); await pg.keyboard.press('Enter'); await pg.waitForTimeout(400);
       assert.equal(await pg.evaluate(() => window.__pavecad.E.notes.at(-1).text), 'trinca longitudinal');
-      assert.equal(await pg.locator('.toast-nota').count(), 0);
+      assert.match(await pg.textContent('#nr .nr-centro'), /Salvo/, 'volta para a roda de Salvo');
     }],
     ['nota rápida: mover mais de 8 px cancela e o mapa arrasta; botão direito abre o menu; Esc e toque fora fecham', ['1366x768'], async (pg) => {
       const ponto = await centrarNaFaixa(pg, 0, 300, 1);
@@ -1535,9 +1537,9 @@ const TESTES = {
       await ctx.setGeolocation({ latitude: alvo.lat, longitude: alvo.lon, accuracy: 9 });
       await noMeuLocal(); await pg.waitForTimeout(1200);
       assert.equal(await pg.locator('#nr .nr-op').count(), 4, 'GPS bom: menu no meu local');
-      await pg.click('#nr .nr-op[data-t=retirar]'); await pg.waitForTimeout(400);
+      await pg.click('#nr .nr-op[data-t=dreno_menos]'); await pg.waitForTimeout(400);
       const n = await pg.evaluate(() => window.__pavecad.E.notes.at(-1));
-      assert.equal(n.rapida.origem, 'gps'); assert.equal(n.rapida.precisao, 9); assert.equal(n.rapida.tipo, 'retirar'); assert.equal(n.rapida.estado, 'dentro');
+      assert.equal(n.rapida.origem, 'gps'); assert.equal(n.rapida.precisao, 9); assert.equal(n.rapida.tipo, 'dreno_menos'); assert.equal(n.rapida.estado, 'dentro');
       // 40 m: abre, com aviso na legenda
       await ctx.setGeolocation({ latitude: alvo.lat, longitude: alvo.lon, accuracy: 40 });
       await noMeuLocal(); await pg.waitForTimeout(1200);
@@ -1560,7 +1562,7 @@ const TESTES = {
       const t0 = Date.now(); await noMeuLocal(); await pg.waitForFunction(() => /Sem GPS/.test(document.querySelector('#toast').textContent), null, { timeout: 12000 });
       const dt = Date.now() - t0; assert.ok(dt >= 7500 && dt < 11000, `espera de 8 s antes de avisar (${dt} ms)`);
     }],
-    ['nota rápida: pistas a 10 m deixam o sentido ambíguo: grava o mais próximo e o toast oferece "Trocar sentido"; sem planilha e fora do trecho gravam só a posição', ['1366x768'], async (pg) => {
+    ['menu de campo: pistas a 10 m deixam o sentido ambíguo: grava o mais próximo e a roda oferece "Trocar sentido"; sem planilha e fora do trecho gravam só a posição', ['1366x768'], async (pg) => {
       const alvo = await pg.evaluate(() => {
         const E = window.__pavecad.E, m = window.__pavecad.map(), c = E.P.find((q) => /TH44 · Crescente/.test(q.meta.name)), d = E.P.find((q) => /TH44 · Decrescente/.test(q.meta.name));
         const i = 30, a = c.rows[i], j = d.kmNum.findIndex((k) => Math.abs(k - c.kmNum[i]) < 0.011), b = d.rows[j];
@@ -1574,27 +1576,202 @@ const TESTES = {
       assert.equal(await pg.locator('#nr select, #nr [role=group], #nr .seg').count(), 0, 'sem seletor de sentido no menu');
       await pg.click('#nr .nr-op[data-t=dreno_menos]'); await pg.waitForTimeout(400);
       assert.equal(await pg.evaluate(() => window.__pavecad.E.notes.at(-1).rapida.sentido), 'Crescente', 'grava o sentido mais próximo');
-      assert.deepEqual(await pg.evaluate(() => [...document.querySelectorAll('.toast-nota button')].map((b) => b.textContent)), ['Desfazer', 'Trocar sentido', 'Observação']);
-      await pg.click('.toast-nota [data-a=sentido]'); await pg.waitForTimeout(300);
+      assert.deepEqual(await pg.evaluate(() => [...document.querySelectorAll('#nr .nr-op')].map((b) => b.dataset.a)), ['obs', 'desfazer', 'sentido']);
+      await pg.click('#nr .nr-op[data-a=sentido]'); await pg.waitForTimeout(300);
       const n = await pg.evaluate(() => window.__pavecad.E.notes.at(-1));
       assert.equal(n.rapida.sentido, 'Decrescente'); assert.equal(n.rapida.tipo, 'dreno_menos'); assert.match(n.rapida.planilha, /Decrescente/); assert.ok(n.loc && /Decrescente/.test(n.loc.name));
-      await pg.click('.toast-nota [data-a=sentido]'); await pg.waitForTimeout(300);
+      await pg.click('#nr .nr-op[data-a=sentido]'); await pg.waitForTimeout(300);
       assert.equal(await pg.evaluate(() => window.__pavecad.E.notes.at(-1).rapida.sentido), 'Crescente', 'trocar de novo volta');
+      await pg.keyboard.press('Escape'); await pg.waitForTimeout(150);
       // fora do trecho: longe de tudo
       await pg.evaluate(() => window.__pavecad.map().jumpTo({ center: [-47.5, -14.9], zoom: 16 })); await pg.waitForTimeout(800);
       const c = await pg.evaluate(() => { const r = document.querySelector('#map').getBoundingClientRect(); return { x: r.left + r.width / 2 - 100, y: r.top + r.height / 2 }; });
       await pg.mouse.click(c.x, c.y, { button: 'right' }); await pg.waitForTimeout(300);
       assert.match(await pg.textContent('#nr .nr-cap'), /Fora do trecho/);
-      await pg.click('#nr .nr-op[data-t=melhorar]'); await pg.waitForTimeout(300);
+      await pg.click('#nr .nr-op[data-t=dreno_mais]'); await pg.waitForTimeout(300);
+      await pg.keyboard.press('Escape'); await pg.waitForTimeout(150);
       const f = await pg.evaluate(() => window.__pavecad.E.notes.at(-1).rapida);
       assert.equal(f.estado, 'fora'); assert.equal(f.planilha, null); assert.equal(f.km, null); assert.equal(f.faixa, null);
       // sem planilha visível: trecho não definido
       await pg.evaluate(() => window.__pavecad.E.P.forEach((p) => { p.visible = false; }));
-      await pg.mouse.click(c.x, c.y, { button: 'right' }); await pg.waitForTimeout(300);
+      // 60 px ao lado: pressionar sobre o marcador da nota anterior abriria a edição dela
+      await pg.mouse.click(c.x + 60, c.y, { button: 'right' }); await pg.waitForTimeout(300);
       assert.match(await pg.textContent('#nr .nr-cap'), /Trecho não definido/);
-      await pg.click('#nr .nr-op[data-t=retirar]'); await pg.waitForTimeout(300);
+      await pg.click('#nr .nr-op[data-t=dreno_menos]'); await pg.waitForTimeout(300);
       assert.equal(await pg.evaluate(() => window.__pavecad.E.notes.at(-1).rapida.estado), 'sem-planilha');
     }, OPTS_NOVE],
+    ['Alterar solução: segunda roda com as soluções do projeto (atual desabilitada), Sem intervenção e Outros; um toque grava a proposta; Estender, Observação e Desfazer dentro da roda', ['1366x768'], async (pg) => {
+      const ponto = await centrarNaFaixa(pg, 0, 300, 1);
+      const info = await pg.evaluate(() => { const E = window.__pavecad.E, p = E.P[0]; return { atual: p.model[300].tr[0].main, props: E.props.length, tab: E.tab, r0: 300 }; });
+      await pg.mouse.click(ponto.x, ponto.y, { button: 'right' }); await pg.waitForTimeout(300);
+      await pg.click('#nr .nr-op[data-t=alterar]'); await pg.waitForTimeout(250);
+      const roda = await pg.evaluate(() => [...document.querySelectorAll('#nr .nr-op')].map((e) => { const r = e.getBoundingClientRect(), s = document.querySelector('.stage').getBoundingClientRect(); return { s: e.dataset.s, off: e.disabled, w: Math.round(r.width), dentro: r.left >= s.left - 0.5 && r.right <= s.right + 0.5 && r.top >= s.top - 0.5 && r.bottom <= s.bottom + 0.5 }; }));
+      assert.ok(roda.length >= 3 && roda.length <= 7, 'até 5 soluções, Sem intervenção e Outros: ' + roda.length);
+      assert.deepEqual(roda.slice(-2).map((x) => x.s), ['-', '__outros']);
+      assert.ok(roda.every((x) => x.dentro && x.w >= 56), 'bolhas dentro da tela, com 56 px ou mais');
+      const atual = roda.find((x) => x.s === info.atual);
+      if (atual) assert.equal(atual.off, true, 'a solução atual fica desabilitada');
+      assert.match(await pg.textContent('#nr .nr-centro'), new RegExp('Atual'));
+      assert.equal(await pg.locator('#nr input, #nr textarea, #nr select').count(), 0, 'nada para digitar');
+      // um toque na solução nova grava na hora
+      const nova = roda.find((x) => x.s !== '__outros' && x.s !== info.atual && !x.off).s;
+      await pg.click(`#nr .nr-op[data-s="${nova}"]`); await pg.waitForTimeout(400);
+      const pr = await pg.evaluate(() => window.__pavecad.E.props.at(-1));
+      assert.equal(await pg.evaluate(() => window.__pavecad.E.props.length), info.props + 1);
+      assert.equal(pr.to, nova); assert.equal(pr.from, info.atual); assert.equal(pr.lane, 1); assert.equal(pr.r1, pr.r0, 'um segmento de 20 m');
+      const i0 = pr.r0;
+      assert.ok(['Aumenta', 'Reduz', 'Retira', 'Troca'].includes(pr.campo.efeito)); assert.equal(pr.campo.antes, 0); assert.equal(pr.campo.origem, 'pressao');
+      assert.match(await pg.textContent('#nr .nr-centro'), /Salvo/);
+      assert.deepEqual(await pg.evaluate(() => [...document.querySelectorAll('#nr .nr-op')].map((b) => b.dataset.a)), ['estender', 'obs', 'desfazer']);
+      assert.equal(await pg.locator('.toast-nota, .toast-acao').count(), 0, 'sem toast fora do menu');
+      // Estender: dois arcos e a extensão toda; atualiza km inicial e final
+      await pg.click('#nr .nr-op[data-a=estender]'); await pg.waitForTimeout(250);
+      assert.deepEqual(await pg.evaluate(() => [...document.querySelectorAll('#nr .nr-op')].map((b) => b.dataset.e)), ['a20', 'a40', 'a100', 'd20', 'd40', 'd100', 'toda']);
+      await pg.click('#nr .nr-op[data-e=a40]'); await pg.waitForTimeout(250);
+      let q = await pg.evaluate(() => window.__pavecad.E.props.at(-1));
+      assert.equal(q.r0, i0 - 2); assert.equal(q.r1, i0); assert.equal(q.campo.antes, 40);
+      await pg.click('#nr .nr-op[data-e=d20]'); await pg.waitForTimeout(250);
+      q = await pg.evaluate(() => window.__pavecad.E.props.at(-1));
+      assert.equal(q.r0, i0 - 2); assert.equal(q.r1, i0 + 1); assert.equal(q.campo.depois, 20); assert.equal(await pg.evaluate(() => window.__pavecad.E.props.length), info.props + 1, 'estender troca a proposta, não soma outra');
+      assert.equal(await pg.getAttribute('#nr .nr-op[data-e=a40]', 'aria-pressed'), 'true');
+      await pg.click('#nr .nr-op[data-e=toda]'); await pg.waitForTimeout(250);
+      q = await pg.evaluate(() => { const E = window.__pavecad.E, r = E.props.at(-1), base = r.r0 + r.campo.antes / 20; return { r0: r.r0, r1: r.r1, run: (() => { const p = E.P[0], c = p.model[base].tr[0].code; let a = base, b = base; while (a > 0 && p.model[a - 1].tr[0].code === c) a--; while (b < p.rows.length - 1 && p.model[b + 1].tr[0].code === c) b++; return [a, b]; })() }; });
+      assert.ok(q.r0 <= q.run[0] + 0 && q.r1 >= q.run[1], 'toda a extensão da solução atual: ' + JSON.stringify(q));
+      await pg.click('#nr [data-a=pronto]'); await pg.waitForTimeout(200);
+      // Observação: só se o usuário tocar
+      await pg.click('#nr .nr-op[data-a=obs]'); await pg.waitForTimeout(200);
+      await pg.keyboard.type('trocar na faixa 1'); await pg.keyboard.press('Enter'); await pg.waitForTimeout(300);
+      assert.equal(await pg.evaluate(() => window.__pavecad.E.props.at(-1).note), 'trocar na faixa 1');
+      // Desfazer volta tudo
+      await pg.click('#nr .nr-op[data-a=desfazer]'); await pg.waitForTimeout(300);
+      assert.equal(await pg.evaluate(() => window.__pavecad.E.props.length), info.props, 'Desfazer remove a proposta');
+      assert.equal(await pg.locator('#nr .nr-op').count(), 0, 'e fecha a roda');
+      assert.equal(await estado(pg, 'E => E.tab'), info.tab, 'nenhuma ação abriu painel ou aba');
+    }],
+    ['Alterar solução: Sem intervenção retira; Outros lista todo o catálogo; a roda fecha sozinha em 5 s; a proposta aparece na Revisão e sobrevive ao recarregar', ['1366x768'], async (pg) => {
+      const linhaComSolucao = await pg.evaluate(() => { const p = window.__pavecad.E.P[0]; for (let r = 300; r < p.rows.length - 3; r++) if (p.model[r].tr[0].main !== '-' && p.model[r + 1].tr[0].main !== '-') return r; return 300; });
+      const ponto = await centrarNaFaixa(pg, 0, linhaComSolucao, 1);
+      await pg.mouse.click(ponto.x, ponto.y, { button: 'right' }); await pg.waitForTimeout(300);
+      await pg.click('#nr .nr-op[data-t=alterar]'); await pg.waitForTimeout(250);
+      await pg.click('#nr .nr-op[data-s="__outros"]'); await pg.waitForTimeout(250);
+      const n = await pg.evaluate(() => ({ itens: document.querySelectorAll('#nr .nr-lista .nr-li[data-s]').length, rolavel: (() => { const l = document.querySelector('#nr .nr-lista'); return getComputedStyle(l).overflowY; })(), cat: window.__pavecad.E.P.length }));
+      assert.ok(n.itens >= 17, 'todo o catálogo: ' + n.itens); assert.equal(n.rolavel, 'auto');
+      await pg.click('#nr .nr-li[data-s="-"]'); await pg.waitForTimeout(350);
+      let q = await pg.evaluate(() => window.__pavecad.E.props.at(-1));
+      assert.equal(q.to, '-'); assert.equal(q.campo.efeito, 'Retira');
+      assert.match(await pg.textContent('#nr .nr-centro'), /Salvo/);
+      // a roda fecha sozinha depois de 5 s sem toque
+      await pg.waitForTimeout(5600);
+      assert.equal(await pg.locator('#nr .nr-op').count(), 0, 'fecha sozinha em 5 s');
+      assert.equal(await pg.evaluate(() => window.__pavecad.E.props.length), 1, 'a proposta continua gravada');
+      // Revisão: a alteração aparece na lista de propostas, com o efeito
+      await aba(pg, 'notas'); await pg.waitForTimeout(250);
+      assert.match(await pg.textContent('#t-notas'), /Retira|Troca/);
+      await pg.reload(); await pg.waitForFunction(() => window.__pavecad && window.__pavecad.E.P.length === 2, null, { timeout: 60000 }); await pg.waitForTimeout(2000);
+      const e = await pg.evaluate(() => window.__pavecad.E.props.map((r) => ({ to: r.to, ef: r.campo && r.campo.efeito, orfa: r.orfa })));
+      assert.deepEqual(e.map((x) => x.to), ['-'], 'sobrevive ao recarregar'); assert.ok(e[0].ef && !e[0].orfa);
+    }],
+    ['pressionar o marcador de uma alteração abre a roda de edição: Alterar, Estender, Observação e Excluir com Desfazer; pressionar o marcador de um dreno: Alterar tipo, Observação e Excluir', ['1366x768'], async (pg) => {
+      const ponto = await centrarNaFaixa(pg, 0, 300, 1);
+      await pg.mouse.click(ponto.x, ponto.y, { button: 'right' }); await pg.waitForTimeout(300);
+      await pg.click('#nr .nr-op[data-t=alterar]'); await pg.waitForTimeout(250);
+      await pg.click('#nr .nr-op[data-s]:not([disabled]):not([data-s="__outros"]):not([data-s="-"])'); await pg.waitForTimeout(350);
+      await pg.keyboard.press('Escape'); await pg.waitForTimeout(200);
+      const marcador = () => pg.evaluate(() => { const m = window.__pavecad.map(), f = m.getSource('notes')._data.features.find((x) => String(x.properties.id).startsWith('prop:')); const q = m.project(f.geometry.coordinates), r = m.getCanvas().getBoundingClientRect(); return { x: r.left + q.x, y: r.top + q.y }; });
+      const mk = await marcador();
+      await pg.mouse.click(mk.x, mk.y, { button: 'right' }); await pg.waitForTimeout(300);
+      assert.deepEqual(await pg.evaluate(() => [...document.querySelectorAll('#nr .nr-op')].map((b) => b.dataset.a)), ['alterar', 'estender', 'obs', 'excluir']);
+      // Alterar: mesma segunda roda, com a solução nova atual desabilitada
+      const to = await pg.evaluate(() => window.__pavecad.E.props.at(-1).to);
+      await pg.click('#nr .nr-op[data-a=alterar]'); await pg.waitForTimeout(250);
+      assert.equal(await pg.evaluate((t) => document.querySelector(`#nr .nr-op[data-s="${t}"]`)?.disabled ?? true, to), true, 'a solução atual da proposta fica desabilitada');
+      await pg.click('#nr .nr-op[data-s="-"]'); await pg.waitForTimeout(350);
+      assert.equal(await pg.evaluate(() => window.__pavecad.E.props.at(-1).to), '-', 'trocou a solução proposta');
+      assert.equal(await pg.evaluate(() => window.__pavecad.E.props.length), 1, 'sem duplicar');
+      await pg.click('#nr .nr-op[data-a=desfazer]'); await pg.waitForTimeout(300);
+      assert.equal(await pg.evaluate(() => window.__pavecad.E.props.at(-1).to), to, 'Desfazer devolve a solução proposta de antes');
+      await pg.evaluate(() => { const E = window.__pavecad.E; E.props.length = 0; });
+      // refaz e exclui com Desfazer
+      await pg.mouse.click(ponto.x, ponto.y, { button: 'right' }); await pg.waitForTimeout(300);
+      await pg.click('#nr .nr-op[data-t=alterar]'); await pg.waitForTimeout(250);
+      await pg.click('#nr .nr-op[data-s]:not([disabled]):not([data-s="__outros"]):not([data-s="-"])'); await pg.waitForTimeout(350);
+      await pg.keyboard.press('Escape'); await pg.waitForTimeout(200);
+      await pg.mouse.click(mk.x, mk.y, { button: 'right' }); await pg.waitForTimeout(300);
+      await pg.click('#nr .nr-op[data-a=excluir]'); await pg.waitForTimeout(300);
+      assert.equal(await pg.evaluate(() => window.__pavecad.E.props.length), 0, 'excluída');
+      assert.deepEqual(await pg.evaluate(() => [...document.querySelectorAll('#nr .nr-op')].map((b) => b.dataset.a)), ['desfazer']);
+      await pg.click('#nr .nr-op[data-a=desfazer]'); await pg.waitForTimeout(300);
+      assert.equal(await pg.evaluate(() => window.__pavecad.E.props.length), 1, 'Desfazer devolve a alteração');
+      // dreno: marcador próprio
+      const p2 = await centrarNaFaixa(pg, 0, 340, 1);
+      await pg.mouse.click(p2.x, p2.y, { button: 'right' }); await pg.waitForTimeout(300);
+      await pg.click('#nr .nr-op[data-t=dreno_mais]'); await pg.waitForTimeout(300);
+      await pg.keyboard.press('Escape'); await pg.waitForTimeout(150);
+      const mk2 = await pg.evaluate(() => { const m = window.__pavecad.map(), n = window.__pavecad.E.notes.at(-1), q = m.project(n.coords[0]), r = m.getCanvas().getBoundingClientRect(); return { x: r.left + q.x, y: r.top + q.y }; });
+      await pg.mouse.click(mk2.x, mk2.y, { button: 'right' }); await pg.waitForTimeout(300);
+      assert.deepEqual(await pg.evaluate(() => [...document.querySelectorAll('#nr .nr-op')].map((b) => b.dataset.a)), ['alterar', 'obs', 'excluir']);
+      await pg.click('#nr .nr-op[data-a=alterar]'); await pg.waitForTimeout(300);
+      assert.equal(await pg.evaluate(() => window.__pavecad.E.notes.at(-1).rapida.tipo), 'dreno_menos', 'Alterar troca Colocar por Retirar dreno');
+      await pg.click('#nr .nr-op[data-a=desfazer]'); await pg.waitForTimeout(300);
+      assert.equal(await pg.evaluate(() => window.__pavecad.E.notes.at(-1).rapida.tipo), 'dreno_mais');
+    }],
+    ['Ver parâmetros: levantamento do ponto por faixa, alcance em chips, Copiar levantamento (CSV do recorte); não cria nota nem proposta', ['1366x768'], async (pg, { ctx }) => {
+      await ctx.grantPermissions(['clipboard-read', 'clipboard-write']);
+      const ponto = await centrarNaFaixa(pg, 0, 300, 1);
+      const antes = await pg.evaluate(() => ({ n: window.__pavecad.E.notes.length, q: window.__pavecad.E.props.length }));
+      await pg.mouse.click(ponto.x, ponto.y, { button: 'right' }); await pg.waitForTimeout(300);
+      await pg.click('#nr .nr-op[data-t=parametros]'); await pg.waitForTimeout(300);
+      assert.equal(await pg.locator('#nr .nr-card').count(), 1, 'cartão aberto');
+      assert.deepEqual(await pg.evaluate(() => [...document.querySelectorAll('#nr .nr-chip')].map((b) => b.textContent)), ['Só este segmento', '100 m', '500 m', '1 km']);
+      const lin = () => pg.evaluate(() => [...document.querySelectorAll('#nr .nr-tab tbody tr:not(.cam)')].map((r) => r.querySelector('th').textContent));
+      const f0 = await lin();
+      assert.ok(f0.length >= 3 && f0[0] === 'Fx 1', 'uma linha por faixa e o acostamento: ' + f0);
+      assert.match(await pg.textContent('#nr .nr-card-top'), /km \d+\+\d{3}/);
+      const cab = await pg.evaluate(() => [...document.querySelectorAll('#nr .nr-tab thead th')].map((t) => t.textContent));
+      assert.deepEqual(cab.slice(0, 5), ['Faixa', 'Km', 'Solução', 'Larg. (m)', 'Área (m²)']);
+      assert.ok(cab.includes('IRI'), 'indicadores com dado: ' + cab);
+      await pg.click('#nr .nr-chip[data-m="500"]'); await pg.waitForTimeout(250);
+      assert.equal(await pg.getAttribute('#nr .nr-chip[data-m="500"]', 'aria-pressed'), 'true');
+      const f500 = await lin(); assert.ok(f500.length >= f0.length, 'alcance maior, ao menos as mesmas linhas');
+      await pg.click('#nr [data-a=copiar]'); await pg.waitForTimeout(400);
+      const csv = await pg.evaluate(() => navigator.clipboard.readText());
+      assert.match(csv.split('\n')[0], /^Planilha;Faixa;Km inicial;Km final;Extensão \(m\);Largura \(m\);Área \(m²\);Código;Solução;Classe;Camadas;/);
+      assert.equal(csv.split('\n').length - 1, f500.length, 'uma linha por trecho do recorte');
+      assert.deepEqual(await pg.evaluate(() => ({ n: window.__pavecad.E.notes.length, q: window.__pavecad.E.props.length })), antes, 'não grava nota nem proposta');
+      // fecha ao tocar fora
+      await pg.mouse.click(40, 560); await pg.waitForTimeout(250);
+      assert.equal(await pg.locator('#nr .nr-card').count(), 0, 'tocar fora fecha');
+    }],
+    ['as rodas cabem em 360x640: menu principal e segunda roda inteiros dentro da tela, sem sobrepor, perto das bordas', ['1366x768'], async (pg) => {
+      await pg.setViewportSize({ width: 360, height: 640 }); await pg.waitForTimeout(600);
+      const caixa = await pg.evaluate(() => { const r = document.querySelector('.stage').getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; });
+      const confere = async (rot, esperado) => {
+        const r = await pg.evaluate(() => { const s = document.querySelector('.stage').getBoundingClientRect(); const b = [...document.querySelectorAll('#nr .nr-op')].map((e) => e.getBoundingClientRect()); return { n: b.length, dentro: b.every((q) => q.left >= s.left - 0.5 && q.right <= s.right + 0.5 && q.top >= s.top - 0.5 && q.bottom <= s.bottom + 0.5), sobrepoe: b.some((q, i) => b.some((w, j) => j > i && q.left < w.right - 1 && q.right > w.left + 1 && q.top < w.bottom - 1 && q.bottom > w.top + 1)) }; });
+        assert.equal(r.n, esperado, rot + ': ' + r.n + ' bolhas'); assert.ok(r.dentro, rot + ': dentro da tela'); assert.ok(!r.sobrepoe, rot + ': sem sobreposição');
+      };
+      let abertos = 0;
+      for (const [fx, fy] of [[0.5, 0.5], [0.06, 0.5], [0.94, 0.5], [0.5, 0.12], [0.5, 0.9], [0.06, 0.1], [0.94, 0.1], [0.06, 0.9], [0.25, 0.3], [0.75, 0.7], [0.3, 0.8], [0.7, 0.2]]) {
+        if (abertos >= 6) break;
+        const x = caixa.l + (caixa.r - caixa.l) * fx, y = caixa.t + (caixa.b - caixa.t) * fy;
+        const livre = await pg.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.classList.contains('maplibregl-canvas'), { x, y });
+        if (!livre) continue;
+        await pg.mouse.click(x, y, { button: 'right' }); await pg.waitForTimeout(250);
+        await confere(`principal em ${fx},${fy}`, 4); abertos++;
+        await pg.click('#nr .nr-op[data-t=alterar]'); await pg.waitForTimeout(250);
+        const n = await pg.locator('#nr .nr-op').count();
+        if (n) await confere(`soluções em ${fx},${fy}`, n);
+        await pg.keyboard.press('Escape'); await pg.waitForTimeout(150);
+      }
+      assert.ok(abertos >= 2, 'ao menos dois pontos livres do mapa testados: ' + abertos + ' ' + JSON.stringify(caixa));
+    }],
+    ['Ajustes: o catálogo tem o campo "Nível" (padrão: sem intervenção 0 a reparo profundo 7), editável e lembrado', ['1366x768'], async (pg) => {
+      await pg.click('#btnCfg');
+      await pg.waitForSelector('#catBody', { timeout: 4000 });
+      const niv = await pg.evaluate(() => Object.fromEntries([...document.querySelectorAll('#catBody tr')].map((r) => [r.dataset.c, r.querySelector('[data-f=nivel]').value])));
+      assert.equal(niv.ST, '1'); assert.equal(niv.MFS, '2'); assert.equal(niv.FS3, '3'); assert.equal(niv.FSE, '4'); assert.equal(niv.REF, '5'); assert.equal(niv.REC, '6'); assert.equal(niv.RP, '7');
+      await pg.fill('#catBody tr[data-c=FS3] [data-f=nivel]', '9'); await pg.press('#catBody tr[data-c=FS3] [data-f=nivel]', 'Tab'); await pg.waitForTimeout(300);
+      assert.equal(await pg.inputValue('#catBody tr[data-c=FS3] [data-f=nivel]'), '9');
+    }],
     ['nota rápida em tela de toque (CDP): segurar 500 ms abre o menu e vibra; arrastar mais de 8 px cancela; dica única "Segure no mapa" lembrada', ['tablet-h-1024x768'], async (pg, { ctx }) => {
       await pg.waitForSelector('.nr-dica', { timeout: 6000 });
       assert.match(await pg.textContent('.nr-dica'), /Segure no mapa para anotar/);
@@ -1627,11 +1804,11 @@ const TESTES = {
         const p = await centrarNaFaixa(pg, re, row, 1);
         await pg.mouse.click(p.x, p.y, { button: 'right' }); await pg.waitForTimeout(300);
         await pg.click(`#nr .nr-op[data-t=${tipo}]`); await pg.waitForTimeout(350);
-        await pg.evaluate(() => document.querySelector('.toast-acao')?.remove());
+        await pg.keyboard.press('Escape'); await pg.waitForTimeout(100);
         return p;
       };
-      const p1 = await criar('TH45 · Crescente', 30, 'melhorar');
-      await criar('TH42 · Decrescente', 25, 'dreno_mais');
+      const p1 = await criar('TH45 · Crescente', 30, 'dreno_mais');
+      await criar('TH42 · Decrescente', 25, 'dreno_menos');
       const notas = await pg.evaluate(() => window.__pavecad.E.notes.filter((n) => n.rapida).map((n) => ({ id: n.id, pid: n.loc && n.loc.pid, planilha: n.rapida.planilha, tipo: n.rapida.tipo })));
       assert.equal(notas.length, 2); assert.ok(notas.every((n) => n.pid), 'as duas caíram em planilhas');
       await aba(pg, 'notas'); await pg.waitForTimeout(300);
@@ -1651,7 +1828,7 @@ const TESTES = {
       await pg.click(`#t-notas details.qual[data-qp="${notas[0].pid}"] summary`); await pg.waitForTimeout(250);
       const item = await pg.evaluate((id) => { const e = document.querySelector(`[data-nri="${id}"]`); return { svg: !!e.querySelector('.nrl-ic svg'), txt: e.innerText.replace(/\s+/g, ' ').trim() }; }, notas[0].id);
       assert.ok(item.svg, 'ícone do tipo');
-      assert.match(item.txt, /km \d+\+\d{3}/); assert.match(item.txt, /\d{2}\/\d{2}[ ,]+\d{2}:\d{2}/, 'hora: ' + item.txt); assert.match(item.txt, /Melhorar solução/);
+      assert.match(item.txt, /km \d+\+\d{3}/); assert.match(item.txt, /\d{2}\/\d{2}[ ,]+\d{2}:\d{2}/, 'hora: ' + item.txt); assert.match(item.txt, /Colocar dreno/);
       await pg.evaluate(() => window.__pavecad.map().jumpTo({ center: [-48.5, -14.5], zoom: 12 })); await pg.waitForTimeout(500);
       await pg.click(`[data-nri="${notas[0].id}"] .nri-go`); await pg.waitForTimeout(1100);
       const c = await pg.evaluate(() => { const m = window.__pavecad.map().getCenter(); return [m.lng, m.lat]; });
@@ -1675,9 +1852,16 @@ const TESTES = {
         const p = await centrarNaFaixa(pg, 0, row, 1);
         await pg.mouse.click(p.x, p.y, { button: 'right' }); await pg.waitForTimeout(300);
         await pg.click(`#nr .nr-op[data-t=${tipo}]`); await pg.waitForTimeout(350);
-        await pg.evaluate(() => document.querySelector('.toast-acao')?.remove());
+        await pg.keyboard.press('Escape'); await pg.waitForTimeout(100);
       };
-      await criar(300, 'melhorar'); await criar(320, 'retirar'); await criar(340, 'dreno_menos');
+      await criar(300, 'dreno_mais'); await criar(320, 'dreno_menos');
+      { // uma alteração de solução, pela mesma roda
+        const p = await centrarNaFaixa(pg, 0, 340, 1);
+        await pg.mouse.click(p.x, p.y, { button: 'right' }); await pg.waitForTimeout(300);
+        await pg.click('#nr .nr-op[data-t=alterar]'); await pg.waitForTimeout(250);
+        await pg.click('#nr .nr-op[data-s]:not([disabled]):not([data-s="__outros"])'); await pg.waitForTimeout(350);
+        await pg.keyboard.press('Escape'); await pg.waitForTimeout(100);
+      }
       await pg.evaluate(() => { const E = window.__pavecad.E; E.notes.push({ id: 'velha', type: 'pin', coords: [[-47.75, -12.79]], cat: 'def', text: 'buraco', photos: [], t: '2026-01-01T10:00:00.000Z', loc: null }); });
       await aba(pg, 'notas'); await pg.waitForTimeout(300);
       assert.equal(await pg.locator('#t-notas :text("GeoJSON")').count(), 0, 'sem GeoJSON na Revisão');
@@ -1687,14 +1871,17 @@ const TESTES = {
       const wb = XLSX.readFile(await dx.path(), { cellDates: true, cellStyles: true });
       assert.deepEqual(wb.SheetNames, ['Notas', 'Resumo']);
       const ws = wb.Sheets.Notas, linhas = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true });
-      assert.deepEqual(linhas[0], ['Data', 'Hora', 'Tipo', 'Rodovia', 'Planilha', 'Sentido', 'Faixa', 'Km', 'Latitude', 'Longitude', 'UTM Leste', 'UTM Norte', 'Origem', 'Precisão (m)', 'Observação', 'Status']);
-      assert.equal(linhas.length, 5, 'cabeçalho, três notas rápidas e a anotação antiga');
-      assert.equal(ws.A2.t, 'd', 'a data é uma data de verdade'); assert.equal(typeof ws.I3.v, 'number', 'latitude numérica');
+      assert.deepEqual(linhas[0], ['Data', 'Hora', 'Tipo', 'Rodovia', 'Planilha', 'Sentido', 'Faixa', 'Solução atual', 'Solução nova', 'Efeito', 'Extensão antes (m)', 'Extensão depois (m)', 'Km inicial', 'Km final', 'Latitude', 'Longitude', 'UTM Leste', 'UTM Norte', 'Origem', 'Precisão (m)', 'Observação', 'Status']);
+      assert.equal(linhas.length, 5, 'cabeçalho, dois drenos, uma alteração de solução e a anotação antiga');
+      assert.equal(ws.A2.t, 'd', 'a data é uma data de verdade'); assert.equal(typeof ws.O3.v, 'number', 'latitude numérica');
       assert.equal(ws.A2.v.getFullYear(), 2026, 'a anotação antiga (2026-01-01) é a primeira por data');
-      assert.equal(ws.C2.v, 'Defeito'); assert.equal(ws.M2.v, 'Manual'); assert.equal(ws.O2.v, 'buraco');
-      const tipos = linhas.slice(2).map((l) => l[2]); assert.deepEqual(tipos, ['Melhorar solução', 'Retirar solução', 'Retirar dreno'].map((t) => t).sort((a, b) => tipos.indexOf(a) - tipos.indexOf(b)));
-      assert.ok(ws['!autofilter'], 'filtro automático'); assert.ok(ws['!cols'].length === 16, 'larguras');
-      assert.equal(linhas[2][3], 'BR-900/GO'); assert.match(linhas[2][7], /^\d+\+\d{3}$/); assert.equal(linhas[2][12], 'Pressão');
+      assert.equal(ws.C2.v, 'Defeito'); assert.equal(ws.S2.v, 'Manual'); assert.equal(ws.U2.v, 'buraco');
+      const tipos = linhas.slice(2).map((l) => l[2]); assert.deepEqual([...tipos].sort(), ['Alterar solução', 'Colocar dreno', 'Retirar dreno']);
+      const alt = linhas.slice(2).find((l) => l[2] === 'Alterar solução');
+      assert.ok(alt[7] && alt[8] && ['Aumenta', 'Reduz', 'Retira', 'Troca'].includes(alt[9]), 'solução atual, nova e efeito: ' + JSON.stringify(alt));
+      assert.equal(alt[10], 0); assert.equal(alt[11], 0); assert.match(alt[12], /^\d+\+\d{3}$/); assert.match(alt[13], /^\d+\+\d{3}$/, 'km inicial e final');
+      assert.ok(ws['!autofilter'], 'filtro automático'); assert.ok(ws['!cols'].length === 22, 'larguras');
+      assert.equal(linhas[2][3], 'BR-900/GO'); assert.match(linhas[2][12], /^\d+\+\d{3}$/); assert.equal(linhas[2][18], 'Pressão');
       const resumo = XLSX.utils.sheet_to_json(wb.Sheets.Resumo, { header: 1 });
       assert.equal(resumo.find((r) => r[0] === 'Total')[1], 4);
       // .csv
@@ -1703,7 +1890,7 @@ const TESTES = {
       const buf = require('fs').readFileSync(await dc.path());
       assert.deepEqual([...buf.slice(0, 3)], [0xef, 0xbb, 0xbf], 'BOM UTF-8');
       const csv = buf.slice(3).toString('utf8').split('\r\n');
-      assert.equal(csv[0], 'Data;Hora;Tipo;Rodovia;Planilha;Sentido;Faixa;Km;Latitude;Longitude;UTM Leste;UTM Norte;Origem;Precisão (m);Observação;Status');
+      assert.equal(csv[0], 'Data;Hora;Tipo;Rodovia;Planilha;Sentido;Faixa;Solução atual;Solução nova;Efeito;Extensão antes (m);Extensão depois (m);Km inicial;Km final;Latitude;Longitude;UTM Leste;UTM Norte;Origem;Precisão (m);Observação;Status');
       assert.equal(csv.length, 5); assert.match(csv[2], /;-12,\d{6};-47,\d{6};\d{6},\d{2};\d{7},\d{2};Pressão;;;Aberta$/);
       // compartilhar: com Web Share, entrega o arquivo; sem, baixa
       await pg.evaluate(() => { window.__shared = null; navigator.canShare = (d) => !!(d && d.files && d.files.length); navigator.share = async (d) => { window.__shared = { nome: d.files[0].name, tipo: d.files[0].type, tam: d.files[0].size }; }; });
@@ -1725,7 +1912,8 @@ const TESTES = {
     ['Backup (.json) discreto em Ajustes: baixa as notas com os campos das rápidas e restaura', ['1366x768'], async (pg) => {
       const p = await centrarNaFaixa(pg, 0, 300, 1);
       await pg.mouse.click(p.x, p.y, { button: 'right' }); await pg.waitForTimeout(300);
-      await pg.click('#nr .nr-op[data-t=retirar]'); await pg.waitForTimeout(350);
+      await pg.click('#nr .nr-op[data-t=dreno_menos]'); await pg.waitForTimeout(350);
+      await pg.keyboard.press('Escape'); await pg.waitForTimeout(100);
       await aba(pg, 'aj'); await pg.waitForTimeout(200);
       assert.match(await pg.textContent('details.bk summary'), /^Backup \(\.json\)$/);
       assert.equal(await pg.evaluate(() => document.querySelector('details.bk').open), false, 'discreto: recolhido');
@@ -1733,12 +1921,12 @@ const TESTES = {
       const [d] = await Promise.all([pg.waitForEvent('download'), pg.click('#bkDown')]);
       assert.match(d.suggestedFilename(), /^pavecad-backup-\d{4}-\d{2}-\d{2}\.json$/);
       const gj = JSON.parse(require('fs').readFileSync(await d.path(), 'utf8'));
-      assert.equal(gj.features.length, 1); assert.equal(gj.features[0].properties.rapida.tipo, 'retirar');
+      assert.equal(gj.features.length, 1); assert.equal(gj.features[0].properties.rapida.tipo, 'dreno_menos');
       // apaga e restaura
       await pg.evaluate(() => { const E = window.__pavecad.E; E.notes.length = 0; });
       await pg.setInputFiles('#importIn', await d.path()); await pg.waitForTimeout(500);
       const n = await pg.evaluate(() => window.__pavecad.E.notes.map((x) => x.rapida && x.rapida.tipo));
-      assert.deepEqual(n, ['retirar'], 'a nota rápida volta com os campos');
+      assert.deepEqual(n, ['dreno_menos'], 'a nota rápida volta com os campos');
     }],
   ],
   g03: [
@@ -2174,7 +2362,7 @@ const TESTES = {
           console.log(`ok   ${g}: ${rotulo}`);
         } catch (e) {
           falhas++;
-          console.log(`FALHA ${g}: ${rotulo}\n     ${String(e.message).split('\n').slice(0, 4).join('\n     ')}`);
+          console.log(`FALHA ${g}: ${rotulo}\n     ${String(e.message).split('\n').slice(0, 14).join('\n     ')}`);
           // no GitHub Actions a falha vira annotation (legível pela API mesmo quando o log do job não é)
           if (process.env.GITHUB_ACTIONS) console.log(`::error title=e2e ${g}::${rotulo} | ${String(e.message).split('\n').slice(0, 3).join(' / ').replace(/%/g, '%25')}`);
         }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as fflate from 'fflate';
 import * as XLSX from 'xlsx-js-style';
-import { COLUNAS, csvDeLinhas, linhasDeNotas, nomeArquivoNotas, resumoDeLinhas, serialDoDia, type NotaExport } from '../src/dominio/exportNotas';
+import { COLUNAS, csvDeLinhas, juntarLinhas, linhasDeNotas, linhasDePropostas, nomeArquivoNotas, resumoDeLinhas, serialDoDia, type NotaExport } from '../src/dominio/exportNotas';
 import { montarXlsx, type FflateLib, type XlsxLib } from '../src/dominio/xlsxNotas';
 import type { DadosRapida } from '../src/dominio/notaRapida';
 
@@ -26,17 +26,17 @@ const opcoes = {
 const linhas = linhasDeNotas(notas, opcoes);
 
 describe('linhas das notas', () => {
-  it('ordem da mais antiga para a mais nova, com as 16 colunas pedidas', () => {
+  it('ordem da mais antiga para a mais nova, com as colunas pedidas', () => {
     expect(linhas.map((l) => l.tipo)).toEqual(['Defeito', 'Melhorar solução', 'Colocar dreno', 'Retirar solução']);
-    expect([...COLUNAS]).toEqual(['Data', 'Hora', 'Tipo', 'Rodovia', 'Planilha', 'Sentido', 'Faixa', 'Km', 'Latitude', 'Longitude', 'UTM Leste', 'UTM Norte', 'Origem', 'Precisão (m)', 'Observação', 'Status']);
+    expect([...COLUNAS]).toEqual(['Data', 'Hora', 'Tipo', 'Rodovia', 'Planilha', 'Sentido', 'Faixa', 'Solução atual', 'Solução nova', 'Efeito', 'Extensão antes (m)', 'Extensão depois (m)', 'Km inicial', 'Km final', 'Latitude', 'Longitude', 'UTM Leste', 'UTM Norte', 'Origem', 'Precisão (m)', 'Observação', 'Status']);
   });
 
   it('nota rápida: origem, precisão, faixa e status; anotação antiga entra com os dados que tiver', () => {
     const [antiga, a, c, b] = linhas;
     expect(b).toMatchObject({ origem: 'GPS', precisao: 8, sentido: 'Decrescente', faixa: 2, status: 'Resolvida', observacao: 'trinca; "grave"' });
-    expect(a).toMatchObject({ origem: 'Pressão', precisao: null, rodovia: 'RD-001', km: '10+400', faixa: 1, status: 'Aberta' });
-    expect(c).toMatchObject({ rodovia: '', planilha: '', sentido: '', km: '', faixa: '' }); // fora do trecho: só a posição
-    expect(antiga).toMatchObject({ tipo: 'Defeito', origem: 'Manual', planilha: 'RD-001 · TH02 · Crescente', km: '60+120', faixa: 'Acost.', observacao: 'buraco', precisao: null });
+    expect(a).toMatchObject({ origem: 'Pressão', precisao: null, rodovia: 'RD-001', kmIni: '10+400', kmFim: '', faixa: 1, status: 'Aberta', solucaoAtual: '', efeito: '', extAntes: null });
+    expect(c).toMatchObject({ rodovia: '', planilha: '', sentido: '', kmIni: '', faixa: '' }); // fora do trecho: só a posição
+    expect(antiga).toMatchObject({ tipo: 'Defeito', origem: 'Manual', planilha: 'RD-001 · TH02 · Crescente', kmIni: '60+120', faixa: 'Acost.', observacao: 'buraco', precisao: null });
   });
 
   it('data e hora separadas, locais; coordenadas com 6 casas e UTM do fuso', () => {
@@ -50,7 +50,7 @@ describe('linhas das notas', () => {
 
   it('o contexto do app sobrepõe (modo privacidade esconde nome e km)', () => {
     const l = linhasDeNotas([notas[1]], { ...opcoes, contexto: () => ({ rodovia: 'Rodovia A', planilha: 'Planilha 1 · Crescente', km: '0+400' }) })[0];
-    expect(l).toMatchObject({ rodovia: 'Rodovia A', planilha: 'Planilha 1 · Crescente', km: '0+400' });
+    expect(l).toMatchObject({ rodovia: 'Rodovia A', planilha: 'Planilha 1 · Crescente', kmIni: '0+400' });
   });
 
   it('resumo por tipo e por rodovia e sentido', () => {
@@ -118,21 +118,21 @@ describe('XLSX', () => {
     const num = XLSX.read(bytes, { type: 'array' }).Sheets['Notas'];
     expect(num['B2'].t).toBe('n'); expect(num['B2'].v).toBeCloseTo((7 * 3600 + 45 * 60 + 5) / 86400, 6);
     expect(num['A2'].t).toBe('n'); expect(num['A2'].v).toBe(serialDoDia(new Date(2026, 9, 17)));
-    expect(cel('I2').t).toBe('n'); expect(cel('I2').v).toBe(-15.2); expect(cel('I2').z).toBe('0.000000');
-    expect(cel('J2').t).toBe('n'); expect(cel('J2').z).toBe('0.000000');
-    expect(cel('K2').t).toBe('n'); expect(cel('L2').t).toBe('n');
-    expect(cel('N5').v).toBe(8); expect(cel('N5').t).toBe('n'); // precisão do GPS
-    expect(ws['N3']).toBeUndefined(); // pressão: sem precisão, sem célula
+    expect(cel('O2').t).toBe('n'); expect(cel('O2').v).toBe(-15.2); expect(cel('O2').z).toBe('0.000000');
+    expect(cel('P2').t).toBe('n'); expect(cel('P2').z).toBe('0.000000');
+    expect(cel('Q2').t).toBe('n'); expect(cel('R2').t).toBe('n');
+    expect(cel('T5').v).toBe(8); expect(cel('T5').t).toBe('n'); // precisão do GPS
+    expect(ws['T3']).toBeUndefined(); // pressão: sem precisão, sem célula
   });
 
   it('valores de texto: tipo, sentido, faixa, km, origem, observação e status', () => {
-    expect(cel('C5').v).toBe('Retirar solução'); expect(cel('F5').v).toBe('Decrescente'); expect(cel('G5').v).toBe(2); expect(cel('H3').v).toBe('10+400');
-    expect(cel('M5').v).toBe('GPS'); expect(cel('O5').v).toBe('trinca; "grave"'); expect(cel('P5').v).toBe('Resolvida');
+    expect(cel('C5').v).toBe('Retirar solução'); expect(cel('F5').v).toBe('Decrescente'); expect(cel('G5').v).toBe(2); expect(cel('M3').v).toBe('10+400');
+    expect(cel('S5').v).toBe('GPS'); expect(cel('U5').v).toBe('trinca; "grave"'); expect(cel('V5').v).toBe('Resolvida');
     expect(cel('G2').v).toBe('Acost.');
   });
 
   it('filtro automático, larguras e primeira linha congelada', () => {
-    expect(ws['!autofilter']?.ref).toBe('A1:P5');
+    expect(ws['!autofilter']?.ref).toBe('A1:V5');
     expect(ws['!cols']).toHaveLength(COLUNAS.length);
     expect(ws['!cols']!.every((c) => (c.wch ?? 0) >= 6)).toBe(true);
     const xml = fflate.strFromU8(fflate.unzipSync(bytes)['xl/worksheets/sheet1.xml']);
@@ -152,5 +152,43 @@ describe('XLSX', () => {
   it('sem notas gera só o cabeçalho', () => {
     const vazio = XLSX.read(montarXlsx(XLSX as unknown as XlsxLib, fflate as unknown as FflateLib, []), { type: 'array' });
     expect(XLSX.utils.sheet_to_json<unknown[]>(vazio.Sheets['Notas'], { header: 1 })).toHaveLength(1);
+  });
+});
+
+describe('alterações de solução (propostas) na mesma planilha', () => {
+  const props = [
+    { id: 'q1', t: new Date(2026, 9, 19, 9, 0, 0).toISOString(), lane: 2, note: 'rebaixa; "pouco"', campo: { efeito: 'Reduz', antes: 40, depois: 20, origem: 'gps' as const, precisao: 6, lat: -15.21, lon: -47.91 } },
+    { id: 'q2', t: new Date(2026, 9, 19, 9, 30, 0).toISOString(), lane: 0, note: '' },
+  ];
+  const ctx = (p: { id: string }) => ({
+    rodovia: 'RD-001', planilha: 'RD-001 · TH01 · Crescente', sentido: 'Crescente', kmIni: '10+400', kmFim: '10+480', lat: -15.2, lon: -47.9,
+    atual: p.id === 'q1' ? 'REC (Reconstrução)' : 'Sem intervenção', nova: 'FS3 (Fresagem funcional 3 cm)', efeito: p.id === 'q1' ? 'Reduz' : 'Aumenta',
+  });
+  const l = linhasDePropostas(props, ctx);
+  const todas = juntarLinhas(linhas, l);
+
+  it('Tipo "Alterar solução", solução atual e nova, efeito, extensões e km inicial e final', () => {
+    expect(l[0]).toMatchObject({ tipo: 'Alterar solução', faixa: 2, solucaoAtual: 'REC (Reconstrução)', solucaoNova: 'FS3 (Fresagem funcional 3 cm)', efeito: 'Reduz', extAntes: 40, extDepois: 20, kmIni: '10+400', kmFim: '10+480', origem: 'GPS', precisao: 6, lat: -15.21, lon: -47.91, observacao: 'rebaixa; "pouco"' });
+    expect(l[1]).toMatchObject({ faixa: 'Acost.', origem: 'Manual', extAntes: 0, extDepois: 0, lat: -15.2, precisao: null });
+  });
+
+  it('entram na ordem do tempo junto das notas', () => {
+    expect(todas).toHaveLength(6);
+    expect(todas.map((x) => x.tipo)).toEqual(['Defeito', 'Melhorar solução', 'Colocar dreno', 'Alterar solução', 'Alterar solução', 'Retirar solução']);
+  });
+
+  it('CSV: mesmas colunas, vírgula decimal', () => {
+    const [, ...resto] = csvDeLinhas(todas).slice(1).split('\r\n');
+    expect(resto).toHaveLength(6);
+    for (const r of resto) expect(r.replace(/"[^"]*(""[^"]*)*"/g, '""').split(';')).toHaveLength(COLUNAS.length);
+    expect(resto[3]).toContain(';"REC (Reconstrução)";"FS3 (Fresagem funcional 3 cm)";Reduz;40;20;10+400;10+480;-15,210000;-47,910000;');
+  });
+
+  it('XLSX: extensões numéricas e solução em texto', () => {
+    const w = XLSX.read(montarXlsx(XLSX as unknown as XlsxLib, fflate as unknown as FflateLib, todas), { type: 'array' }).Sheets['Notas'];
+    expect(w['H5'].v).toBe('REC (Reconstrução)'); expect(w['J5'].v).toBe('Reduz');
+    expect(w['K5'].t).toBe('n'); expect(w['K5'].v).toBe(40); expect(w['L5'].v).toBe(20);
+    expect(w['M5'].v).toBe('10+400'); expect(w['N5'].v).toBe('10+480');
+    expect(w['H4']).toBeUndefined(); // dreno: sem solução
   });
 });

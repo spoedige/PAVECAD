@@ -1,4 +1,6 @@
-import { csvDeLinhas, linhasDeNotas, nomeArquivoNotas, type ContextoNota, type NotaExport } from '../dominio/exportNotas';
+import * as catalogo from '../dominio/catalogo';
+import { csvDeLinhas, juntarLinhas, linhasDeNotas, linhasDePropostas, nomeArquivoNotas, type ContextoNota, type ContextoProp, type NotaExport } from '../dominio/exportNotas';
+import { efeitoDe, type Proposta } from '../dominio/propostas';
 import { montarXlsx, type FflateLib, type XlsxLib } from '../dominio/xlsxNotas';
 import { parseKmTexto } from '../formats/km';
 import { E, NOTE_CATS, getP, kmFmt, projName, rodoviaNome, type Nota } from './estado';
@@ -19,7 +21,25 @@ function contextoDe(n: NotaExport): ContextoNota | undefined {
   return { rodovia: E.privacidade ? rodoviaNome(p.meta.uf) : p.meta.uf, planilha: E.privacidade ? projName(p) : p.meta.name, sentido: p.meta.travel > 0 ? 'Crescente' : 'Decrescente', km: km(nota.loc?.km), faixa: nota.loc?.lane ?? null };
 }
 
-export const linhasAtuais = () => linhasDeNotas(E.notes as NotaExport[], { rotuloCat: (c) => NOTE_CATS[c as keyof typeof NOTE_CATS]?.l ?? c, contexto: contextoDe });
+/** "FS3 (Fresagem funcional 3 cm)": o código original e o nome do catálogo. */
+const nomeSolucao = (c: string) => (c === '-' ? 'Sem intervenção' : `${c} (${catalogo.get(c).nome})`);
+
+function contextoDaProposta(r: Proposta): ContextoProp | undefined {
+  const p = r.orfa || !r.pid ? undefined : getP(r.pid);
+  if (!p) return undefined;
+  const meio = p.rows[Math.round((r.r0 + r.r1) / 2)];
+  return {
+    rodovia: E.privacidade ? rodoviaNome(p.meta.uf) : p.meta.uf, planilha: E.privacidade ? projName(p) : p.meta.name, sentido: p.meta.travel > 0 ? 'Crescente' : 'Decrescente',
+    kmIni: p.kmLab[r.r0], kmFim: kmFmt(p.kmNum[r.r1] + 0.02), lat: meio.lat, lon: meio.lon,
+    atual: nomeSolucao(r.from), nova: nomeSolucao(r.to), efeito: r.campo?.efeito ?? efeitoDe(r.from, r.to),
+  };
+}
+
+/** Notas (drenos e as da primeira versão) e alterações de solução, juntas e da mais antiga para a mais nova. */
+export const linhasAtuais = () => juntarLinhas(
+  linhasDeNotas(E.notes as NotaExport[], { rotuloCat: (c) => NOTE_CATS[c as keyof typeof NOTE_CATS]?.l ?? c, contexto: contextoDe }),
+  linhasDePropostas(E.props, (r) => contextoDaProposta(r as Proposta)),
+);
 
 const MIME_XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
@@ -40,7 +60,7 @@ function aposExportar() {
   if (E.tab === 'notas') renderNotes();
 }
 
-const semNotas = () => { if (!E.notes.length) { toast('Nenhuma nota para exportar'); return true; } return false; };
+const semNotas = () => { if (!linhasAtuais().length) { toast('Nenhuma nota para exportar'); return true; } return false; };
 
 /** "Baixar planilha (.xlsx)". */
 export async function baixarXlsx() {

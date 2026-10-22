@@ -1,5 +1,19 @@
 import { kmLabel } from '../formats/km';
 import type { PV } from './analise';
+import { nivelDe } from './catalogo';
+
+/** O que a troca de solução faz com a intensidade da intervenção. */
+export type Efeito = 'Aumenta' | 'Reduz' | 'Retira' | 'Troca';
+
+/** Deduz o efeito pelo nível de cada solução no catálogo. A nova "Sem intervenção" ("-") retira; nível maior aumenta, menor reduz;
+ *  igual ou sem nível em qualquer das duas é só troca. */
+export function efeitoDe(atual: string | null | undefined, nova: string | null | undefined): Efeito {
+  const a = atual || '-', n = nova || '-';
+  if (n === '-') return a === '-' ? 'Troca' : 'Retira';
+  const na = nivelDe(a), nn = nivelDe(n);
+  if (na === null || nn === null || na === nn) return 'Troca';
+  return nn > na ? 'Aumenta' : 'Reduz';
+}
 
 /** Proposta de nova solução para um trecho de uma faixa. Ligada à planilha pelo nome. */
 export interface Proposta {
@@ -22,6 +36,8 @@ export interface Proposta {
   to: string;
   note: string;
   t: string;
+  /** Proposta feita em campo pelo menu pressionável: efeito deduzido, metros acrescentados antes e depois do segmento pressionado e de onde veio a posição. */
+  campo?: { efeito: Efeito; antes: number; depois: number; origem: 'pressao' | 'gps'; precisao: number | null; lat: number; lon: number };
 }
 
 export type Alvo = Pick<Proposta, 'pid' | 'pname' | 'lane' | 'r0' | 'r1' | 'from'>;

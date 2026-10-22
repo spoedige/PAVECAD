@@ -35,11 +35,12 @@ function larguras(cab: readonly string[], linhas: unknown[][]): { wch: number }[
 export function montarXlsx(X: XlsxLib, F: FflateLib, linhas: Linha[]): Uint8Array {
   // campo vazio fica sem célula (e não uma célula de texto vazio)
   const v = (x: string | number | null) => (x === '' || x === null ? null : x);
-  const dados = linhas.map((l) => [l.data, l.hora, l.tipo, v(l.rodovia), v(l.planilha), v(l.sentido), v(l.faixa), v(l.km), l.lat, l.lon, l.utmE, l.utmN, l.origem, v(l.precisao), v(l.observacao), l.status]);
+  const dados = linhas.map((l) => [l.data, l.hora, l.tipo, v(l.rodovia), v(l.planilha), v(l.sentido), v(l.faixa), v(l.solucaoAtual), v(l.solucaoNova), v(l.efeito), v(l.extAntes), v(l.extDepois), v(l.kmIni), v(l.kmFim),
+    l.lat, l.lon, l.utmE, l.utmN, l.origem, v(l.precisao), v(l.observacao), l.status]);
   const ws = X.utils.aoa_to_sheet([[...COLUNAS], ...dados]);
   const set = (r: number, c: number, f: (x: Cel) => void) => { const a = ws[X.utils.encode_cell({ r, c })] as Cel | undefined; if (a) f(a); };
   COLUNAS.forEach((_, c) => set(0, c, (x) => { x.s = NEGRITO; }));
-  const FORM: Record<number, string> = { 0: 'dd/mm/yyyy', 1: 'hh:mm', 8: '0.000000', 9: '0.000000', 10: '0.00', 11: '0.00', 13: '0' };
+  const FORM: Record<number, string> = { 0: 'dd/mm/yyyy', 1: 'hh:mm', 10: '0', 11: '0', 14: '0.000000', 15: '0.000000', 16: '0.00', 17: '0.00', 19: '0' };
   linhas.forEach((_, i) => { for (const [c, z] of Object.entries(FORM)) set(i + 1, +c, (x) => { if (x.t === 'n') x.z = z; }); });
   ws['!cols'] = larguras(COLUNAS, dados);
   ws['!rows'] = [{ hpt: 22 }];

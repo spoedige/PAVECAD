@@ -4,7 +4,8 @@ import { crsForZone, toUtm, zoneOf } from '../geometry/utm';
 import { TIPOS_RAPIDOS, type DadosRapida } from './notaRapida';
 
 export const COLUNAS = [
-  'Data', 'Hora', 'Tipo', 'Rodovia', 'Planilha', 'Sentido', 'Faixa', 'Km', 'Latitude', 'Longitude', 'UTM Leste', 'UTM Norte', 'Origem', 'Precisão (m)', 'Observação', 'Status',
+  'Data', 'Hora', 'Tipo', 'Rodovia', 'Planilha', 'Sentido', 'Faixa', 'Solução atual', 'Solução nova', 'Efeito', 'Extensão antes (m)', 'Extensão depois (m)', 'Km inicial', 'Km final',
+  'Latitude', 'Longitude', 'UTM Leste', 'UTM Norte', 'Origem', 'Precisão (m)', 'Observação', 'Status',
 ] as const;
 
 export interface NotaExport {
@@ -37,7 +38,13 @@ export interface Linha {
   planilha: string;
   sentido: string;
   faixa: number | string;
-  km: string;
+  solucaoAtual: string;
+  solucaoNova: string;
+  efeito: string;
+  extAntes: number | null;
+  extDepois: number | null;
+  kmIni: string;
+  kmFim: string;
   lat: number;
   lon: number;
   utmE: number;
@@ -68,7 +75,8 @@ export function linhasDeNotas(notas: NotaExport[], o: OpcoesExport): Linha[] {
       planilha: ctx.planilha ?? r?.planilha ?? n.loc?.name ?? '',
       sentido: ctx.sentido ?? r?.sentido ?? '',
       faixa: faixaDe(ctx.faixa !== undefined ? ctx.faixa : r ? r.faixa : n.loc?.lane),
-      km: ctx.km ?? r?.km ?? n.loc?.km ?? '',
+      solucaoAtual: '', solucaoNova: '', efeito: '', extAntes: null, extDepois: null,
+      kmIni: ctx.km ?? r?.km ?? n.loc?.km ?? '', kmFim: '',
       lat: +lat.toFixed(6), lon: +lon.toFixed(6), utmE: +e.toFixed(2), utmN: +nn.toFixed(2), fuso: `${zone}S`,
       origem: r ? (r.origem === 'gps' ? 'GPS' : 'Pressão') : 'Manual',
       precisao: r?.precisao ?? null,
@@ -77,6 +85,43 @@ export function linhasDeNotas(notas: NotaExport[], o: OpcoesExport): Linha[] {
     };
   });
 }
+
+/** Alteração de solução (a proposta, feita em campo ou na barra Propor) como linha da planilha de notas. */
+export interface PropExport {
+  id: string;
+  t: string;
+  lane: number;
+  note: string;
+  campo?: { efeito: string; antes: number; depois: number; origem: 'pressao' | 'gps'; precisao: number | null; lat: number; lon: number };
+}
+export interface ContextoProp {
+  rodovia: string; planilha: string; sentido: string; kmIni: string; kmFim: string;
+  /** Meio do trecho, para as propostas sem posição de campo. */
+  lat: number; lon: number;
+  /** Solução atual e nova como "FS3 (Fresagem funcional 3 cm)"; efeito deduzido. */
+  atual: string; nova: string; efeito: string;
+}
+
+export function linhasDePropostas(props: PropExport[], ctx: (p: PropExport) => ContextoProp | undefined): Linha[] {
+  const out: Linha[] = [];
+  for (const r of props) {
+    const c = ctx(r);
+    if (!c) continue;
+    const d = new Date(r.t), lat = r.campo?.lat ?? c.lat, lon = r.campo?.lon ?? c.lon, zone = zoneOf(lon), [e, nn] = toUtm(crsForZone(zone), lat, lon);
+    out.push({
+      data: serialDoDia(d), hora: fracaoDoDia(d),
+      dataTxt: `${z2(d.getDate())}/${z2(d.getMonth() + 1)}/${d.getFullYear()}`, horaTxt: `${z2(d.getHours())}:${z2(d.getMinutes())}`,
+      tipo: 'Alterar solução', rodovia: c.rodovia, planilha: c.planilha, sentido: c.sentido, faixa: r.lane === 0 ? 'Acost.' : r.lane,
+      solucaoAtual: c.atual, solucaoNova: c.nova, efeito: c.efeito, extAntes: r.campo?.antes ?? 0, extDepois: r.campo?.depois ?? 0, kmIni: c.kmIni, kmFim: c.kmFim,
+      lat: +lat.toFixed(6), lon: +lon.toFixed(6), utmE: +e.toFixed(2), utmN: +nn.toFixed(2), fuso: `${zone}S`,
+      origem: r.campo ? (r.campo.origem === 'gps' ? 'GPS' : 'Pressão') : 'Manual', precisao: r.campo?.precisao ?? null, observacao: r.note ?? '', status: 'Aberta',
+    });
+  }
+  return out;
+}
+
+/** Notas e alterações juntas, da mais antiga para a mais nova. */
+export const juntarLinhas = (...listas: Linha[][]): Linha[] => listas.flat().sort((a, b) => a.data + a.hora - (b.data + b.hora));
 
 export interface Resumo {
   total: number;
@@ -107,8 +152,8 @@ export function csvDeLinhas(linhas: Linha[], eol = '\r\n'): string {
   const rows = [COLUNAS.join(';')];
   for (const l of linhas) {
     rows.push([
-      l.dataTxt, l.horaTxt, q(l.tipo), q(l.rodovia), q(l.planilha), l.sentido, l.faixa, l.km, dec(l.lat, 6), dec(l.lon, 6), dec(l.utmE, 2), dec(l.utmN, 2), l.origem,
-      l.precisao === null ? '' : String(l.precisao), q(l.observacao), l.status,
+      l.dataTxt, l.horaTxt, q(l.tipo), q(l.rodovia), q(l.planilha), l.sentido, l.faixa, q(l.solucaoAtual), q(l.solucaoNova), l.efeito, l.extAntes === null ? '' : String(l.extAntes), l.extDepois === null ? '' : String(l.extDepois), l.kmIni, l.kmFim,
+      dec(l.lat, 6), dec(l.lon, 6), dec(l.utmE, 2), dec(l.utmN, 2), l.origem, l.precisao === null ? '' : String(l.precisao), q(l.observacao), l.status,
     ].join(';'));
   }
   return '﻿' + rows.join(eol);

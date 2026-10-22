@@ -117,6 +117,64 @@ function gravarProp(r: Proposta) {
   db.gravar('props', c);
 }
 
+/** Troca `substituir` por `rec` pelo mesmo caminho da barra Propor (a sobreposição divide as propostas antigas) e devolve como desfazer.
+ *  É o que o menu pressionável usa para "Alterar solução": não existe um segundo modelo de proposta. */
+export function aplicarProposta(rec: Proposta, pj: AppProj, substituir: Proposta[] = []): { rec: Proposta; novas: Proposta[]; desfazer: () => void } {
+  const saem = new Set(substituir.map((x) => x.id));
+  E.props = E.props.filter((x) => !saem.has(x.id));
+  substituir.forEach((x) => db.apagar('props', x.id));
+  const antes = E.props, r = addProposta(E.props, rec, pj.kmNum);
+  E.props = r.list;
+  const deslocadas = antes.filter((x) => r.removidas.includes(x.id));
+  r.removidas.forEach((id) => db.apagar('props', id));
+  r.novas.forEach(gravarProp);
+  refreshPropLayers(); refreshNotesLayer();
+  if (E.tab === 'notas') renderNotes();
+  const volta = [...substituir, ...deslocadas];
+  return {
+    rec, novas: r.novas,
+    desfazer: () => {
+      const ids = new Set(r.novas.map((x) => x.id));
+      E.props = E.props.filter((x) => !ids.has(x.id)).concat(volta);
+      r.novas.forEach((x) => db.apagar('props', x.id));
+      volta.forEach(gravarProp);
+      refreshPropLayers(); refreshNotesLayer();
+      if (E.tab === 'notas') renderNotes();
+    },
+  };
+}
+
+/** Remove uma proposta e devolve o desfazer. */
+export function removerProposta(r: Proposta): () => void {
+  E.props = E.props.filter((x) => x.id !== r.id);
+  db.apagar('props', r.id);
+  refreshPropLayers(); refreshNotesLayer();
+  if (E.tab === 'notas') renderNotes();
+  return () => {
+    E.props = E.props.concat([r]);
+    gravarProp(r);
+    refreshPropLayers(); refreshNotesLayer();
+    if (E.tab === 'notas') renderNotes();
+  };
+}
+
+/** Grava de novo uma proposta alterada no lugar (observação, solução nova). */
+export function atualizarProposta(r: Proposta) {
+  gravarProp(r);
+  refreshPropLayers(); refreshNotesLayer();
+  if (E.tab === 'notas') renderNotes();
+}
+
+/** Centro de uma proposta no mapa (meio do trecho), para o marcador. */
+function centroDaProposta(r: Proposta): [number, number] | null {
+  const p = getP(r.pid ?? '');
+  if (!p) return null;
+  const f = p.polyByFid.get(Math.round((r.r0 + r.r1) / 2) * 8 + (r.lane || 7));
+  if (!f) return null;
+  const c = (f.geometry as GeoJSON.Polygon).coordinates[0];
+  return [(c[0][0] + c[2][0]) / 2, (c[0][1] + c[2][1]) / 2];
+}
+
 function polysFor(s: Alvo) {
   const p = getP(s.pid ?? ''), out: GeoJSON.Feature[] = [];
   if (!p) return out;
@@ -161,7 +219,7 @@ function propsHtml(): string {
   }
   const cards = vp.map((r) => {
     const p = getP(r.pid!)!, q = runStats(p, r);
-    return `<div class="note-card"><button class="note-top" data-pf="${r.id}"><span class="sw" style="background:${tc(r.to)};width:12px;height:12px"></span><span class="t"><b>${esc(trLabel(r.from))} → ${esc(trLabel(r.to))}</b><span>${esc(projName(p))} · ${r.lane ? 'Fx ' + r.lane : 'Acost.'} · ${runLabel(p, r)} · ${fmt(q.len, 0)} m · ${fmt(q.area, 0)} m²${r.note ? ' · ' + esc(r.note) : ''}</span></span></button><div class="btns"><button class="btn d" data-pd="${r.id}" style="min-height:28px;padding:3px 10px">${IC.trash} Remover</button></div></div>`;
+    return `<div class="note-card"><button class="note-top" data-pf="${r.id}"><span class="sw" style="background:${tc(r.to)};width:12px;height:12px"></span><span class="t"><b>${esc(trLabel(r.from))} → ${esc(trLabel(r.to))}${r.campo ? ' · ' + r.campo.efeito : ''}</b><span>${esc(projName(p))} · ${r.lane ? 'Fx ' + r.lane : 'Acost.'} · ${runLabel(p, r)} · ${fmt(q.len, 0)} m · ${fmt(q.area, 0)} m²${r.note ? ' · ' + esc(r.note) : ''}</span></span></button><div class="btns"><button class="btn d" data-pd="${r.id}" style="min-height:28px;padding:3px 10px">${IC.trash} Remover</button></div></div>`;
   }).join('');
   const rows = Object.entries(sum).map(([k, v]) => `<div class="row"><span class="sw" style="background:${tc(k)}"></span><div class="grow">${esc(trLabel(k))}</div><div class="val num">${fmt(v.area, 0)} <span class="muted" style="font-weight:400;font-size:var(--fs-meta)">m² · ${fmt(v.len / 1000, 2)} km·faixa</span></div></div>`).join('');
   return `${orfasHtml}<div>${head}<div class="list">${cards}</div>
@@ -234,12 +292,22 @@ export function startNote(type: Nota['type'], coords: number[][]) {
   refreshNotesLayer();
 }
 
+/** Linhas da planilha de notas: as notas e as alterações de solução (propostas) das planilhas carregadas. */
+const totalExportavel = () => E.notes.length + E.props.filter((r) => r.pid && !r.orfa).length;
+
 export function refreshNotesLayer() {
   const contador = document.getElementById('ppN');
-  if (contador) contador.textContent = String(E.notes.length);
+  if (contador) contador.textContent = String(totalExportavel());
   if (!E.mapReady) return;
   const lista = E.notes.filter((n) => !E.editing || E.editing.id !== n.id || !E.editing.isNew).concat(E.editing ? [E.editing] : []);
-  setData('notes', { type: 'FeatureCollection', features: lista.map((n) => ({ type: 'Feature', properties: { id: n.id, cat: n.cat }, geometry: noteGeom(n) })) });
+  const feicoes: GeoJSON.Feature[] = lista.map((n) => ({ type: 'Feature', properties: { id: n.id, cat: n.cat }, geometry: noteGeom(n) }));
+  // propostas feitas em campo ganham um marcador, para a pressão sobre ele abrir a edição
+  for (const r of E.props) {
+    if (!r.campo || r.orfa || !r.pid) continue;
+    const c = centroDaProposta(r);
+    if (c) feicoes.push({ type: 'Feature', properties: { id: 'prop:' + r.id, cat: 'rev' }, geometry: { type: 'Point', coordinates: c } });
+  }
+  setData('notes', { type: 'FeatureCollection', features: feicoes });
 }
 
 /** Planilha e km de uma nota. No modo privacidade, refeitos com o nome e o km ocultos (a nota guarda os reais). */
@@ -305,7 +373,7 @@ function ocorrenciasHtml(): string {
 
 /** Exportar as notas: planilha (principal), CSV e compartilhar. */
 function exportarHtml(): string {
-  const n = E.notes.length, novas = notasNovasSemExportar();
+  const n = totalExportavel(), novas = notasNovasSemExportar();
   const lembrete = precisaLembrar(novas) ? `<p class="nrl-lembrete" style="margin-bottom:8px">${novas} notas novas sem exportar. Baixe a planilha para guardar uma cópia.</p>` : '';
   return `<div><div class="sect">Exportar notas <span style="text-transform:none;font-weight:500">${n}</span></div>${lembrete}
     <div class="btns"><button class="btn p" id="exXlsx" ${n ? '' : 'disabled'}>Baixar planilha (.xlsx)</button><button class="btn" id="exCsv" ${n ? '' : 'disabled'}>Baixar CSV</button><button class="btn" id="exShare" ${n ? '' : 'disabled'}>Compartilhar</button></div>

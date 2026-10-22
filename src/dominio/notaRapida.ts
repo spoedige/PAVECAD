@@ -3,6 +3,7 @@
 import { localizar, type Local, type LocP } from './localizar';
 
 export const TIPOS_RAPIDOS = {
+  // melhorar e retirar são as notas da primeira versão: continuam na lista e na exportação, mas o menu não as cria mais
   melhorar: { rotulo: 'Melhorar solução', curto: 'Melhorar', cat: 'rev' },
   retirar: { rotulo: 'Retirar solução', curto: 'Retirar', cat: 'rev' },
   dreno_mais: { rotulo: 'Colocar dreno', curto: 'Dreno +', cat: 'dre' },
@@ -82,17 +83,34 @@ export function dadosDeLocal(l: Local | null, estado: EstadoLocal, kmTxt: (p: Lo
 /* Menu circular                                                     */
 /* ---------------------------------------------------------------- */
 export interface Ponto { x: number; y: number }
-/** Centros dos quatro botões em volta do ponto, deslocados para longe do dedo (para cima primeiro) e sempre inteiros dentro da área. */
-export function posicionarMenu(pt: Ponto, area: { w: number; h: number }, tam = 64, raio = 116, margem = 8): { botoes: Ponto[]; angulo: number } {
+export interface Roda { botoes: Ponto[]; /** Centro da roda: o ponto pressionado, ou um ponto deslocado para dentro quando a roda não cabe em volta dele. */ centro: Ponto; angulo: number; deslocada: boolean }
+
+/** Posiciona `n` botões de lado `tam` em arco em volta do ponto, para longe do dedo (para cima primeiro), sem sobrepor os vizinhos e sempre inteiros dentro da área.
+ *  O passo angular vem do tamanho do botão e do raio (mínimo `passoMin`). Se nenhum arco cabe em volta do ponto, o raio cresce; sem espaço mesmo assim,
+ *  a roda inteira é centrada num ponto deslocado para dentro da tela ("arco ajustado à borda"). */
+export function posicionarRoda(pt: Ponto, area: { w: number; h: number }, n: number, tam = 64, raio = 116, margem = 8, passoMin = 0): Roda {
   const dentro = (b: Ponto) => b.x - tam / 2 >= margem && b.x + tam / 2 <= area.w - margem && b.y - tam / 2 >= margem && b.y + tam / 2 <= area.h - margem;
-  const gerar = (centro: number, r: number): Ponto[] => [0, 1, 2, 3].map((k) => {
-    const a = ((centro + (k - 1.5) * 46) * Math.PI) / 180;
-    return { x: pt.x + r * Math.cos(a), y: pt.y + r * Math.sin(a) };
+  const passoDe = (r: number) => Math.max(passoMin, (2 * Math.asin(Math.min(1, (tam + 6) / (2 * r))) * 180) / Math.PI);
+  const gerar = (c: Ponto, centro: number, r: number, passo: number): Ponto[] => Array.from({ length: n }, (_, k) => {
+    const a = ((centro + (k - (n - 1) / 2) * passo) * Math.PI) / 180;
+    return { x: c.x + r * Math.cos(a), y: c.y + r * Math.sin(a) };
   });
-  const angulos = [-90, 90, 180, 0, -135, -45, 135, 45];
-  for (const r of [raio, raio + 16, raio + 32]) for (const a of angulos) { const b = gerar(a, r); if (b.every(dentro)) return { botoes: b, angulo: a }; }
-  const b = gerar(-90, raio).map((q) => ({ x: Math.min(area.w - margem - tam / 2, Math.max(margem + tam / 2, q.x)), y: Math.min(area.h - margem - tam / 2, Math.max(margem + tam / 2, q.y)) }));
-  return { botoes: b, angulo: -90 };
+  const angulos = [-90, 90, 180, 0, -135, -45, 135, 45, -112, -68, 112, 68, 157, 23, -157, -23];
+  for (const r of [raio, raio + 16, raio + 32, raio + 48]) for (const a of angulos) {
+    const b = gerar(pt, a, r, passoDe(r));
+    if (b.every(dentro)) return { botoes: b, centro: pt, angulo: a, deslocada: false };
+  }
+  // anel completo num centro deslocado: cabe sempre que a área comporta o anel
+  const R = Math.max(tam, Math.min(raio, Math.min(area.w, area.h) / 2 - tam / 2 - margem));
+  const lim = (v: number, tot: number) => Math.min(tot - margem - tam / 2 - R, Math.max(margem + tam / 2 + R, v));
+  const c = { x: lim(pt.x, area.w), y: lim(pt.y, area.h) };
+  return { botoes: gerar(c, -90, R, Math.max(passoDe(R), 360 / n)), centro: c, angulo: -90, deslocada: true };
+}
+
+/** Os quatro botões do menu principal (46° entre eles). */
+export function posicionarMenu(pt: Ponto, area: { w: number; h: number }, tam = 64, raio = 116, margem = 8): { botoes: Ponto[]; angulo: number } {
+  const r = posicionarRoda(pt, area, 4, tam, raio, margem, 46);
+  return { botoes: r.botoes, angulo: r.angulo };
 }
 
 /* ---------------------------------------------------------------- */
