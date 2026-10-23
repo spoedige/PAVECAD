@@ -7,7 +7,7 @@ Extração de referência em Python: `extract.py` (mesmo mapeamento de colunas q
 
 Ler a planilha padrão de unifilar de restauração (abas `Unifilar` e `Solução`) e mostrar, em mapa, cada faixa de cada segmento de 20 m com sua solução e seus parâmetros. Coloração por solução, IRI, ATR, D0, Rc e % de defeitos. Painel lateral por segmento e unifilar de km na base.
 
-## Contrato de dados (planilha exemplo BR-050/MG Crescente)
+## Contrato de dados (planilha exemplo BR-900/MG Crescente)
 
 Índices de coluna começam em 0. Linhas de dados: aba `Unifilar` a partir da linha 11 (índice 10), filtrando linhas com número na coluna 13. Aba `Solução` a partir da linha 10, filtrando número na coluna 2. O vínculo entre as abas é o hodômetro em metros (`round(km*1000)`).
 

@@ -825,7 +825,7 @@ function setTab(t){
 function renderAll(){ updateStakes();
   renderViews(); renderLegend(); renderResumo(); renderSeg(); renderAna(); renderNotes(); renderAj(); renderGroups(); syncAllSegs(); drawUni();
   const v=visibleProjects();
-  $('#title').textContent = P.length ? `${P.length} planilha${P.length>1?'s':''} · BR-050` : 'Nenhuma planilha';
+  $('#title').textContent = P.length ? `${P.length} planilha${P.length>1?'s':''} · BR-900` : 'Nenhuma planilha';
   $('#subtitle').textContent = v.length ? `${v.length} visível${v.length>1?'eis':''} · padrão RoadRunner` : 'Carregue um arquivo no padrão RoadRunner';
 }
 function renderViews(){
@@ -1464,7 +1464,7 @@ async function boot(){
     try{ const d=await gunzipB64(EMBED[key]); addProjectData(d); }catch(err){ toast('Falha ao abrir dados de exemplo: '+err.message,6000); }
   }
   resolveProps(); refreshPropLayers();
-  activeGroup='BR-050/MG'; settingsPid=(P[0]||{}).id;
+  activeGroup='BR-900/MG'; settingsPid=(P[0]||{}).id;
   if(mapReady){ renderAll(); fitAll(true); applyPaint(); }
   syncAllSegs();
 }

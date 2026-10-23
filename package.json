@@ -7,15 +7,28 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "e2e": "node scripts/capturas/e2e.cjs",
+    "capturas": "node scripts/capturas/run.cjs",
+    "auditoria-ui": "node scripts/auditoria-ui.cjs"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",
+    "playwright": "^1.56.1",
     "typescript": "^7.0.2",
     "vite": "^8.3.4",
-    "vitest": "^5.0.5"
+    "vite-plugin-pwa": "^2.0.0",
+    "vitest": "^5.0.5",
+    "workbox-build": "^7.4.1",
+    "workbox-window": "^7.4.1"
   },
   "dependencies": {
-    "xlsx": "^0.18.5"
+    "fflate": "^0.8.3",
+    "maplibre-gl": "^4.7.1",
+    "xlsx": "^0.18.5",
+    "xlsx-js-style": "^1.2.0"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }
