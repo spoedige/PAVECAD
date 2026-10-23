@@ -1499,8 +1499,14 @@ const TESTES = {
       assert.equal(await pg.isHidden('#offBadge'), true, 'online: sem selo');
       await ctx.grantPermissions(['geolocation']);
       await ctx.setGeolocation({ latitude: alvo.lat, longitude: alvo.lon, accuracy: 10 });
+      // sem rede de verdade: o navegador diz offline e os tiles novos falham em sequência (só o aviso do navegador não basta)
+      const semTiles = (r) => r.abort();
+      await ctx.route(/(tile\.openstreetmap\.org|server\.arcgisonline\.com|api\.maptiler\.com)/, semTiles);
       await ctx.setOffline(true);
-      await pg.waitForFunction(() => window.__pavecad.E.base === 'none', null, { timeout: 5000 });
+      await pg.waitForSelector('#offBadge:not([hidden])', { timeout: 5000 });
+      assert.equal(await pg.evaluate(() => window.__pavecad.E.base), 'esri', 'só o aviso do navegador não troca o fundo');
+      await pg.evaluate(() => window.__pavecad.map().jumpTo({ zoom: 16.4 }));
+      await pg.waitForFunction(() => window.__pavecad.E.base === 'none', null, { timeout: 8000 });
       assert.equal((await pg.textContent('#offBadge')).trim(), 'Offline');
       assert.equal(await pg.isVisible('#offBadge'), true);
       assert.equal(await pg.evaluate(() => document.querySelector('#base [data-b=none]').getAttribute('aria-pressed')), 'true', 'o seletor mostra Liso');
@@ -1508,13 +1514,18 @@ const TESTES = {
       await pg.click('#btnGps'); await pg.waitForSelector('#gRef', { timeout: 8000 });
       assert.match(await pg.textContent('#gRef'), /^km \d+\+\d{3} · a \d+ m do eixo · Fx \d$/, 'km e distância ao eixo sem rede');
       await pg.click('#btnGps');
+      await ctx.unroute(/(tile\.openstreetmap\.org|server\.arcgisonline\.com|api\.maptiler\.com)/, semTiles);
       await ctx.setOffline(false);
       await pg.waitForFunction(() => window.__pavecad.E.base === 'esri', null, { timeout: 5000 });
       assert.equal(await pg.isHidden('#offBadge'), true, 'o selo some ao voltar');
       assert.equal(await pg.evaluate(() => document.querySelector('#base [data-b=esri]').getAttribute('aria-pressed')), 'true');
       // se a pessoa escolheu outro fundo sem rede, a escolha dela vale ao voltar
-      await ctx.setOffline(true); await pg.waitForFunction(() => window.__pavecad.E.base === 'none');
+      await ctx.route(/(tile\.openstreetmap\.org|server\.arcgisonline\.com|api\.maptiler\.com)/, semTiles);
+      await ctx.setOffline(true); await pg.evaluate(() => window.__pavecad.map().jumpTo({ zoom: 17.7 }));
+      await pg.waitForFunction(() => window.__pavecad.E.base === 'none', null, { timeout: 8000 });
+      assert.equal(await pg.evaluate(() => [...document.querySelectorAll('#base button')].some((b) => b.disabled)), false, 'as opções de fundo nunca ficam desabilitadas');
       await pg.click('[data-b=osm]'); await pg.waitForTimeout(200);
+      await ctx.unroute(/(tile\.openstreetmap\.org|server\.arcgisonline\.com|api\.maptiler\.com)/, semTiles);
       await ctx.setOffline(false); await pg.waitForTimeout(400);
       assert.equal(await pg.evaluate(() => window.__pavecad.E.base), 'osm', 'a escolha manual não é desfeita');
       await pg.click('[data-b=none]');
@@ -2192,6 +2203,80 @@ const TESTES = {
       assert.equal(rg.tinta, 0, 'nenhum rótulo cortado na borda direita da régua');
     }],
   ],
+  // Teste de fumaça do celular (toque real via CDP): encadeia as ações na mesma sessão, sem recarregar, e exige que a seguinte responda.
+  t25: [
+    ['celular, fumaça em sequência (toques CDP): fundo, camada, ir para km, pressão, cancelar por movimento, alterar solução, gaveta e abas', ['cel-412x915'], async (pg, { ctx }) => {
+      const cdp = await ctx.newCDPSession(pg);
+      const erros = [];
+      pg.on('pageerror', (e) => erros.push(e.message));
+      const T = (type, x, y) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' || type === 'touchCancel' ? [] : [{ x, y, id: 1 }] });
+      const centro = (sel) => pg.evaluate((q) => { const e = document.querySelector(q); if (!e || !e.checkVisibility()) return null; const r = e.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2, t = document.elementFromPoint(x, y); return { x, y, ok: !!t && (e.contains(t) || t.contains(e)), topo: t ? (t.id || t.className || t.tagName) : null }; }, sel);
+      /** Toque real no centro do controle; falha se o controle não existe ou se outro elemento recebe o toque. */
+      const tocar = async (sel, rotulo) => {
+        const c = await centro(sel);
+        assert.ok(c, `${rotulo}: controle ausente (${sel})`);
+        assert.ok(c.ok, `${rotulo}: o toque iria para ${c.topo}, não para ${sel}`);
+        await T('touchStart', c.x, c.y); await pg.waitForTimeout(60); await T('touchEnd'); await pg.waitForTimeout(380);
+      };
+      const pressionar = async (x, y, ms, mover) => {
+        await T('touchStart', x, y); await pg.waitForTimeout(ms);
+        if (mover === 'mover') { await T('touchMove', x + 40, y + 40); await pg.waitForTimeout(120); }
+        if (mover === 'cancelar') await T('touchCancel'); else await T('touchEnd');
+        await pg.waitForTimeout(450);
+      };
+      const menuAberto = () => pg.evaluate(() => document.querySelectorAll('#nr .nr-op').length);
+      const estadoApp = (f) => pg.evaluate(`(${f})(window.__pavecad.E)`);
+      const respondem = async (rotulo) => { for (const sel of ['#cMapa', '#btnCamada', '#cLocal', '#gavTxt']) { const c = await centro(sel); assert.ok(c && c.ok, `${rotulo}: ${sel} deixou de responder (${c ? 'coberto por ' + c.topo : 'ausente'})`); } };
+      await pg.evaluate(() => document.querySelectorAll('.nr-dica,#nrDica').forEach((e) => e.remove()));
+      let ponto = { x: 206, y: 420 };
+
+      // 1. fundo para Satélite, fechar a folha "Mapa", abrir e fechar de novo
+      await tocar('#cMapa', 'abrir Mapa'); await tocar('#drawer #base [data-b=esri]', 'Satélite');
+      assert.equal(await estadoApp('E => E.base'), 'esri');
+      await tocar('#cMapa', 'fechar Mapa'); await respondem('depois do fundo');
+      await tocar('#cMapa', 'abrir ⋯'); await tocar('#cMapa', 'fechar ⋯'); await respondem('depois do ⋯');
+      // 2. camada
+      await tocar('#btnCamada', 'chip de camada'); await tocar('#modes [data-m=iri]', 'camada IRI');
+      assert.equal(await estadoApp('E => E.mode'), 'iri'); await respondem('depois da camada');
+      // 3. Ir para km
+      await tocar('#cLocal', 'Ir para km'); await pg.fill('#cGoKm', '170+500'); await tocar('#cGoBtn', 'Ir'); await pg.waitForTimeout(1200); await respondem('depois do km');
+      ponto = await centrarNaFaixa(pg, 0, 300, 1); // um ponto sobre a pista para a pressão
+      // 4. pressão abre o menu; Escape fecha
+      await pressionar(ponto.x, ponto.y, 850);
+      assert.ok(await menuAberto() >= 4, 'a pressão abriu o menu'); await pg.keyboard.press('Escape'); await pg.waitForTimeout(300);
+      assert.equal(await menuAberto(), 0); await respondem('depois do menu');
+      // 5. pressão cancelada por movimento: nada abre e o mapa segue respondendo
+      await pressionar(ponto.x, ponto.y, 180, 'mover');
+      assert.equal(await menuAberto(), 0, 'o movimento cancelou a pressão'); await respondem('depois do cancelamento por movimento');
+      // 6. pressão interrompida por touchCancel: nada abre, nada fica preso
+      await pressionar(ponto.x, ponto.y, 180, 'cancelar');
+      assert.equal(await menuAberto(), 0, 'touchCancel cancelou a pressão');
+      assert.equal(await pg.evaluate(() => { const a = document.querySelector('.nr-anel'); return !a || a.hidden; }), true, 'o anel de progresso não fica na tela');
+      await respondem('depois do touchCancel');
+      // 7. de novo a pressão, e "Alterar solução" (roda e solução); o arrasto do passo 5 moveu o mapa, então a pista é centrada de novo
+      ponto = await centrarNaFaixa(pg, 0, 300, 1);
+      await pressionar(ponto.x, ponto.y, 850);
+      assert.ok(await menuAberto() >= 4, 'o menu abre de novo depois do cancelamento');
+      assert.equal(await pg.locator('#nr input, #nr textarea').count(), 0, 'o menu não pede texto');
+      await tocar('#nr .nr-op[data-t=alterar]', 'Alterar solução');
+      await pg.waitForSelector('#nr .nr-s:not([disabled])', { timeout: 4000 }).catch(async () => { throw new Error('a roda de soluções não abriu: ' + (await pg.evaluate(() => { const n = document.querySelector('#nr'); return `${n.hidden} | ${n.textContent.slice(0, 120)} | ${n.className}`; }))); });
+      await pg.waitForTimeout(500);
+      await tocar('#nr .nr-s:not([disabled])', 'escolher a solução'); await pg.waitForTimeout(500);
+      assert.equal(await estadoApp('E => E.props.length'), 1, 'a alteração de solução foi gravada com um toque');
+      await pg.keyboard.press('Escape'); await pg.waitForTimeout(300);
+      // 8. dreno grava com um toque, sem texto
+      ponto = await centrarNaFaixa(pg, 0, 312, 1);
+      await pressionar(ponto.x, ponto.y, 850); await tocar('#nr .nr-op[data-t=dreno_mais]', 'Colocar dreno'); await pg.waitForTimeout(500);
+      assert.equal(await estadoApp('E => E.notes.length'), 1, 'o dreno gravou com um toque');
+      assert.equal(await pg.locator('#nr input, #nr textarea').count(), 0, 'o dreno não pede texto');
+      await pg.keyboard.press('Escape'); await pg.waitForTimeout(300); await respondem('depois do dreno');
+      // 9. gaveta e abas
+      await tocar('#gavTxt', 'abrir a gaveta'); await tocar('#tabs [data-t=ana]', 'aba Análise'); await tocar('#tabs [data-t=exp]', 'aba Exportar'); await tocar('#tabs [data-t=seg]', 'aba Segmento');
+      assert.equal(await pg.evaluate(() => document.querySelector('#tabs [aria-selected=true]').dataset.t), 'seg');
+      assert.deepEqual(erros, [], 'nenhuma exceção não tratada');
+    }],
+  ],
+
   t24: [
     ['celular, critérios de aceite: com planilha e gaveta fechada, mapa livre de 70% ou mais, nada além da borda nem rolagem horizontal, alvos de 44 px, sem sobreposição', CELULARES, async (pg, { vpNome }) => {
       assert.equal(await pg.evaluate(() => document.documentElement.classList.contains('celular')), true);

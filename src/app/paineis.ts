@@ -16,6 +16,7 @@ import { IC } from './icones';
 import { applyLayers, applyPaint, clearFocus, clearSel, fitAll, fitFocus, fitList, getMap, renderLegend, select, setBase, setFocus, setProjectData, stepSel, updateSelLayer, updateStakes, applyVisibility, temMapTiler } from './mapa';
 import { drawUni, renderGroups } from './unifilar';
 import { refreshProp, refreshPropLayers, renderNotes, resolveProps, startNote } from './revisao';
+import { renderDiagnostico } from './diagnostico';
 import { $, cssv, esc, fmt, syncAllSegs, syncSeg, toast, toastAcao } from './ui';
 
 const Q = () => (E.field ? Q5F : Q5);
@@ -379,6 +380,10 @@ e(n) = e0 + dir · Σ largura(1..n)
 P(n) = P + e(n) · (nE , nN)</div>
       <p class="note" style="margin-top:8px">O sentido decrescente usa o mesmo cálculo com a normal invertida, porque as linhas da planilha seguem a quilometragem crescente.</p></details>`;
   ligarSelecao(el, { itens: lista, marcadas: E.settingsSel, origem: p ? itemDe(p) : undefined, aoMudar: () => renderAj() });
+  const diag = document.createElement('div');
+  diag.id = 'diagBox';
+  el.appendChild(diag);
+  renderDiagnostico(diag);
   document.getElementById('irAlinhar')?.addEventListener('click', () => abrirAlinhar());
   if (p) {
     // seletores: mostra o valor comum; se as marcadas diferem, "vários"

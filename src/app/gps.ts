@@ -147,6 +147,14 @@ function ligarChip(chip: HTMLElement) {
 
 /* ---- posição manual ---- */
 
+/** Entrada pelo "Definir posição por km" da aba Campo e offline (e pelo botão do chip): espera o toque no mapa ou o km digitado. */
+export function iniciarPosicaoManual() {
+  gps.definindo = true;
+  desenharChip();
+  document.getElementById('gKm')?.focus();
+}
+
+
 export function definirPosicaoManual(m: Manual) {
   gps.estado = { ...gps.estado, manual: m };
   gps.definindo = false;

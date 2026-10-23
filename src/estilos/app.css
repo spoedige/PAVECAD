@@ -651,3 +651,6 @@ details.bk{margin-top:6px;opacity:.85}
 
 /* botões dos controles segmentados nunca encolhem abaixo do texto: o controle rola por dentro quando falta largura */
 .seg button{flex:0 0 auto}
+
+/* toque longo no mapa: sem menu nativo do Android, sem seleção de texto e sem lupa */
+#map,.maplibregl-canvas-container,.maplibregl-canvas{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
