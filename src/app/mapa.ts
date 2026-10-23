@@ -604,7 +604,8 @@ const fitPad = () => {
   const dir = ret('#inspector'), uni = ret('#unicard');
   const direita = dir ? innerWidth - dir.left + m : 60;
   // o unifilar pode ainda não ter a altura final no primeiro enquadramento: vale o maior entre o medido e a altura padrão (190 px), salvo recolhido
-  const baixo = uni ? Math.max(innerHeight - uni.top, E.uniCollapsed ? 0 : 204) + m : 60;
+  // +8 px: a rodovia é desenhada com a largura real das faixas, que passa dos pontos do eixo usados no enquadramento
+  const baixo = uni ? Math.max(innerHeight - uni.top, E.uniCollapsed ? 0 : 204) + m + 8 : 60;
   const w = innerWidth, h = innerHeight;
   // sem folga demais: sobra ao menos metade da tela para a rodovia (cada eixo com o seu fator)
   const fx = Math.min(1, (w * 0.5) / Math.max(1, esq + direita)), fy = Math.min(1, (h * 0.5) / Math.max(1, topo + baixo));
