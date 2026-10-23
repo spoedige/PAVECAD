@@ -22,6 +22,7 @@ export function registrarErro(msg: unknown, onde = '', pilha = '') {
     pilha: String(pilha).split('\n').slice(0, 4).join('\n').slice(0, 400),
   };
   gravarErros([...errosGuardados(), e]);
+  try { document.dispatchEvent(new CustomEvent('pavecad-erro')); } catch { /* sem DOM */ }
 }
 export const limparErros = () => { try { localStorage.removeItem(CHAVE_ERROS); } catch { /* sem storage */ } };
 
@@ -98,6 +99,8 @@ export function ligarDiagToque(on: boolean) {
 
 /** Liga os registradores de erro e, se estava ligado, o diagnóstico de toque. Chamar o mais cedo possível. */
 export function iniciarDiagnostico() {
+  // a seção de Ajustes se atualiza sozinha quando um erro novo é guardado
+  document.addEventListener('pavecad-erro', () => { const b = document.getElementById('diagBox'); if (b) renderDiagnostico(b); });
   window.addEventListener('error', (e) => registrarErro(e.message || 'erro', e.filename ? `${e.filename.split('/').pop()}:${e.lineno}` : '', e.error?.stack ?? ''));
   window.addEventListener('unhandledrejection', (e) => registrarErro((e.reason && (e.reason.message ?? e.reason)) || 'promessa rejeitada', 'promessa', e.reason?.stack ?? ''));
   if (diagToqueLigado()) ligarDiagToque(true);

@@ -2275,6 +2275,43 @@ const TESTES = {
       assert.equal(await pg.evaluate(() => document.querySelector('#tabs [aria-selected=true]').dataset.t), 'seg');
       assert.deepEqual(erros, [], 'nenhuma exceção não tratada');
     }],
+    ['Ajustes: diagnóstico com versão, Atualizar app, relatório dos últimos erros e modo diagnóstico de toque', ['1366x768'], async (pg, { ctx }) => {
+      await ctx.grantPermissions(['clipboard-read', 'clipboard-write']).catch(() => {});
+      await pg.evaluate(() => localStorage.removeItem('pavecad-erros'));
+      await aba(pg, 'aj'); await pg.waitForSelector('#dgVersao');
+      assert.match(await pg.textContent('#dgVersao'), /\S+ · /, 'versão do app (hash e data)');
+      assert.equal((await pg.textContent('#dgAtualiza')).trim(), 'Atualizar app');
+      assert.match(await pg.textContent('#dgQtd'), /Nenhum erro guardado/);
+      // um erro de JavaScript não tratado vai para o relatório local (e só para ele)
+      await pg.evaluate(() => { setTimeout(() => { throw new Error('erro de teste do relatório'); }, 0); });
+      await pg.waitForTimeout(300);
+      await aba(pg, 'seg'); await aba(pg, 'aj'); await pg.waitForSelector('#dgQtd');
+      assert.match(await pg.textContent('#dgQtd'), /1 erro guardado/);
+      await pg.click('#dgCopia'); await pg.waitForTimeout(300);
+      const txt = await pg.evaluate(() => navigator.clipboard.readText().catch(() => ''));
+      if (txt) { assert.match(txt, /^PAVECAD versão /); assert.match(txt, /erro de teste do relatório/); }
+      // modo diagnóstico de toque: desligado por padrão; ligado, mostra o último evento e o elemento que o recebeu
+      assert.equal(await pg.locator('#diagToque').count(), 0, 'desligado por padrão');
+      await pg.click('#dgToque'); await pg.waitForSelector('#diagToque');
+      await pg.mouse.click(700, 300); await pg.waitForTimeout(200);
+      assert.match(await pg.textContent('#diagToque'), /recebeu: .*\nsob o ponto: /);
+      await pg.click('#dgToque'); await pg.waitForTimeout(150);
+      assert.equal(await pg.locator('#diagToque').count(), 0, 'desligar remove a caixa');
+      await pg.click('#dgLimpa'); await pg.waitForTimeout(150);
+      assert.match(await pg.textContent('#dgQtd'), /Nenhum erro guardado/);
+    }],
+    ['Campo e offline: a página abre com o estado e o botão Preparar para campo, e nunca fica em branco mesmo sem Cache API', ['1366x768'], async (pg) => {
+      // simula um navegador (aba privada) em que o Cache API e o armazenamento falham
+      await pg.evaluate(() => { Object.defineProperty(window, 'caches', { value: { open: () => Promise.reject(new Error('bloqueado')), keys: () => Promise.reject(new Error('bloqueado')), delete: () => Promise.reject(new Error('bloqueado')) }, configurable: true }); });
+      await pg.click('#btnCfg'); await pg.click('#cfgTabs [data-ct=campo]'); await pg.waitForSelector('#cpConexao');
+      assert.match(await pg.textContent('#cpConexao'), /^(Online|Offline)$/);
+      assert.equal((await pg.textContent('#cpPrep')).trim(), 'Preparar para campo');
+      for (const id of ['#cpArmaz', '#cpPrepara', '#cpCache', '#cpPosicao', '#cpAjuda']) assert.equal(await pg.isVisible(id), true, id + ' visível');
+      await pg.waitForFunction(() => /ainda não disponível/.test(document.querySelector('#cpTiles').textContent), null, { timeout: 6000 });
+      assert.match(await pg.textContent('#cpTiles'), /ainda não disponível/, 'o que falha mostra a mensagem, não uma página em branco');
+      assert.ok((await pg.textContent('#cpLimpar')).trim() === 'Limpar tiles');
+      await pg.click('#cfgClose');
+    }],
   ],
 
   t24: [
