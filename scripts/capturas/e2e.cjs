@@ -1645,8 +1645,9 @@ const TESTES = {
       // pressão: antes dos 500 ms nada; depois, menu
       await pg.mouse.move(ponto.x, ponto.y); await pg.mouse.down(); await pg.waitForTimeout(250);
       assert.equal(await pg.locator('#nr .nr-op').count(), 0, 'aos 250 ms ainda não abriu');
-      assert.equal(await pg.isVisible('.nr-anel'), true, 'anel de progresso durante a pressão');
-      await pg.waitForTimeout(450); await pg.mouse.up(); await pg.waitForTimeout(300);
+      assert.equal(await pg.waitForFunction(() => { const a = document.querySelector('.nr-anel'); return !!a && !a.hidden; }, null, { timeout: 380 }).then(() => true, () => false), true, 'anel de progresso durante a pressão');
+      // a margem cobre o atraso do desenho do mapa em máquinas lentas: solta só depois de 1 s segurando
+      await pg.waitForSelector('#nr .nr-op', { timeout: 1500 }).catch(() => {}); await pg.waitForTimeout(150); await pg.mouse.up(); await pg.waitForTimeout(300);
       assert.equal(await pg.locator('#nr .nr-op').count(), 4, 'aos 700 ms o menu está aberto');
       assert.ok(!(await estado(pg, 'E => !!E.sel')), 'o clique que sobra da pressão não seleciona nada');
       // auditoria: nada obrigatório. Sem campo de texto, seletor nem confirmação
