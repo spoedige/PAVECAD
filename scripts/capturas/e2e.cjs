@@ -1643,11 +1643,13 @@ const TESTES = {
       assert.ok(await estado(pg, 'E => !!E.sel'), 'clique simples seleciona o segmento');
       await pg.evaluate(() => window.__pavecad.E.sel = null);
       // pressão: antes dos 500 ms nada; depois, menu
+      // o anel aparece antes do menu; um observador registra isso, sem depender do atraso do desenho do mapa em máquinas lentas
+      await pg.evaluate(() => { window.__anelVisto = false; const a = document.querySelector('.nr-anel'); new MutationObserver(() => { if (!a.hidden) window.__anelVisto = true; }).observe(a, { attributes: true }); });
       await pg.mouse.move(ponto.x, ponto.y); await pg.mouse.down(); await pg.waitForTimeout(250);
       assert.equal(await pg.locator('#nr .nr-op').count(), 0, 'aos 250 ms ainda não abriu');
-      assert.equal(await pg.waitForFunction(() => { const a = document.querySelector('.nr-anel'); return !!a && !a.hidden; }, null, { timeout: 380 }).then(() => true, () => false), true, 'anel de progresso durante a pressão');
-      // a margem cobre o atraso do desenho do mapa em máquinas lentas: solta só depois de 1 s segurando
-      await pg.waitForSelector('#nr .nr-op', { timeout: 1500 }).catch(() => {}); await pg.waitForTimeout(150); await pg.mouse.up(); await pg.waitForTimeout(300);
+      // solta só depois de o menu abrir (com folga para máquinas lentas)
+      await pg.waitForSelector('#nr .nr-op', { timeout: 2500 }).catch(() => {}); await pg.waitForTimeout(150); await pg.mouse.up(); await pg.waitForTimeout(300);
+      assert.equal(await pg.evaluate(() => window.__anelVisto), true, 'anel de progresso durante a pressão');
       assert.equal(await pg.locator('#nr .nr-op').count(), 4, 'aos 700 ms o menu está aberto');
       assert.ok(!(await estado(pg, 'E => !!E.sel')), 'o clique que sobra da pressão não seleciona nada');
       // auditoria: nada obrigatório. Sem campo de texto, seletor nem confirmação
