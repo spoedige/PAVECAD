@@ -82,3 +82,7 @@ details.ana-sec>.ana-c{display:flex;flex-direction:column;gap:14px;padding:4px 0
 .dash-c details.rgrp{background:var(--fill)}
 .dash-c details.rgrp .rg-c{padding:6px 0 12px}
 html.dash-aberto .inspector,html.dash-aberto .uni{z-index:4}
+
+/* diagnóstico em Ajustes */
+.dg-btns{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+#diagToque{position:fixed;left:8px;bottom:8px;z-index:9999;margin:0;padding:6px 8px;max-width:calc(100vw - 16px);border-radius:8px;background:rgba(0,0,0,.78);color:#fff;font:12px/1.35 var(--mono,monospace);white-space:pre-wrap;pointer-events:none}

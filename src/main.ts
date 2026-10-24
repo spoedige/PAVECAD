@@ -11,6 +11,7 @@ import {
 import type { ModeKey } from './dominio/indicadores';
 import { abrirDb } from './app/persist';
 import { gpsToggle } from './app/gps';
+import { iniciarDiagnostico } from './app/diagnostico';
 import { initOffline } from './app/offline';
 import { agendarPoda } from './app/tilesCache';
 import { initRevisao, onToolClick, refreshNotesLayer, refreshPropLayers, resolveProps, setTool } from './app/revisao';
@@ -28,7 +29,7 @@ import { fecharLegenda, initControles } from './app/controles';
 import { initCelular } from './app/celular';
 import { fecharNotaRapida, initNotaRapida, notaNoMeuLocal } from './app/notaRapida';
 import { clearFocus } from './app/mapa';
-import { $, observarHud, observarRolagem, observarRolagemH, syncAllSegs, syncSeg, toast } from './app/ui';
+import { $, observarHud, observarRolagem, observarRolagemH, syncAllSegs, syncSeg, toast, toastAcao } from './app/ui';
 
 async function carregarExemplos() {
   const { nomesExemplo, lerExemplo } = await import('./app/exemplo');
@@ -186,11 +187,13 @@ async function boot() {
   if (n) toast(`${n} planilha(s) reaberta(s) deste aparelho`);
   atualizarAviso();
 }
+iniciarDiagnostico();
 void boot();
 
 /* PWA: cache do app para abrir sem rede. Só ativo no build (no dev não há service worker). */
-registerSW({
+const atualizarSW = registerSW({
   immediate: true,
+  onNeedRefresh: () => toastAcao('Nova versão disponível', 'Atualizar', () => void atualizarSW(true), 20000),
   onOfflineReady: () => toast('Pronto para uso sem internet', 4000),
   onRegisterError: (e) => console.warn('service worker:', e),
 });

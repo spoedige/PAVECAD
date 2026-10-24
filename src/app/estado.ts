@@ -115,6 +115,9 @@ export const H = {
   /** Ferramentas ativas consomem o clique; devolve true quando consumiu. */
   onClick: (_e: MapMouseEvent): boolean => false,
   onView: () => {},
+  /** Um tile do fundo falhou ou carregou (detecção de falta de rede). */
+  onTileErro: () => {},
+  onTileOk: () => {},
   /** O catálogo mudou (código novo visto, edição, importação). */
   onCatalogo: () => {},
 };

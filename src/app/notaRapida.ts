@@ -1,3 +1,4 @@
+import { registrarErro } from './diagnostico';
 import { kmLabel } from '../formats';
 import * as catalogo from '../dominio/catalogo';
 import type { Local, LocP } from '../dominio/localizar';
@@ -557,23 +558,33 @@ export function initNotaRapida() {
     } else limparDestaque();
   };
 
-  cont.addEventListener('pointerdown', (e) => {
+  /** Qualquer erro num gesto de entrada limpa o estado da pressão e é guardado em Ajustes > Diagnóstico: um gesto que falha nunca pode deixar o mapa sem responder. */
+  const seguro = (onde: string, f: () => void) => {
+    try { f(); } catch (err) {
+      registrarErro(err, onde, err instanceof Error ? err.stack : '');
+      try { cancelar(false); if (menu) fecharMenu(); } catch { /* o estado já está limpo o bastante */ }
+    }
+  };
+  cont.addEventListener('pointerdown', (e) => seguro('pressão (pointerdown)', () => {
     if (ini && e.pointerId !== ini.id) { cancelar(); return; } // segundo dedo: é gesto de zoom ou rotação
     if ((e.pointerType === 'mouse' && e.button !== 0) || !livre() || !noMapa(e)) return;
     const dur = pressaoMs();
     ini = { x: e.clientX, y: e.clientY, id: e.pointerId };
-    mostra = setTimeout(() => { if (ini) mostrarAnel(ini.x, ini.y, dur); }, PRESSAO_ATRASO_MS);
-    timer = setTimeout(() => {
+    mostra = setTimeout(() => seguro('pressão (anel)', () => { if (ini) mostrarAnel(ini.x, ini.y, dur); }), PRESSAO_ATRASO_MS);
+    timer = setTimeout(() => seguro('pressão (abrir o menu)', () => {
       if (!ini) return;
       const { x, y } = ini;
       cancelar(false); disparouEm = Date.now();
       E.cliqueSuprimidoAte = Date.now() + 700;
       vibrar(30);
       abrirEm(x, y);
-    }, dur);
-  });
+    }), dur);
+  }));
   cont.addEventListener('pointermove', (e) => { if (ini && e.pointerId === ini.id && Math.hypot(e.clientX - ini.x, e.clientY - ini.y) > PRESSAO_MOVE_PX) cancelar(); });
-  for (const ev of ['pointerup', 'pointercancel', 'pointerleave'] as const) cont.addEventListener(ev, () => cancelar());
+  // fim ou interrupção do gesto por qualquer caminho: soltar, cancelar, perder a captura, sair da tela, trocar de app ou perder o foco
+  for (const ev of ['pointerup', 'pointercancel', 'pointerleave', 'lostpointercapture', 'touchcancel'] as const) cont.addEventListener(ev, () => cancelar());
+  window.addEventListener('blur', () => cancelar());
+  document.addEventListener('visibilitychange', () => { if (document.hidden) cancelar(); });
   // o menu de contexto do navegador nunca aparece sobre o mapa; o botão direito do mouse abre o menu direto
   cont.addEventListener('contextmenu', (e) => {
     e.preventDefault();
