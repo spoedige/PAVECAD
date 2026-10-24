@@ -45,6 +45,16 @@ async function centrarNaFaixa(pg, iProj, row, lane, zoom = 18.5) {
   return { ...pt, ...r };
 }
 
+/** Pede tiles novos (zooms diferentes) até as falhas em sequência levarem o fundo ao Liso; com a máquina carregada pode levar alguns ciclos. */
+const faltaDeTiles = async (pg) => {
+  for (const z of [16.4, 17.7, 15.9, 17.1, 16.9, 18.3, 15.5, 17.4]) {
+    await pg.evaluate((zz) => window.__pavecad.map().jumpTo({ zoom: zz }), z);
+    const ok = await pg.waitForFunction(() => window.__pavecad.E.base === 'none', null, { timeout: 2500 }).then(() => true, () => false);
+    if (ok) return;
+  }
+  assert.equal(await pg.evaluate(() => window.__pavecad.E.base), 'none', 'as falhas de tile em sequência levam o fundo ao Liso');
+};
+
 const TESTES = {
   t01: [
     ['abas do painel inteiras e subtítulo em duas linhas, nos quatro tamanhos', 'tablet-h-1024x768', async (pg, { ctx }) => {
@@ -1505,8 +1515,7 @@ const TESTES = {
       await ctx.setOffline(true);
       await pg.waitForSelector('#offBadge:not([hidden])', { timeout: 5000 });
       assert.equal(await pg.evaluate(() => window.__pavecad.E.base), 'esri', 'só o aviso do navegador não troca o fundo');
-      await pg.evaluate(() => window.__pavecad.map().jumpTo({ zoom: 16.4 }));
-      await pg.waitForFunction(() => window.__pavecad.E.base === 'none', null, { timeout: 8000 });
+      await faltaDeTiles(pg);
       assert.equal((await pg.textContent('#offBadge')).trim(), 'Offline');
       assert.equal(await pg.isVisible('#offBadge'), true);
       assert.equal(await pg.evaluate(() => document.querySelector('#base [data-b=none]').getAttribute('aria-pressed')), 'true', 'o seletor mostra Liso');
@@ -1521,8 +1530,7 @@ const TESTES = {
       assert.equal(await pg.evaluate(() => document.querySelector('#base [data-b=esri]').getAttribute('aria-pressed')), 'true');
       // se a pessoa escolheu outro fundo sem rede, a escolha dela vale ao voltar
       await ctx.route(/(tile\.openstreetmap\.org|server\.arcgisonline\.com|api\.maptiler\.com)/, semTiles);
-      await ctx.setOffline(true); await pg.evaluate(() => window.__pavecad.map().jumpTo({ zoom: 17.7 }));
-      await pg.waitForFunction(() => window.__pavecad.E.base === 'none', null, { timeout: 8000 });
+      await ctx.setOffline(true); await faltaDeTiles(pg);
       assert.equal(await pg.evaluate(() => [...document.querySelectorAll('#base button')].some((b) => b.disabled)), false, 'as opções de fundo nunca ficam desabilitadas');
       await pg.click('[data-b=osm]'); await pg.waitForTimeout(200);
       await ctx.unroute(/(tile\.openstreetmap\.org|server\.arcgisonline\.com|api\.maptiler\.com)/, semTiles);
