@@ -1547,6 +1547,8 @@ const TESTES = {
         await rota.fulfill({ status: 200, contentType: 'image/png', headers: { 'access-control-allow-origin': '*' }, body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64') });
       });
       await pg.click('#btnCfg'); await pg.click('#cfgTabs [data-ct=campo]'); await pg.waitForSelector('#cpArmaz');
+      // o armazenamento do navegador é preenchido depois do conteúdo fixo da página
+      await pg.waitForFunction(() => /Planilhas: \d+/.test(document.querySelector('#cpPlan').textContent) && /Tiles de mapa: \d+/.test(document.querySelector('#cpTiles').textContent), null, { timeout: 8000 });
       const salvo = await pg.textContent('#cpArmaz');
       assert.match(salvo, /Planilhas: \d+/); assert.match(salvo, /Notas: \d+/); assert.match(salvo, /Propostas: \d+/); assert.match(salvo, /Tiles de mapa: \d+/);
       assert.match(await pg.textContent('#cpProv'), /Liso não tem tiles/, 'no Liso não há o que preparar');
