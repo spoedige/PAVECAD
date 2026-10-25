@@ -41,9 +41,10 @@ export function atualizarCentro() {
 }
 
 export function initCelular() {
-  const map = getMap();
-  map.on('move', atualizarCentro);
-  map.on('moveend', atualizarCentro);
+  /* os botões da tela não dependem do mapa: se o mapa não subiu (WebGL bloqueado, por exemplo), "⋯" e "Abrir planilhas" ainda respondem */
+  const map = getMap() as ReturnType<typeof getMap> | undefined;
+  map?.on('move', atualizarCentro);
+  map?.on('moveend', atualizarCentro);
   atualizarCentro();
 
   /* chip de localização: Ir para km (e a lista de rodovias, se houver mais de uma) */
@@ -91,11 +92,12 @@ export function initCelular() {
   };
   espelho('#btnGps', '#cGps'); espelho('#btnLimpo', '#cLimpo');
   const gira = () => {
+    if (!map) return;
     const rot = Math.abs(map.getBearing()) > 0.5;
     $('#btnCompassC').hidden = !rot;
     $('#compassF').style.transform = `rotate(${-map.getBearing()}deg)`;
   };
-  map.on('rotate', gira); gira();
+  map?.on('rotate', gira); gira();
   $('#btnCompassC').addEventListener('click', () => north());
 
   /* gaveta: três estados, arrastar a alça, tocar na linha de resumo, tocar fora fecha */
@@ -105,7 +107,7 @@ export function initCelular() {
   $('#gavTxt').addEventListener('click', () => { if (gavetaCel() === 'fechada') setGavetaCel('meia'); });
   $('#gavCores').addEventListener('click', (e) => { if ((e.target as HTMLElement).closest('.legmais')) return; setLegendaAberta(true); });
   $('#gavUni').addEventListener('click', () => setUniExpandido(!uniExpandido()));
-  map.on('click', (e) => {
+  map?.on('click', (e) => {
     if (!ehCelular() || gavetaCel() === 'fechada') return;
     if (!hitAt(e.point)) setGavetaCel('fechada');
   });

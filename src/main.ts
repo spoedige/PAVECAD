@@ -9,9 +9,9 @@ import {
   agendarReaplicar, marcosInfo, alignToRoad, applyLayers, clearSel, fitAll, getMap, goLabel, initMap, north, rotate, select, setBase, setNitidez, stepSel, syncNitidezUi, updateStakes,
 } from './app/mapa';
 import type { ModeKey } from './dominio/indicadores';
-import { abrirDb } from './app/persist';
+import { abrirDb, bancoIndisponivel, LIMITE_BANCO_MS } from './app/persist';
 import { gpsToggle } from './app/gps';
-import { iniciarDiagnostico } from './app/diagnostico';
+import { iniciarDiagnostico, registrarErro } from './app/diagnostico';
 import { initOffline } from './app/offline';
 import { agendarPoda } from './app/tilesCache';
 import { initRevisao, onToolClick, refreshNotesLayer, refreshPropLayers, resolveProps, setTool } from './app/revisao';
@@ -44,6 +44,7 @@ async function carregarExemplos() {
 
 /* ---- controles ---- */
 $('#btnFile').addEventListener('click', () => $('#file').click());
+$('#gavAbrir').addEventListener('click', () => $('#file').click()); // celular sem planilha: o botão fica à vista, sem depender do "⋯"
 $('#file').addEventListener('change', (e) => {
   const input = e.target as HTMLInputElement;
   const files = [...(input.files ?? [])];
@@ -146,28 +147,40 @@ if (import.meta.env.DEV) {
   };
 }
 
+/** Cada etapa da partida roda isolada: erro ou espera longa numa delas (banco, mapa) não deixa os botões sem ouvinte. */
+function passo(nome: string, f: () => unknown) {
+  try { f(); } catch (e) { registrarErro(e, 'partida:' + nome, e instanceof Error ? (e.stack ?? '') : ''); }
+}
+async function passoAsync(nome: string, f: () => Promise<unknown>, limiteMs = 6000) {
+  try { await Promise.race([f(), new Promise((r) => setTimeout(r, limiteMs))]); } catch (e) { registrarErro(e, 'partida:' + nome, e instanceof Error ? (e.stack ?? '') : ''); }
+}
+
 async function boot() {
-  E.mode = camadaSalva();
-  try { E.field = localStorage.getItem('pavecad-field') === '1'; } catch { /* sem storage */ }
-  try { E.privacidade = localStorage.getItem('pavecad-privacidade') === '1'; } catch { /* sem storage */ }
-  try { const v = localStorage.getItem('pavecad-padrao'); E.padrao = v === null ? null : v === '1'; } catch { /* sem storage */ }
-  if (E.field) { document.documentElement.setAttribute('data-contrast', 'field'); $('#btnField').setAttribute('aria-pressed', 'true'); }
-  await abrirDb();
-  await carregarConfig();
-  await initRevisao();
-  initUnifilar();
-  initConfig();
-  initOffline(() => abrirConfig('campo'));
-  agendarPoda();
-  try { void navigator.storage?.persist?.(); } catch { /* sem a API */ }
-  initLayout();
-  syncNitidezUi();
-  initGrupos(() => { drawUni(); agendarReaplicar(); });
-  observarHud(agendarReaplicar);
-  document.querySelectorAll<HTMLElement>('.tabbody').forEach(observarRolagem);
-  observarRolagemH($('#unigroups'));
-  renderAll();
-  initMap(() => {
+  passo('prefs', () => {
+    E.mode = camadaSalva();
+    try { E.field = localStorage.getItem('pavecad-field') === '1'; } catch { /* sem storage */ }
+    try { E.privacidade = localStorage.getItem('pavecad-privacidade') === '1'; } catch { /* sem storage */ }
+    try { const v = localStorage.getItem('pavecad-padrao'); E.padrao = v === null ? null : v === '1'; } catch { /* sem storage */ }
+    if (E.field) { document.documentElement.setAttribute('data-contrast', 'field'); $('#btnField').setAttribute('aria-pressed', 'true'); }
+  });
+  await passoAsync('banco', abrirDb, LIMITE_BANCO_MS + 500);
+  await passoAsync('config', carregarConfig);
+  await passoAsync('revisao', initRevisao);
+  passo('unifilar', initUnifilar);
+  passo('config-ui', initConfig);
+  passo('offline', () => initOffline(() => abrirConfig('campo')));
+  passo('poda', agendarPoda);
+  passo('persist', () => { void navigator.storage?.persist?.(); });
+  passo('layout', initLayout);
+  passo('nitidez', syncNitidezUi);
+  passo('grupos', () => initGrupos(() => { drawUni(); agendarReaplicar(); }));
+  passo('hud', () => observarHud(agendarReaplicar));
+  passo('rolagem', () => {
+    document.querySelectorAll<HTMLElement>('.tabbody').forEach(observarRolagem);
+    observarRolagemH($('#unigroups'));
+  });
+  passo('render', renderAll);
+  passo('mapa', () => initMap(() => {
     resolveProps();
     applyLayers();
     refreshNotesLayer();
@@ -175,17 +188,20 @@ async function boot() {
     renderAll();
     updateStakes();
     if (E.P.length) fitAll(true);
-  });
-  initNotaRapida(); // depois do initMap: precisa da instância do mapa
-  initPinoNotas();
-  initDash();
-  initCamadas();
-  initControles();
-  initCelular();
-  syncAllSegs();
-  const n = await restaurarProjetos();
-  if (n) toast(`${n} planilha(s) reaberta(s) deste aparelho`);
-  atualizarAviso();
+  }));
+  passo('nota-rapida', initNotaRapida); // depois do initMap: precisa da instância do mapa
+  passo('pino', initPinoNotas);
+  passo('dash', initDash);
+  passo('camadas', initCamadas);
+  passo('controles', initControles);
+  passo('celular', initCelular);
+  passo('segs', syncAllSegs);
+  if (bancoIndisponivel) toast('Armazenamento do navegador indisponível: nada será salvo neste aparelho');
+  await passoAsync('restaurar', async () => {
+    const n = await restaurarProjetos();
+    if (n) toast(`${n} planilha(s) reaberta(s) deste aparelho`);
+  }, 30000);
+  passo('aviso', atualizarAviso);
 }
 iniciarDiagnostico();
 void boot();

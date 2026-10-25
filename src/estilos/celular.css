@@ -102,3 +102,10 @@ html.celular.gav-cheia:not(.cel-paisagem):not(.limpo) .coldir{display:none}
 html.celular .cel-off{display:block;position:absolute;top:60px;right:max(12px,env(safe-area-inset-right,0px));z-index:6}
 html.celular .cel-off[hidden]{display:none}
 html.celular #offBadge{display:none}
+
+/* celular sem planilha: "Abrir planilhas" à vista na gaveta fechada */
+.gav-abrir{display:none}
+html.celular .uni .gav-res .gav-abrir{display:none}
+html.celular.vazio .uni .gav-res .gav-abrir{display:inline-flex;min-height:44px;margin-left:auto}
+html.celular.vazio .uni .gav-res{height:auto;min-height:44px}
+html.celular.vazio #gavTxt{display:none}

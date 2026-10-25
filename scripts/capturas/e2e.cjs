@@ -2216,6 +2216,18 @@ const TESTES = {
       assert.equal(rg.tinta, 0, 'nenhum rótulo cortado na borda direita da régua');
     }],
   ],
+  // Armazenamento que não responde (aba privada, bloqueio no Brave/Android): a partida não pode ficar presa esperando o IndexedDB.
+  t26: [
+    ['celular com IndexedDB que nunca responde: "⋯" e "Abrir planilhas" respondem e o app avisa que nada será salvo', ['cel-412x915'], async (pg) => {
+      await pg.waitForFunction(() => document.querySelector('#cMapa')?.dataset.pronto === '1' || /indisponível/.test(document.querySelector('#toast')?.textContent || ''), null, { timeout: 15000 });
+      await pg.tap('#cMapa'); await pg.waitForTimeout(500);
+      assert.equal(await pg.getAttribute('#cMapa', 'aria-expanded'), 'true', 'o "⋯" abriu a folha');
+      await pg.tap('#cMapa'); await pg.waitForTimeout(400);
+      assert.equal(await pg.getAttribute('#cMapa', 'aria-expanded'), 'false');
+      const [fc] = await Promise.all([pg.waitForEvent('filechooser', { timeout: 4000 }), pg.tap('#gavAbrir')]);
+      assert.ok(fc, 'o botão "Abrir planilhas" da gaveta abre o seletor de arquivos');
+    }, { vazio: true, antes: () => { indexedDB.open = () => ({ set onsuccess(_f) {}, set onerror(_f) {}, set onblocked(_f) {}, set onupgradeneeded(_f) {}, result: null }); } }],
+  ],
   // Teste de fumaça do celular (toque real via CDP): encadeia as ações na mesma sessão, sem recarregar, e exige que a seguinte responda.
   t25: [
     ['celular, fumaça em sequência (toques CDP): fundo, camada, ir para km, pressão, cancelar por movimento, alterar solução, gaveta e abas', ['cel-412x915'], async (pg, { ctx }) => {
