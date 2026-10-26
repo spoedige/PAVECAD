@@ -11,7 +11,7 @@ import {
 import type { ModeKey } from './dominio/indicadores';
 import { abrirDb, bancoIndisponivel, LIMITE_BANCO_MS } from './app/persist';
 import { gpsToggle } from './app/gps';
-import { iniciarDiagnostico, registrarErro } from './app/diagnostico';
+import { iniciarDiagnostico, registrarErro, versaoApp } from './app/diagnostico';
 import { initOffline } from './app/offline';
 import { agendarPoda } from './app/tilesCache';
 import { initRevisao, onToolClick, refreshNotesLayer, refreshPropLayers, resolveProps, setTool } from './app/revisao';
@@ -44,6 +44,7 @@ async function carregarExemplos() {
 
 /* ---- controles ---- */
 $('#btnFile').addEventListener('click', () => $('#file').click());
+$('#gavVer').textContent = 'v' + versaoApp().commit; // celular sem planilha: mostra qual versão está rodando
 $('#gavAbrir').addEventListener('click', () => $('#file').click()); // celular sem planilha: o botão fica à vista, sem depender do "⋯"
 $('#file').addEventListener('change', (e) => {
   const input = e.target as HTMLInputElement;

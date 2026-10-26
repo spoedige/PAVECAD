@@ -16,7 +16,7 @@ export default defineConfig({
   test: { include: ['testes/**/*.test.ts'], testTimeout: 60000 },
   plugins: process.env.VITEST ? [] : [
     VitePWA({
-      registerType: 'prompt',
+      registerType: 'autoUpdate', // o service worker novo assume sozinho e a página recarrega: no modo 'prompt' a versão antiga ficava em cache até alguém tocar em "Atualizar"
       includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
       manifest: {
         name: 'PaveCAD · Mapa de Soluções de Restauração',
