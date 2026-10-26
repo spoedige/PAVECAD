@@ -1,5 +1,5 @@
 import { $ } from './ui';
-import { ehUnico, MQ_UNICO } from './layout';
+import { ehCelular, ehUnico, MQ_CELULAR, MQ_UNICO } from './layout';
 
 /** Grupos de controles que o usuário pode ocultar. Oculto, o grupo vira um botão de 44 px com ícone, no lugar dele, que o restaura.
  *  O estado de cada grupo fica no localStorage. O mapa limpo (botão de olho e tecla H) esconde todos de uma vez, menos o zoom e o
@@ -27,10 +27,10 @@ try { ocultos = new Set(JSON.parse(localStorage.getItem(CHAVE) ?? '[]') as strin
 export const estaOculto = (id: Id) => ocultos.has(id);
 export const mapaLimpo = () => limpo;
 
-/** Liga as classes na raiz. Fora do layout único (celulares) nada é ocultado. */
+/** Liga as classes na raiz. No celular nada é ocultado: lá a folha "Mapa" abre e fecha pelo "⋯", e um grupo oculto deixaria o "⋯" sem efeito. */
 function aplicar() {
   const R = document.documentElement, ativo = ehUnico();
-  for (const g of GRUPOS) R.classList.toggle('h-' + g.id, ativo && ocultos.has(g.id));
+  for (const g of GRUPOS) R.classList.toggle('h-' + g.id, ativo && !ehCelular() && ocultos.has(g.id));
   R.classList.toggle('limpo', ativo && limpo);
   const b = $('#btnLimpo');
   b.setAttribute('aria-pressed', String(limpo));
@@ -77,11 +77,15 @@ export function initGrupos(mudou: () => void) {
   document.addEventListener('click', (e) => {
     const t = e.target as Element;
     const o = t.closest<HTMLElement>('[data-ocultar]');
-    if (o) { setOculto(o.dataset.ocultar as Id, true); return; }
+    if (o) {
+      if (ehCelular()) { if (o.dataset.ocultar === 'girar') { const m = $('#cMapa'); if (m.getAttribute('aria-expanded') === 'true') m.click(); } return; } // celular: o "−" da folha só fecha
+      setOculto(o.dataset.ocultar as Id, true); return;
+    }
     const r = t.closest<HTMLElement>('.grestaura');
     if (r) setOculto(r.dataset.g as Id, false);
   });
   $('#btnLimpo').addEventListener('click', alternarLimpo);
   window.matchMedia(MQ_UNICO).addEventListener('change', aplicar);
+  window.matchMedia(MQ_CELULAR).addEventListener('change', aplicar);
   aplicar();
 }

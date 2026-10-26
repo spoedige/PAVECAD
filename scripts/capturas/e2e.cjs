@@ -2216,6 +2216,28 @@ const TESTES = {
       assert.equal(rg.tinta, 0, 'nenhum rótulo cortado na borda direita da régua');
     }],
   ],
+  // "⋯" repetido e "−" da folha Mapa no celular, com planilha: nada pode ficar oculto nem sem resposta.
+  t27: [
+    ['celular: o ⋯ abre e fecha a folha várias vezes, o "−" da folha só fecha e não esconde o grupo nem deixa botão solto', ['cel-412x915'], async (pg) => {
+      const exp = () => pg.getAttribute('#cMapa', 'aria-expanded');
+      for (let i = 0; i < 4; i++) { await pg.tap('#cMapa'); await pg.waitForTimeout(350); assert.equal(await exp(), i % 2 === 0 ? 'true' : 'false', `⋯ toque ${i + 1}`); }
+      await pg.tap('#cMapa'); await pg.waitForTimeout(350); assert.equal(await exp(), 'true');
+      await pg.tap('#drawer [data-ocultar=girar]'); await pg.waitForTimeout(400);
+      assert.equal(await exp(), 'false', 'o "−" fechou a folha');
+      for (const c of ['h-girar', 'h-titulo', 'h-ferramentas', 'h-painel', 'h-unifilar']) assert.equal(await pg.evaluate((k) => document.documentElement.classList.contains(k), c), false, c);
+      assert.equal(await pg.evaluate(() => [...document.querySelectorAll('.grestaura')].filter((e) => e.checkVisibility()).length), 0, 'sem botão de restaurar solto');
+      await pg.tap('#cMapa'); await pg.waitForTimeout(400);
+      assert.equal(await exp(), 'true', 'o ⋯ abre de novo depois do "−"');
+      assert.equal(await pg.evaluate(() => document.querySelector('#drawer').checkVisibility()), true, 'a folha está visível');
+    }],
+    ['celular com estado antigo salvo ("girar" oculto): o ⋯ ainda abre a folha', ['cel-412x915'], async (pg) => {
+      await pg.evaluate(() => localStorage.setItem('pavecad-ocultos', '["girar","painel"]'));
+      await pg.reload(); await pg.waitForTimeout(2500);
+      await pg.tap('#cMapa'); await pg.waitForTimeout(400);
+      assert.equal(await pg.getAttribute('#cMapa', 'aria-expanded'), 'true');
+      assert.equal(await pg.evaluate(() => document.querySelector('#drawer').checkVisibility()), true);
+    }, { vazio: true }],
+  ],
   // Armazenamento que não responde (aba privada, bloqueio no Brave/Android): a partida não pode ficar presa esperando o IndexedDB.
   t26: [
     ['celular com IndexedDB que nunca responde: "⋯" e "Abrir planilhas" respondem e o app avisa que nada será salvo', ['cel-412x915'], async (pg) => {
