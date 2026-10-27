@@ -20,7 +20,7 @@ import { abrirConfig, atualizarAviso, configAberta, initConfig } from './app/con
 import { focarAjustes, modosVisiveis, renderAll, renderSeg, setField, setMode, setTab, syncBaseSeg } from './app/paineis';
 import { blocosDoUnifilar, drawUni, lacunasDoUnifilar, planilhasDoUnifilar, initUnifilar } from './app/unifilar';
 import { ehCelular, ehCompacto, initLayout, setPainel } from './app/layout';
-import { alternarAlinhar } from './app/alinhar';
+import { abrirAlinhar } from './app/alinhar';
 import { alternarLimpo, initGrupos } from './app/grupos';
 import { initPinoNotas, verNotas } from './app/pinoNotas';
 import { alternarDash, fecharDash, initDash } from './app/dashboard';
@@ -62,7 +62,6 @@ document.querySelectorAll<HTMLButtonElement>('#tabs button').forEach((b) => b.ad
 document.querySelectorAll<HTMLButtonElement>('#base button').forEach((b) =>
   b.addEventListener('click', () => { setBase(b.dataset.b as typeof E.base); syncBaseSeg(); renderAll(); }));
 document.querySelectorAll<HTMLButtonElement>('#nitidez button').forEach((b) => b.addEventListener('click', () => setNitidez(b.dataset.n as 'maxima' | 'segura')));
-document.querySelectorAll<HTMLElement>('[data-alinhar]').forEach((b) => b.addEventListener('click', () => alternarAlinhar()));
 $('#rotL').addEventListener('click', () => rotate(-15));
 $('#rotR').addEventListener('click', () => rotate(15));
 $('#rotN').addEventListener('click', north);
@@ -118,7 +117,7 @@ window.addEventListener('keydown', (e) => {
   if (lk === 'q') { rotate(-15); return; }
   if (lk === 'e') { rotate(15); return; }
   if (lk === 'r') { alignToRoad(); return; }
-  if (lk === 'a') { alternarAlinhar(); return; }
+  if (lk === 'a') { abrirAlinhar(); return; }
   if (lk === 'g') { void gpsToggle(); return; }
   if (lk === 's') { setField(!E.field); return; }
   if (!E.sel) return;

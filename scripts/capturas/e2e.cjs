@@ -121,7 +121,7 @@ const TESTES = {
       assert.equal(m.topo.filter((x) => !['btnAjuda', 'btnCfg', 'btnFile', 'btnGps', 'btnField', 'btnAlinhar', 'btnProjetos', 'prop', 'btnNotas', 'ocultar-ferramentas'].includes(x)).length, 0, 'topo com botão extra: ' + m.topo);
       assert.equal(m.baseNoTopo, false, 'a escolha de base saiu do topo');
     }],
-    ['gaveta ⋯ abre alinhar, girar, norte e base; estado salvo; Satélite troca a base', TODOS, async (pg) => {
+    ['gaveta ⋯ abre girar, norte e base; estado salvo; Satélite troca a base', TODOS, async (pg) => {
       assert.equal(await pg.isVisible('#drawer'), false, 'a gaveta começa fechada');
       assert.equal(await pg.getAttribute('#btnMore', 'aria-expanded'), 'false');
       await pg.click('#btnMore'); await pg.waitForSelector('#drawer', { state: 'visible', timeout: 5000 });
@@ -786,8 +786,8 @@ const TESTES = {
       const perto = (v, esp, msg) => assert.ok(Math.abs(v - esp) < 0.08, `${msg}: ${v.toFixed(3)} x ${esp}`);
       const ajustou = async (l, t) => { await pg.waitForFunction(([pid, l, t]) => { const p = window.__pavecad.E.P.find((q) => q.id === pid); return p.desloc.l === l && p.desloc.t === t; }, [(await medir()).pid, l, t], { timeout: 15000 }); await pg.waitForTimeout(400); };
       const pid = (await medir()).pid;
-      await pg.click('#btnAlinhar'); await pg.waitForSelector('#al-lista');
-      await pg.click('#t-al [data-atalho=nenhuma]'); await pg.check(`#al-lista input[data-id="${pid}"]`); await pg.waitForSelector('#d-l');
+      await aba(pg, 'aj'); await pg.waitForSelector('#a-lista');
+      await pg.click('#t-aj [data-atalho=nenhuma]'); await pg.check(`#a-lista input[data-id="${pid}"]`); await pg.waitForSelector('#d-l');
       const m0 = await medir();
       assert.deepEqual(m0.desloc, { l: 0, t: 0 });
       // transversal +5 m (direita do sentido de percurso)
@@ -821,8 +821,8 @@ const TESTES = {
       const depois = await pg.evaluate(() => { const p = window.__pavecad.E.P.find((q) => q.meta.travel === 1); return { n: window.__pavecad.E.P.length, desloc: { ...p.desloc }, lat: p.rows[10].lat }; });
       assert.deepEqual(depois.desloc, { l: 7, t: -4 }, 'o deslocamento volta após recarregar');
       assert.ok(Math.abs(depois.lat - (await pg.evaluate(() => window.__pavecad.E.P.find((q) => q.meta.travel === 1).rowsPlanilha[10].lat))) > 1e-6, 'e a geometria está deslocada');
-      await pg.click('#btnAlinhar'); await pg.waitForSelector('#al-lista');
-      await pg.click('#t-al [data-atalho=crescentes]');
+      await aba(pg, 'aj'); await pg.waitForSelector('#a-lista');
+      await pg.click('#t-aj [data-atalho=crescentes]');
       assert.equal(await pg.inputValue('#d-l'), '7'); assert.equal(await pg.inputValue('#d-t'), '-4');
       // Zerar
       await pg.click('#d-zero');
@@ -834,18 +834,18 @@ const TESTES = {
       void antes;
     }],
     ['Alinhar: marcar planilhas por checkbox, Aplicar às selecionadas grava só nelas ("Só decrescentes"), sair sem aplicar descarta e Desfazer restaura', '1366x768', async (pg) => {
-      await pg.click('#btnAlinhar');
-      await pg.waitForSelector('#al-lista');
+      await aba(pg, 'aj');
+      await pg.waitForSelector('#a-lista');
       const ver = () => pg.evaluate(() => window.__pavecad.E.P.map((p) => ({ id: p.id, travel: p.meta.travel, d: { ...p.desloc } })));
       const salvos = () => pg.evaluate(() => JSON.stringify(window.__pavecad.E.deslocSalvos));
       const todas = await ver();
-      assert.equal(await pg.locator('#al-lista input[data-id]').count(), todas.length, 'todas as planilhas aparecem na lista');
+      assert.equal(await pg.locator('#a-lista input[data-id]').count(), todas.length, 'todas as planilhas aparecem na lista');
       assert.equal(await pg.locator('select#a-proj').count(), 0, 'a lista suspensa deixou de existir');
       const dec = todas.filter((p) => p.travel === -1);
-      await pg.click('#t-al [data-atalho=decrescentes]');
-      const marc = () => pg.evaluate(() => [...document.querySelectorAll('#al-lista input[data-id]')].filter((c) => c.checked).map((c) => c.dataset.id).sort());
+      await pg.click('#t-aj [data-atalho=decrescentes]');
+      const marc = () => pg.evaluate(() => [...document.querySelectorAll('#a-lista input[data-id]')].filter((c) => c.checked).map((c) => c.dataset.id).sort());
       assert.deepEqual(await marc(), dec.map((p) => p.id).sort(), 'Só decrescentes marca apenas as decrescentes');
-      assert.match(await pg.innerText('#al-cont'), new RegExp(`^${dec.length} de ${todas.length}`, 'i'));
+      assert.match(await pg.innerText('#a-cont'), new RegExp(`^${dec.length} de ${todas.length}`, 'i'));
       assert.equal(await pg.isDisabled('#d-aplicar'), true, 'sem alteração, Aplicar fica desabilitado');
       // +5 longitudinal e −1 transversal aparecem no mapa na hora, mas ainda não estão gravados
       await pg.click('[data-d=l][data-s="5"]');
@@ -859,8 +859,8 @@ const TESTES = {
       await aba(pg, 'seg');
       await pg.waitForFunction(() => window.__pavecad.E.P.every((p) => p.desloc.l === 0 && p.desloc.t === 0), null, { timeout: 30000 });
       // de novo, agora aplicando
-      await pg.click('#btnAlinhar'); await pg.waitForSelector('#al-lista');
-      await pg.click('#t-al [data-atalho=decrescentes]');
+      await aba(pg, 'aj'); await pg.waitForSelector('#a-lista');
+      await pg.click('#t-aj [data-atalho=decrescentes]');
       await pg.click('[data-d=l][data-s="5"]');
       await pg.waitForFunction(() => window.__pavecad.E.P.filter((p) => p.meta.travel === -1).every((p) => p.desloc.l === 5), null, { timeout: 30000 });
       await pg.click('#d-aplicar');
@@ -871,19 +871,19 @@ const TESTES = {
       for (const p of await ver()) assert.deepEqual(p.d, p.travel === -1 ? { l: 5, t: 0 } : { l: 0, t: 0 }, `${p.id} depois de aplicar`);
       // individual: uma só marcada
       const uma = dec[0].id;
-      await pg.click('#t-al [data-atalho=nenhuma]'); await pg.check(`#al-lista input[data-id="${uma}"]`);
+      await pg.click('#t-aj [data-atalho=nenhuma]'); await pg.check(`#a-lista input[data-id="${uma}"]`);
       await pg.click('[data-d=l][data-s="1"]');
       await pg.waitForFunction((id) => window.__pavecad.E.P.find((p) => p.id === id).desloc.l === 6, uma, { timeout: 30000 });
       for (const p of await ver()) assert.deepEqual(p.d, p.id === uma ? { l: 6, t: 0 } : p.travel === -1 ? { l: 5, t: 0 } : { l: 0, t: 0 }, `${p.id} depois do ajuste individual`);
       // valores diferentes entre as marcadas aparecem como "vários"
       await pg.click('#d-aplicar');
-      await pg.click('#t-al [data-atalho=decrescentes]');
+      await pg.click('#t-aj [data-atalho=decrescentes]');
       if (dec.length > 1) { assert.equal(await pg.inputValue('#d-l'), ''); assert.equal(await pg.getAttribute('#d-l', 'placeholder'), 'vários'); }
       // nenhuma marcada: nada para alinhar
-      await pg.click('#t-al [data-atalho=nenhuma]');
+      await pg.click('#t-aj [data-atalho=nenhuma]');
       assert.equal(await pg.locator('#desloc').count(), 0, 'sem planilha marcada, não há o que alinhar');
       // desfazer: restaura o valor gravado antes da aplicação
-      await pg.click('#t-al [data-atalho=decrescentes]');
+      await pg.click('#t-aj [data-atalho=decrescentes]');
       await pg.click('#d-zero');
       await pg.waitForFunction(() => window.__pavecad.E.P.filter((p) => p.meta.travel === -1).every((p) => p.desloc.l === 0), null, { timeout: 30000 });
       await pg.click('#d-aplicar');
@@ -892,16 +892,16 @@ const TESTES = {
       await pg.waitForFunction((id) => window.__pavecad.E.P.find((p) => p.id === id).desloc.l === 6, uma, { timeout: 30000 });
     }, { exemplos: true }],
     ['Alinhar: sentidos opostos mostram o aviso e "Copiar como deslocamento no mapa" converte o vetor pelo azimute médio de cada planilha', '1366x768', async (pg) => {
-      await pg.click('#btnAlinhar'); await pg.waitForSelector('#al-lista');
+      await aba(pg, 'aj'); await pg.waitForSelector('#a-lista');
       const info = await pg.evaluate(() => window.__pavecad.E.P.map((p) => ({ id: p.id, travel: p.meta.travel, uf: p.meta.uf })));
       const cres = info.find((p) => p.travel === 1), decr = info.find((p) => p.travel === -1 && p.uf === cres.uf);
-      await pg.click('#t-al [data-atalho=nenhuma]'); await pg.check(`#al-lista input[data-id="${cres.id}"]`);
+      await pg.click('#t-aj [data-atalho=nenhuma]'); await pg.check(`#a-lista input[data-id="${cres.id}"]`);
       assert.equal(await pg.isVisible('#al-sentidos'), false, 'uma planilha só: sem aviso');
       await pg.fill('#d-l', '5'); await pg.press('#d-l', 'Tab');
       await pg.waitForFunction((id) => window.__pavecad.E.P.find((p) => p.id === id).desloc.l === 5, cres.id, { timeout: 30000 });
       await pg.fill('#d-t', '3'); await pg.press('#d-t', 'Tab');
       await pg.waitForFunction((id) => window.__pavecad.E.P.find((p) => p.id === id).desloc.t === 3, cres.id, { timeout: 30000 });
-      await pg.check(`#al-lista input[data-id="${decr.id}"]`);
+      await pg.check(`#a-lista input[data-id="${decr.id}"]`);
       await pg.waitForSelector('#al-sentidos', { state: 'visible' });
       assert.match(await pg.innerText('#al-sentidos'), /O deslocamento transversal será aplicado em relação ao sentido de cada planilha/);
       assert.equal(await pg.innerText('#d-copiar-mapa'), 'Copiar como deslocamento no mapa');
@@ -914,35 +914,58 @@ const TESTES = {
       assert.ok(Math.abs(v.d.l + 5) < 1 && Math.abs(v.d.t + 3) < 1, 'convertido pelo azimute médio: ' + JSON.stringify(v.d));
       assert.ok(await pg.evaluate(() => !document.querySelector('#d-aplicar').disabled));
     }, { exemplos: true }],
-    ['Alinhar: botão na barra de ferramentas e na gaveta, fora de Ajustes; lista fixa no topo, ±1 e ±5 m, campo, Zerar e Aplicar; alvos de 44 px (falha se sumir)', TODOS, async (pg) => {
-      assert.ok(await pg.isVisible('#btnAlinhar'), 'botão na barra de ferramentas');
-      await pg.click('#btnMore'); await pg.waitForSelector('#drawer', { state: 'visible' });
-      assert.ok(await pg.isVisible('#btnAlinharG'), 'botão na gaveta');
-      await pg.click('#btnMore');
+    ['Alinhar nos Ajustes: seção própria com todos os controles à vista de uma vez (±1 e ±5 m, campos, Zerar, Aplicar, seleção por planilha e por sentido), alvos de 44 px, e nenhum outro ponto de entrada', TODOS, async (pg) => {
+      assert.equal(await pg.locator('#btnAlinhar, #btnAlinharG, [data-alinhar]').count(), 0, 'sem botão Alinhar na barra de ferramentas nem na gaveta do mapa');
+      assert.equal(await pg.locator('#tabs [data-t=al]').count(), 0, 'não há aba Alinhar separada'); assert.equal(await pg.evaluate(() => !!document.querySelector('#t-al').closest('#t-aj')), true, 'o Alinhar só existe dentro de Ajustes');
       await aba(pg, 'aj');
-      assert.equal(await pg.locator('#t-aj #desloc').count(), 0, 'o deslocamento saiu da aba Ajustes');
-      await pg.click('#btnAlinhar');
-      await pg.waitForSelector('#desloc', { state: 'visible' });
+      await pg.waitForSelector('#t-aj #alSect');
+      await pg.waitForSelector('#t-aj #desloc', { state: 'visible' });
       const m = await pg.evaluate(() => {
         const alvo = (s) => { const r = document.querySelector(s)?.getBoundingClientRect(); return r ? [Math.round(r.width), Math.round(r.height)] : null; };
-        const topo = document.querySelector('#t-al .al-topo').getBoundingClientRect(), corpo = document.querySelector('#t-al');
-        corpo.scrollTop = 60;
-        const topo2 = document.querySelector('#t-al .al-topo').getBoundingClientRect();
+        const todos = ['[data-d=l][data-s="-5"]', '[data-d=l][data-s="-1"]', '[data-d=l][data-s="1"]', '[data-d=l][data-s="5"]', '[data-d=t][data-s="-5"]', '[data-d=t][data-s="-1"]', '[data-d=t][data-s="1"]', '[data-d=t][data-s="5"]', '#d-l', '#d-t', '#d-zero', '#d-aplicar'];
         return {
+          visiveis: todos.filter((s) => !document.querySelector(s)?.checkVisibility()),
           passos: ['l', 't'].map((e) => [-5, -1, 1, 5].map((v) => alvo(`[data-d=${e}][data-s="${v}"]`))),
-          campos: [alvo('#d-l'), alvo('#d-t')], zero: alvo('#d-zero'), aplicar: alvo('#d-aplicar'), item: alvo('#al-lista .sel-item'),
-          atalhos: [...document.querySelectorAll('#t-al [data-atalho]')].map((b) => b.dataset.atalho),
-          fixa: Math.abs(topo2.top - topo.top) < 1,
+          campos: [alvo('#d-l'), alvo('#d-t')], zero: alvo('#d-zero'), aplicar: alvo('#d-aplicar'), item: alvo('#a-lista .sel-item'),
+          atalhos: [...document.querySelectorAll('#t-aj [data-atalho]')].map((b) => b.dataset.atalho),
           dentro: document.querySelector('#desloc').getBoundingClientRect().right <= window.innerWidth + 0.5,
+          rolagemH: document.querySelector('#t-aj').scrollWidth <= document.querySelector('#t-aj').clientWidth + 1,
         };
       });
-      assert.deepEqual(m.atalhos, ['todas', 'nenhuma', 'crescentes', 'decrescentes', 'rodovia'], 'atalhos na mesma ordem do seletor das Larguras');
+      assert.deepEqual(m.visiveis, [], 'todos os controles do Alinhar visíveis ao mesmo tempo');
+      assert.deepEqual(m.atalhos, ['todas', 'nenhuma', 'crescentes', 'decrescentes', 'rodovia'], 'seleção por planilha e por sentido na mesma aba');
       for (const g of m.passos) for (const a of g) assert.ok(a && a[0] >= 44 && a[1] >= 44, 'botão de passo ≥ 44 px: ' + JSON.stringify(m.passos));
       for (const a of [...m.campos, m.zero, m.aplicar]) assert.ok(a && a[1] >= 44, 'alvo ≥ 44 px: ' + JSON.stringify(m));
       const toque = await pg.evaluate(() => matchMedia('(pointer: coarse)').matches);
       assert.ok(m.item && m.item[1] >= (toque ? 44 : 36), 'linha da lista: ' + JSON.stringify(m.item));
-      assert.ok(m.fixa, 'o cabeçalho (nome, contagem e Fechar) fica fixo no topo ao rolar');
-      assert.ok(m.dentro, 'cabe na largura da tela');
+      assert.ok(m.dentro && m.rolagemH, 'cabe na largura da tela, sem rolagem horizontal');
+      // ajustar não abre nenhum sub-diálogo
+      await pg.click('[data-d=l][data-s="1"]'); await pg.waitForTimeout(400);
+      assert.equal(await pg.locator('[role=dialog]:not([hidden]), dialog[open]').count(), 0, 'sem sub-diálogo para ajustar');
+      await pg.click('#d-zero'); await pg.waitForTimeout(300);
+    }],
+    ['celular: o Alinhar na aba Ajustes, com a gaveta cheia, cabe na largura (sem rolagem horizontal) e todos os controles têm alvo de 44 px ou mais', CELULARES, async (pg) => {
+      await pg.evaluate(() => document.querySelectorAll('.nr-dica,#nrDica').forEach((e) => e.remove()));
+      assert.equal(await pg.locator('#btnAlinhar, #btnAlinharG, [data-alinhar]').count(), 0, 'sem entrada do Alinhar no menu "Mapa" nem na barra');
+      await pg.keyboard.press('a'); await pg.waitForSelector('#t-aj #desloc', { state: 'visible', timeout: 5000 }); await pg.waitForTimeout(500);
+      const m = await pg.evaluate(() => {
+        const alvos = [...document.querySelectorAll('#desloc button, #desloc input')].filter((e) => e.checkVisibility()).map((e) => { const r = e.getBoundingClientRect(); return [e.getAttribute('aria-label') || e.id, Math.round(r.width), Math.round(r.height), r.right <= innerWidth + 0.5 && r.left >= -0.5]; });
+        const aj = document.querySelector('#t-aj');
+        return { alvos, rolagemH: aj.scrollWidth <= aj.clientWidth + 1, pagina: document.documentElement.scrollWidth <= innerWidth + 1, gaveta: document.documentElement.classList.contains('gav-cheia') };
+      });
+      assert.ok(m.gaveta, 'a gaveta abre cheia'); assert.ok(m.rolagemH && m.pagina, 'sem rolagem horizontal: ' + JSON.stringify(m));
+      for (const [nome, w, h, dentro] of m.alvos) { assert.ok(h >= 44, `alvo ${nome} com ${h} px de altura`); assert.ok(dentro, `${nome} dentro da largura da tela`); }
+    }],
+    ['Alinhar: sem botão ao lado do mapa, a tecla A abre Ajustes na seção Alinhar e o cartão do projeto tem o atalho de texto "Alinhar: abrir Ajustes"', '1366x768', async (pg) => {
+      await pg.keyboard.press('a'); await pg.waitForTimeout(500);
+      assert.equal(await estado(pg, 'E => E.tab'), 'aj');
+      assert.ok(await pg.isVisible('#t-aj #alSect'), 'a seção Alinhar está à vista');
+      await aba(pg, 'seg');
+      await abrirProjetos(pg);
+      assert.match(await pg.innerText('#dash [data-alinhar-p]'), /Alinhar: abrir Ajustes/);
+      await pg.click('#dash [data-alinhar-p]'); await pg.waitForTimeout(500);
+      assert.equal(await pg.isVisible('#dash'), false); assert.equal(await estado(pg, 'E => E.tab'), 'aj');
+      assert.equal(await estado(pg, 'E => E.settingsSel.size'), 1, 'a planilha do cartão fica marcada');
     }],
   ],
   t12: [
@@ -1065,7 +1088,7 @@ const TESTES = {
       await pg.click('#btnMore');
       for (const t of ['seg', 'ana', 'notas', 'exp', 'aj']) { await aba(pg, t); ruins.push(...await medir(t)); }
       await abrirProjetos(pg); ruins.push(...await medir('projetos')); await fecharProjetos(pg);
-      await pg.click('#btnAlinhar'); await pg.waitForSelector('#desloc', { state: 'visible' }); ruins.push(...await medir('alinhar'));
+      await aba(pg, 'aj'); await pg.waitForSelector('#desloc', { state: 'visible' }); ruins.push(...await medir('alinhar'));
       await aba(pg, 'seg');
       await pg.evaluate(() => { const E = window.__pavecad.E; window.__pavecad.select(E.P[0].id, 20, 1, { tab: true }); });
       await pg.waitForTimeout(500); ruins.push(...await medir('segmento'));
@@ -1088,7 +1111,7 @@ const TESTES = {
       await pg.evaluate(() => { const E = window.__pavecad.E; window.__pavecad.select(E.P[0].id, 20, 1, { tab: true }); });
       let ruins = [];
       for (const t of ['seg', 'ana', 'notas', 'exp', 'aj']) { await aba(pg, t); ruins.push(...await pequenos(12, 'claro ' + t)); }
-      await pg.click('#btnAlinhar'); ruins.push(...await pequenos(12, 'claro alinhar'));
+      await aba(pg, 'aj'); ruins.push(...await pequenos(12, 'claro alinhar'));
       await pg.evaluate(() => window.__pavecad.setField(true, true)); await pg.waitForTimeout(400);
       for (const t of ['seg', 'exp', 'aj']) { await aba(pg, t); ruins.push(...await pequenos(13, 'campo ' + t)); }
       const unicos = [...new Set(ruins)];
@@ -2022,7 +2045,7 @@ const TESTES = {
       assert.equal(await pg.locator('#dash .dash-resumo').count(), 1, 'resumo consolidado no topo');
       const c = await pg.evaluate(() => { const e = document.querySelector('#dash .pcard'); const t = e.innerText.replace(/\s+/g, ' '); return { dir: !!e.querySelector('.dirb'), barra: !!e.querySelector('.pbar'), leg: !!e.querySelector('.pleg li'), ind: /IRI/.test(t) && /ATR/.test(t), q: /alerta/.test(t), cont: /proposta.*nota/.test(t), acoes: [...e.querySelectorAll('.pc-a button, .pc-a label')].map((b) => b.textContent.trim().replace(/\s+/g, ' ')), olho: !!e.querySelector('[data-eye]') }; });
       assert.ok(c.dir && c.barra && c.leg && c.ind && c.q && c.cont && c.olho, 'o cartão traz sentido, distribuição, indicadores, qualidade, contagens e olho: ' + JSON.stringify(c));
-      assert.deepEqual(c.acoes, ['Alinhar', 'Cor', 'Remover']);
+      assert.deepEqual(c.acoes, ['Alinhar: abrir Ajustes', 'Cor', 'Remover']);
       assert.equal(await pg.isVisible('#dashAbrir'), true, 'Abrir planilhas dentro do dashboard');
       // olho oculta a planilha; Cor grava; Alinhar abre a aba de alinhamento
       await pg.click('#dash .pcard [data-eye]'); await pg.waitForTimeout(300);
@@ -2031,7 +2054,7 @@ const TESTES = {
       await pg.evaluate(() => { const i = document.querySelector('#dash [data-cor]'); i.value = '#ff00aa'; i.dispatchEvent(new Event('change', { bubbles: true })); }); await pg.waitForTimeout(300);
       assert.equal(await pg.evaluate(() => Object.values(window.__pavecad.E.coresProj)[0]), '#ff00aa');
       await pg.click('#dash [data-alinhar-p]'); await pg.waitForTimeout(500);
-      assert.equal(await pg.isVisible('#dash'), false, 'Alinhar fecha o dashboard'); assert.equal(await estado(pg, 'E => E.tab'), 'al');
+      assert.equal(await pg.isVisible('#dash'), false, 'Alinhar fecha o dashboard'); assert.equal(await estado(pg, 'E => E.tab'), 'aj');
       await pg.click('#btnProjetos'); await pg.waitForSelector('#dash:not([hidden])');
       await pg.keyboard.press('Escape'); await pg.waitForTimeout(150);
       assert.equal(await pg.isVisible('#dash'), false, 'Esc fecha');
@@ -2195,7 +2218,7 @@ const TESTES = {
       });
       assert.ok(r.ocultar.length >= 5 && r.ocultar.every((x) => x.ok), 'todos os botões de ocultar usam o mesmo "–": ' + JSON.stringify(r.ocultar));
       assert.equal(r.eyeoff, 0, 'o olho riscado não é mais ícone de ocultar painel');
-      assert.ok(r.tb.every((b) => b.t), 'tooltip em todos'); assert.deepEqual(r.tb.filter((b) => b.rot).map((b) => b.rot), ['Posição', 'Propor', 'Campo', 'Alinhar', 'Projetos', 'Notas'], 'rótulo curto visível');
+      assert.ok(r.tb.every((b) => b.t), 'tooltip em todos'); assert.deepEqual(r.tb.filter((b) => b.rot).map((b) => b.rot), ['Posição', 'Propor', 'Campo', 'Projetos', 'Notas'], 'rótulo curto visível');
     }],
     ['botão Abrir planilhas: contorno quando há planilhas; azul sólido só na tela vazia', ['1366x768'], async (pg) => {
       const f = await pg.evaluate(() => { const cs = getComputedStyle(document.querySelector('#btnFile')); return { bg: cs.backgroundColor, bd: cs.borderTopWidth, cor: cs.color }; });

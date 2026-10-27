@@ -774,7 +774,7 @@ export function initNotaRapida() {
     if (!anel.hidden && animar) { anel.classList.remove('nr-roda'); anel.classList.add('nr-sai'); clearTimeout(sai); sai = setTimeout(() => { anel.hidden = true; anel.classList.remove('nr-sai'); }, 150); }
     else { anel.hidden = true; anel.classList.remove('nr-roda', 'nr-sai'); }
   };
-  const livre = () => E.mapReady && !E.tool && E.tab !== 'al' && !menu;
+  const livre = () => E.mapReady && !E.tool && !menu;
   const noMapa = (e: PointerEvent) => (e.target as HTMLElement).classList.contains('maplibregl-canvas');
   const abrirEm = (cx: number, cy: number) => {
     const box = cont.getBoundingClientRect(), pt = relativo(cx, cy), ll = map.unproject([cx - box.left, cy - box.top]);

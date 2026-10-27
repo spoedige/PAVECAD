@@ -2,8 +2,8 @@ import { converterDesloc, DESLOC_MAX, quadroMedio, validarDesloc, type Desloc } 
 import { E, getP, type AppProj } from './estado';
 import { aplicarDesloc, salvarDesloc } from './projetos';
 import { alvosAjuste, setTab } from './paineis';
-import { setPainel } from './layout';
-import { contadorSelecao, htmlSelecao, itemDe, ligarSelecao } from './selecaoPlanilhas';
+import { ehCelular, setPainel } from './layout';
+import { setGavetaCel } from './layout';
 import { projName } from './estado';
 import { $, toast, toastAcao } from './ui';
 
@@ -11,7 +11,6 @@ import { $, toast, toastAcao } from './ui';
  *  Longitudinal e transversal em metros, relativos ao sentido de percurso de cada planilha. Os passos mostram o resultado no mapa
  *  na hora; "Aplicar às selecionadas" grava no aparelho e oferece Desfazer. Sair da ferramenta sem aplicar volta ao valor gravado. */
 
-let abaAnterior: typeof E.tab = 'seg';
 let foco: string | null = null;
 
 const gravado = (p: AppProj): Desloc => E.deslocSalvos[p.meta.name] ?? { l: 0, t: 0 };
@@ -38,36 +37,30 @@ async function pedir(p: AppProj, d: Desloc, salvar = false) {
 /** Espera o worker terminar os deslocamentos em fila. */
 const esperarFila = async () => { while (ocupado || fila.size) await new Promise((r) => setTimeout(r, 30)); };
 
-export const alinharAberto = () => E.tab === 'al';
-
+/** O Alinhar vive em Ajustes, numa seção própria: este atalho abre Ajustes (com a gaveta cheia no celular) e leva a vista até a seção. */
 export function abrirAlinhar() {
-  if (E.tab !== 'al') abaAnterior = E.tab;
-  setPainel(false, false);
-  setTab('al');
-  document.querySelectorAll<HTMLElement>('[data-alinhar]').forEach((b) => b.setAttribute('aria-pressed', 'true'));
+  setPainel(false, false); // expande o painel (no celular, abre a gaveta)
+  if (ehCelular()) setGavetaCel('cheia');
+  setTab('aj');
+  requestAnimationFrame(() => document.getElementById('alSect')?.scrollIntoView({ block: 'start' }));
 }
 
-/** Fecha a ferramenta. Alterações não aplicadas voltam ao valor gravado. */
-export function fecharAlinhar() {
-  if (E.tab !== 'al') return;
-  descartar();
-  setTab(abaAnterior === 'al' ? 'seg' : abaAnterior);
-}
-export const alternarAlinhar = () => (alinharAberto() ? fecharAlinhar() : abrirAlinhar());
-
-/** Chamado por setTab ao sair de Alinhar. */
+/** Chamado por setTab ao sair de Ajustes: o que não foi aplicado volta ao valor gravado. */
 export function aoSairDeAlinhar() {
   descartar();
-  document.querySelectorAll<HTMLElement>('[data-alinhar]').forEach((b) => b.setAttribute('aria-pressed', 'false'));
 }
 
 function descartar() {
   for (const q of E.P) if (!igual(atual(q), gravado(q))) void pedir(q, { ...gravado(q) });
 }
 
+/** A seção "Alinhar planilhas" da aba Ajustes: todos os controles à vista, sem abrir um para ajustar outro. As planilhas alvo são as marcadas em
+ *  "Planilhas a ajustar", no topo da mesma aba (por planilha e por sentido: Só crescentes, Só decrescentes). */
 export function renderAlinhar() {
-  const el = $('#t-al');
-  const lista = E.P.map(itemDe);
+  const el = document.getElementById('t-al');
+  if (!el) return;
+  // planilha desmarcada com alteração pendente volta ao valor gravado
+  for (const q of E.P) if (!E.settingsSel.has(q.id) && !igual(atual(q), gravado(q))) void pedir(q, { ...gravado(q) });
   const alvos = alvosAjuste(), pend = pendentes();
   const campo = (e: 'l' | 't', nome: string, dica: string) => `
     <div class="desl-eixo"><label for="d-${e}">${nome} (m)</label><span class="note">${dica}</span>
@@ -75,8 +68,6 @@ export function renderAlinhar() {
         <input id="d-${e}" class="in num" type="number" step="0.1" min="-${DESLOC_MAX}" max="${DESLOC_MAX}" inputmode="decimal" aria-label="${nome} em metros">
         ${[1, 5].map((v) => `<button class="btn" type="button" data-d="${e}" data-s="${v}" aria-label="${nome} +${v} m">+${v}</button>`).join('')}</div></div>`;
   el.innerHTML = E.P.length ? `
-    <div class="al-topo"><b>Alinhar planilhas</b><span class="num al-cont" id="al-cont">${contadorSelecao(E.settingsSel, E.P.length)}</span><button class="btn" type="button" id="al-fechar">Fechar</button></div>
-    <div class="al-lista-wrap">${htmlSelecao({ itens: lista, marcadas: E.settingsSel }, 'al-lista')}</div>
     <div class="al-corpo" id="al-corpo">
       ${alvos.length ? `<div class="list desl" id="desloc">
         ${campo('l', 'Longitudinal', 'ao longo da via; positivo no sentido de percurso')}
@@ -87,34 +78,24 @@ export function renderAlinhar() {
           <button class="btn" type="button" id="d-copiar-mapa">Copiar como deslocamento no mapa</button>
         </div>
         <div class="btns"><button class="btn" type="button" id="d-zero">Zerar</button><button class="btn p" type="button" id="d-aplicar"${pend.length ? '' : ' disabled'}>Aplicar às selecionadas</button></div>
-        <p class="note" id="d-estado">${pend.length ? `${pend.length} planilha${pend.length > 1 ? 's' : ''} com alteração ainda não aplicada. Sair daqui sem aplicar volta ao valor gravado.` : 'Os passos mostram o resultado no mapa na hora. Aplique para gravar no aparelho, junto com a planilha.'}</p>
+        <p class="note" id="d-estado">${textoEstado(pend.length)}</p>
         <p class="note">Vale para o mapa, o CSV de propostas e a localização por GPS. Cada planilha é movida em relação ao seu sentido de percurso.</p>
-      </div>` : '<p class="note">Marque ao menos uma planilha para alinhar.</p>'}
-    </div>` : '<div class="empty"><b>Nenhuma planilha aberta</b>Abra uma planilha para alinhar.</div>';
+      </div>` : '<p class="note">Marque ao menos uma planilha em "Planilhas a ajustar", acima, para alinhar.</p>'}
+    </div>` : '<p class="note">Abra uma planilha para alinhar.</p>';
   if (!E.P.length) return;
-
-  ligarSelecao(el, {
-    itens: lista, marcadas: E.settingsSel, origem: alvos[0] ? itemDe(alvos[0]) : undefined,
-    aoMudar: () => {
-      // planilha desmarcada com alteração pendente volta ao valor gravado
-      for (const q of E.P) if (!E.settingsSel.has(q.id) && !igual(atual(q), gravado(q))) void pedir(q, { ...gravado(q) });
-      renderCorpo();
-    },
-  });
-  $('#al-fechar').onclick = () => fecharAlinhar();
   renderCorpo();
   if (foco && (!document.activeElement || document.activeElement === document.body)) restaurarFoco();
 }
+
+const textoEstado = (n: number) => (n ? `${n} planilha${n > 1 ? 's' : ''} com alteração ainda não aplicada. Sair de Ajustes sem aplicar volta ao valor gravado.` : 'Os passos mostram o resultado no mapa na hora. Aplique para gravar no aparelho.');
 
 /** Refaz só a parte de baixo (campos e botões); a lista de planilhas fica parada no topo. */
 function renderCorpo() {
   const el = $('#t-al');
   const alvos = alvosAjuste(), pend = pendentes();
-  const cont = document.getElementById('al-cont');
-  if (cont) cont.textContent = contadorSelecao(E.settingsSel, E.P.length);
   const corpo = document.getElementById('al-corpo');
   if (!corpo) return;
-  if (!alvos.length) { corpo.innerHTML = '<p class="note">Marque ao menos uma planilha para alinhar.</p>'; return; }
+  if (!alvos.length) { corpo.innerHTML = '<p class="note">Marque ao menos uma planilha em "Planilhas a ajustar", acima, para alinhar.</p>'; return; }
   if (!document.getElementById('desloc')) { renderAlinhar(); return; }
 
   const set = (id: string, vals: string[]) => {
@@ -125,7 +106,7 @@ function renderCorpo() {
   set('#d-t', alvos.map((q) => String(atual(q).t)));
   const ap = $<HTMLButtonElement>('#d-aplicar');
   ap.disabled = pend.length === 0;
-  $('#d-estado').textContent = pend.length ? `${pend.length} planilha${pend.length > 1 ? 's' : ''} com alteração ainda não aplicada. Sair daqui sem aplicar volta ao valor gravado.` : 'Os passos mostram o resultado no mapa na hora. Aplique para gravar no aparelho, junto com a planilha.';
+  $('#d-estado').textContent = textoEstado(pend.length);
 
   const mudar = (novos: { q: AppProj; d: Desloc }[]) => {
     const msg = novos.map((x) => validarDesloc(x.d)).find(Boolean) ?? '';

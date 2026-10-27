@@ -8,7 +8,7 @@ const ico = (d: string) => `<svg class="i" viewBox="0 0 24 24">${d}</svg>`;
 export const GRUPOS = [
   { id: 'titulo', rotulo: 'título e busca', icone: ico('<circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5.5 5.5"/>') },
   { id: 'ferramentas', rotulo: 'ferramentas', icone: ico('<path d="M4 6h8M18 6h2M4 12h2M12 12h8M4 18h10M20 18h0"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/>') },
-  { id: 'girar', rotulo: 'alinhar e girar', icone: ico('<circle cx="12" cy="12" r="9"/><path d="M15.6 8.4l-2.1 5.1-5.1 2.1 2.1-5.1z"/>') },
+  { id: 'girar', rotulo: 'fundo e rotação', icone: ico('<circle cx="12" cy="12" r="9"/><path d="M15.6 8.4l-2.1 5.1-5.1 2.1 2.1-5.1z"/>') },
   { id: 'unifilar', rotulo: 'unifilar', icone: ico('<path d="M3 7h18M3 12h12M3 17h16"/>') },
   { id: 'painel', rotulo: 'painel', icone: ico('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M14 4v16"/>') },
 ] as const;
