@@ -27,7 +27,7 @@ import { alternarDash, fecharDash, initDash } from './app/dashboard';
 import { abrirCamadas, camadaSalva, fecharCamadas, initCamadas } from './app/camadas';
 import { fecharLegenda, initControles } from './app/controles';
 import { initCelular } from './app/celular';
-import { fecharNotaRapida, initNotaRapida, notaNoMeuLocal } from './app/notaRapida';
+import { fecharNotaRapida, initNotaRapida, notaNoMeuLocal, recuperarRascunho } from './app/notaRapida';
 import { clearFocus } from './app/mapa';
 import { $, observarHud, observarRolagem, observarRolagemH, syncAllSegs, syncSeg, toast, toastAcao } from './app/ui';
 
@@ -203,6 +203,7 @@ async function boot() {
     if (n) toast(`${n} planilha(s) reaberta(s) deste aparelho`);
   }, 30000);
   passo('aviso', atualizarAviso);
+  passo('rascunho', recuperarRascunho); // a observação que ficou pela metade volta ao reabrir
 }
 iniciarDiagnostico();
 void boot();

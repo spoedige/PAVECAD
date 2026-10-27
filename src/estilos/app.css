@@ -654,3 +654,17 @@ details.bk{margin-top:6px;opacity:.85}
 
 /* toque longo no mapa: sem menu nativo do Android, sem seleção de texto e sem lupa */
 #map,.maplibregl-canvas-container,.maplibregl-canvas{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+
+/* Roda de confirmação: Confirmar em destaque e o resumo da ação no centro */
+.nr-op.nr-ok{background:var(--accent);color:#fff;border-color:var(--accent);font-size:12px;gap:2px}
+.nr-op.nr-ok .i{width:26px;height:26px;stroke-width:2.4}
+.nr-op.nr-ok b{font-size:12px;line-height:1}
+.nr-centro.nr-resumo{width:148px}
+.nr-centro.nr-resumo b{font-size:13px}
+.nr-centro.nr-resumo small{font-size:11.5px}
+.nr-obs textarea{min-height:92px;border-radius:10px;border:var(--bw) solid var(--hair);background:var(--fill);color:var(--fg);padding:8px 10px;font:inherit;resize:none}
+.nr-nota{font-size:var(--fs-meta);color:var(--muted)}
+.nr-ver{position:absolute;z-index:2;inset:8px;display:flex;flex-direction:column;gap:8px;align-items:center;justify-content:center;padding:10px;background:var(--solid);border:var(--bw) solid var(--hair);border-radius:16px;box-shadow:var(--shadow)}
+.nr-ver img{max-width:100%;max-height:calc(100% - 52px);object-fit:contain;border-radius:8px}
+.nr-op.nr-p{font-size:9px;letter-spacing:-.35px;gap:0;line-height:1.02}
+.nr-op.nr-p .i{width:18px;height:18px;margin-bottom:1px}

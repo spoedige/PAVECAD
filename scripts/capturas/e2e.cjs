@@ -1636,7 +1636,7 @@ const TESTES = {
     }],
   ],
   t21: [
-    ['menu de campo: segurar 500 ms abre o menu circular com 4 opções e um toque grava, sem digitar nada; clique simples seleciona; Desfazer; persistência', ['1366x768'], async (pg) => {
+    ['menu de campo: segurar 500 ms abre o menu circular com 7 opções e um toque grava, sem digitar nada; clique simples seleciona; Desfazer; persistência', ['1366x768'], async (pg) => {
       const ponto = await centrarNaFaixa(pg, 0, 300, 1);
       const n0 = await pg.evaluate(() => window.__pavecad.E.notes.length);
       // clique simples: seleciona o segmento, sem menu
@@ -1652,15 +1652,15 @@ const TESTES = {
       // solta só depois de o menu abrir (com folga para máquinas lentas)
       await pg.waitForSelector('#nr .nr-op', { timeout: 2500 }).catch(() => {}); await pg.waitForTimeout(150); await pg.mouse.up(); await pg.waitForTimeout(300);
       assert.equal(await pg.evaluate(() => window.__anelVisto), true, 'anel de progresso durante a pressão');
-      assert.equal(await pg.locator('#nr .nr-op').count(), 4, 'aos 700 ms o menu está aberto');
+      assert.equal(await pg.locator('#nr .nr-op').count(), 7, 'aos 700 ms o menu está aberto');
       assert.ok(!(await estado(pg, 'E => !!E.sel')), 'o clique que sobra da pressão não seleciona nada');
       // auditoria: nada obrigatório. Sem campo de texto, seletor nem confirmação
       assert.equal(await pg.locator('#nr input, #nr textarea, #nr select, #nr [role=switch]').count(), 0, 'o menu não tem campo, seletor nem chave');
-      assert.equal(await pg.locator('#nr button').count(), 4, 'só as quatro opções');
+      assert.equal(await pg.locator('#nr button').count(), 7, 'só as sete opções');
       const op = await pg.evaluate(() => [...document.querySelectorAll('#nr .nr-op')].map((e) => { const r = e.getBoundingClientRect(), s = document.querySelector('.stage').getBoundingClientRect(); return { t: e.dataset.t, w: Math.round(r.width), h: Math.round(r.height), dentro: r.left >= s.left && r.right <= s.right && r.top >= s.top && r.bottom <= s.bottom, txt: e.innerText.replace(/\s+/g, ' ').trim(), svg: !!e.querySelector('svg') }; }));
-      assert.deepEqual(op.map((x) => x.t), ['alterar', 'dreno_mais', 'dreno_menos', 'parametros']);
-      assert.ok(op.every((x) => x.w === 64 && x.h === 64 && x.dentro && x.svg), 'quatro alvos de 64 px, com ícone, dentro da tela: ' + JSON.stringify(op));
-      assert.deepEqual(op.map((x) => x.txt), ['Alterar solução', 'Colocar dreno', 'Retirar dreno', 'Ver parâmetros']);
+      assert.deepEqual(op.map((x) => x.t), ['alterar', 'dreno_mais', 'dreno_menos', 'parametros', 'conserva', 'observacao', 'foto']);
+      assert.ok(op.every((x) => x.w === 56 && x.h === 56 && x.dentro && x.svg), 'sete alvos de 56 px, com ícone, dentro da tela: ' + JSON.stringify(op));
+      assert.deepEqual(op.map((x) => x.txt), ['Alterar solução', 'Colocar dreno', 'Retirar dreno', 'Ver parâmetros', 'Ver conserva', 'Observação', 'Foto']);
       assert.match(await pg.textContent('#nr .nr-cap'), /km \d+\+\d{3} · Fx 1/);
       await pg.click('#nr .nr-op[data-t=dreno_menos]'); await pg.waitForTimeout(400);
       assert.equal(await pg.locator('#nr .nr-op[data-t]').count(), 0, 'um toque grava e o menu principal sai');
@@ -1709,18 +1709,18 @@ const TESTES = {
       // movimento de 5 px (abaixo de 8) não cancela
       const p2 = await centrarNaFaixa(pg, 0, 300, 1);
       await pg.mouse.move(p2.x, p2.y); await pg.mouse.down(); await pg.mouse.move(p2.x + 5, p2.y, { steps: 2 }); await pg.waitForTimeout(700); await pg.mouse.up(); await pg.waitForTimeout(300);
-      assert.equal(await pg.locator('#nr .nr-op').count(), 4, 'tremida de 5 px ainda vale como pressão');
+      assert.equal(await pg.locator('#nr .nr-op').count(), 7, 'tremida de 5 px ainda vale como pressão');
       await pg.keyboard.press('Escape'); await pg.waitForTimeout(200);
       assert.equal(await pg.locator('#nr .nr-op').count(), 0, 'Esc fecha');
       const p3 = await centrarNaFaixa(pg, 0, 300, 1);
       await pg.mouse.click(p3.x, p3.y, { button: 'right' }); await pg.waitForTimeout(300);
-      assert.equal(await pg.locator('#nr .nr-op').count(), 4, 'botão direito abre o menu');
+      assert.equal(await pg.locator('#nr .nr-op').count(), 7, 'botão direito abre o menu');
       await pg.mouse.click(p3.x + 250, p3.y + 120); await pg.waitForTimeout(300);
       assert.equal(await pg.locator('#nr .nr-op').count(), 0, 'toque fora fecha');
       assert.equal(await pg.evaluate(() => window.__pavecad.E.notes.length), 0, 'nada gravado');
     }],
     ['nota rápida: o menu fica sempre dentro da tela, perto das bordas, nos quatro tamanhos', TODOS, async (pg) => {
-      const dentro = () => pg.evaluate(() => [...document.querySelectorAll('#nr .nr-op')].map((e) => { const r = e.getBoundingClientRect(), s = document.querySelector('.stage').getBoundingClientRect(); return r.left >= s.left - 0.5 && r.right <= s.right + 0.5 && r.top >= s.top - 0.5 && r.bottom <= s.bottom + 0.5 && Math.round(r.width) === 64 && Math.round(r.height) === 64; }));
+      const dentro = () => pg.evaluate(() => [...document.querySelectorAll('#nr .nr-op')].map((e) => { const r = e.getBoundingClientRect(), s = document.querySelector('.stage').getBoundingClientRect(); return r.left >= s.left - 0.5 && r.right <= s.right + 0.5 && r.top >= s.top - 0.5 && r.bottom <= s.bottom + 0.5 && Math.round(r.width) === 56 && Math.round(r.height) === 56; }));
       const caixa = await pg.evaluate(() => { const r = document.querySelector('#map').getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; });
       for (const [fx, fy] of [[0.5, 0.5], [0.08, 0.5], [0.5, 0.2], [0.35, 0.42]]) {
         const x = caixa.l + (caixa.r - caixa.l) * fx, y = caixa.t + (caixa.b - caixa.t) * fy;
@@ -1728,7 +1728,7 @@ const TESTES = {
         if (!livre) continue; // coberto por um cartão da interface: o menu só abre sobre o mapa
         await pg.mouse.click(x, y, { button: 'right' }); await pg.waitForTimeout(250);
         const r = await dentro();
-        assert.equal(r.length, 4, `menu aberto em ${fx},${fy}`); assert.ok(r.every(Boolean), `os quatro botões dentro da tela e com 64 px em ${fx},${fy}`);
+        assert.equal(r.length, 7, `menu aberto em ${fx},${fy}`); assert.ok(r.every(Boolean), `os sete botões dentro da tela e com 56 px em ${fx},${fy}`);
         await pg.keyboard.press('Escape'); await pg.waitForTimeout(150);
       }
     }],
@@ -1738,14 +1738,14 @@ const TESTES = {
       await ctx.grantPermissions(['geolocation']);
       await ctx.setGeolocation({ latitude: alvo.lat, longitude: alvo.lon, accuracy: 9 });
       await noMeuLocal(); await pg.waitForTimeout(1200);
-      assert.equal(await pg.locator('#nr .nr-op').count(), 4, 'GPS bom: menu no meu local');
+      assert.equal(await pg.locator('#nr .nr-op').count(), 7, 'GPS bom: menu no meu local');
       await pg.click('#nr .nr-op[data-t=dreno_menos]'); await pg.waitForTimeout(400);
       const n = await pg.evaluate(() => window.__pavecad.E.notes.at(-1));
       assert.equal(n.rapida.origem, 'gps'); assert.equal(n.rapida.precisao, 9); assert.equal(n.rapida.tipo, 'dreno_menos'); assert.equal(n.rapida.estado, 'dentro');
       // 40 m: abre, com aviso na legenda
       await ctx.setGeolocation({ latitude: alvo.lat, longitude: alvo.lon, accuracy: 40 });
       await noMeuLocal(); await pg.waitForTimeout(1200);
-      assert.equal(await pg.locator('#nr .nr-op').count(), 4, 'precisão de 40 m ainda abre');
+      assert.equal(await pg.locator('#nr .nr-op').count(), 7, 'precisão de 40 m ainda abre');
       assert.match(await pg.textContent('#nr .nr-cap'), /GPS ±40 m/);
       assert.equal(await pg.locator('#nr .nr-cap.aviso').count(), 1, 'aviso em destaque');
       await pg.keyboard.press('Escape');
@@ -1958,7 +1958,7 @@ const TESTES = {
         const livre = await pg.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.classList.contains('maplibregl-canvas'), { x, y });
         if (!livre) continue;
         await pg.mouse.click(x, y, { button: 'right' }); await pg.waitForTimeout(250);
-        await confere(`principal em ${fx},${fy}`, 4); abertos++;
+        await confere(`principal em ${fx},${fy}`, 7); abertos++;
         await pg.click('#nr .nr-op[data-t=alterar]'); await pg.waitForTimeout(250);
         const n = await pg.locator('#nr .nr-op').count();
         if (n) await confere(`soluções em ${fx},${fy}`, n);
@@ -1987,10 +1987,10 @@ const TESTES = {
       await toque('touchStart', ponto.x, ponto.y); await pg.waitForTimeout(250);
       assert.equal(await pg.locator('#nr .nr-op').count(), 0, 'aos 250 ms ainda não abriu');
       await pg.waitForTimeout(450); await toque('touchEnd', ponto.x, ponto.y); await pg.waitForTimeout(300);
-      assert.equal(await pg.locator('#nr .nr-op').count(), 4, 'pressão por toque abre o menu');
+      assert.equal(await pg.locator('#nr .nr-op').count(), 7, 'pressão por toque abre o menu');
       assert.ok((await pg.evaluate(() => window.__vibrou)).length >= 1, 'vibra ao abrir');
       assert.equal(await pg.evaluate(() => !!window.__pavecad.E.sel), false, 'não seleciona o segmento por baixo');
-      assert.equal(await pg.evaluate(() => document.querySelector('#nr .nr-op').getBoundingClientRect().width), 64);
+      assert.equal(await pg.evaluate(() => document.querySelector('#nr .nr-op').getBoundingClientRect().width), 56);
       await pg.keyboard.press('Escape'); await pg.waitForTimeout(200);
       await toque('touchStart', ponto.x, ponto.y);
       for (let i = 1; i <= 5; i++) await toque('touchMove', ponto.x + i * 6, ponto.y);
@@ -2126,7 +2126,7 @@ const TESTES = {
       await pg.mouse.move(p.x, p.y); await pg.mouse.down(); await pg.waitForTimeout(500);
       assert.equal(await pg.locator('#nr .nr-op').count(), 0, 'aos 500 ms ainda não, com 700 ms configurados');
       await pg.waitForTimeout(500); await pg.mouse.up(); await pg.waitForTimeout(300);
-      assert.equal(await pg.locator('#nr .nr-op').count(), 4, 'aos 700 ms o menu abre'); assert.equal(await pg.isVisible('.nr-anel'), false);
+      assert.equal(await pg.locator('#nr .nr-op').count(), 7, 'aos 700 ms o menu abre'); assert.equal(await pg.isVisible('.nr-anel'), false);
       await pg.keyboard.press('Escape');
       // a duração é escolhida em Ajustes
       await aba(pg, 'aj');
@@ -2238,6 +2238,128 @@ const TESTES = {
       assert.equal(await pg.evaluate(() => document.querySelector('#drawer').checkVisibility()), true);
     }, { vazio: true }],
   ],
+  // Roda de confirmação (padrão do app): nada grava antes do "Confirmar".
+  t28: [
+    ['roda de confirmação: escolher a solução não grava; Confirmar grava com um toque, sem teclado; Estender e Observação mudam o rascunho', ['1366x768'], async (pg) => {
+      const abrir = async () => { const p = await centrarNaFaixa(pg, 0, 300, 1); await pg.mouse.click(p.x, p.y, { button: 'right' }); await pg.waitForSelector('#nr .nr-op[data-t=alterar]', { timeout: 3000 }); await pg.waitForTimeout(200); return p; };
+      const nProps = () => estado(pg, 'E => E.props.length');
+      await abrir();
+      await pg.click('#nr .nr-op[data-t=alterar]'); await pg.waitForTimeout(250);
+      await pg.click('#nr .nr-op[data-s]:not([disabled]):not([data-s="__outros"])'); await pg.waitForTimeout(300);
+      assert.equal(await nProps(), 0, 'tocar na solução não grava');
+      assert.deepEqual(await pg.evaluate(() => [...document.querySelectorAll('#nr .nr-op')].map((b) => b.dataset.a)), ['estender', 'obs', 'confirmar']);
+      const tam = await pg.evaluate(() => Object.fromEntries([...document.querySelectorAll('#nr .nr-op')].map((b) => [b.dataset.a, Math.round(b.getBoundingClientRect().width)])));
+      assert.ok(tam.estender >= 56 && tam.obs >= 56 && tam.confirmar >= 56 && tam.confirmar > tam.estender && tam.confirmar > tam.obs, 'Confirmar maior que os outros dois e todos com 56 px ou mais: ' + JSON.stringify(tam));
+      assert.match(await pg.textContent('#nr .nr-centro'), /→/, 'o centro resume a ação');
+      assert.equal(await pg.locator('#nr input, #nr textarea').count(), 0, 'sem teclado até tocar em Observação');
+      // Estender antes de confirmar altera os km do registro (ainda não gravado)
+      const kmAntes = await pg.textContent('#nr .nr-centro');
+      await pg.click('#nr .nr-op[data-a=estender]'); await pg.waitForTimeout(250);
+      await pg.click('#nr .nr-op[data-e=d100]'); await pg.waitForTimeout(250);
+      await pg.click('#nr [data-a=pronto]'); await pg.waitForTimeout(250);
+      assert.notEqual(await pg.textContent('#nr .nr-centro'), kmAntes, 'o resumo mostra os km estendidos');
+      assert.match(await pg.textContent('#nr .nr-centro'), /km [\d+]+ a [\d+]+/);
+      assert.equal(await nProps(), 0, 'Estender não grava');
+      // Observação: o teclado só abre ao tocar
+      await pg.click('#nr .nr-op[data-a=obs]'); await pg.waitForTimeout(250);
+      assert.equal(await pg.evaluate(() => document.activeElement?.tagName), 'INPUT', 'o campo recebe o foco depois do toque em Observação');
+      await pg.keyboard.type('trinca longitudinal'); await pg.keyboard.press('Enter'); await pg.waitForTimeout(300);
+      assert.equal(await nProps(), 0, 'a observação também só vale depois de confirmar');
+      assert.deepEqual(await pg.evaluate(() => [...document.querySelectorAll('#nr .nr-op')].map((b) => b.dataset.a)), ['estender', 'obs', 'confirmar'], 'volta à roda de confirmação');
+      await pg.click('#nr .nr-op[data-a=confirmar]'); await pg.waitForTimeout(350);
+      assert.equal(await nProps(), 1, 'Confirmar grava');
+      const r = await estado(pg, 'E => ({ note: E.props[0].note, antes: E.props[0].campo.antes, depois: E.props[0].campo.depois, r0: E.props[0].r0, r1: E.props[0].r1 })');
+      assert.equal(r.note, 'trinca longitudinal'); assert.ok(r.depois >= 100 && r.r1 > r.r0, 'a extensão foi gravada: ' + JSON.stringify(r));
+      assert.match(await pg.textContent('#nr .nr-centro'), /Salvo/);
+      assert.deepEqual(await pg.evaluate(() => [...document.querySelectorAll('#nr .nr-op')].map((b) => b.dataset.a)), ['estender', 'obs', 'desfazer']);
+      await pg.click('#nr .nr-op[data-a=desfazer]'); await pg.waitForTimeout(300);
+      assert.equal(await nProps(), 0, 'Desfazer remove');
+    }, { confirmar: true }],
+    ['Confirmar grava com um toque e sem digitar: dreno e Ver conserva passam pela roda de confirmação, sem Estender', ['1366x768'], async (pg) => {
+      for (const [tipo, rotulo, row] of [['dreno_mais', 'Colocar dreno', 300], ['conserva', 'Ver conserva', 330]]) {
+        const p = await centrarNaFaixa(pg, 0, row, 1);
+        await pg.mouse.click(p.x, p.y, { button: 'right' }); await pg.waitForSelector(`#nr .nr-op[data-t=${tipo}]`, { timeout: 3000 }); await pg.waitForTimeout(200);
+        const antes = await estado(pg, 'E => E.notes.length');
+        await pg.click(`#nr .nr-op[data-t=${tipo}]`); await pg.waitForTimeout(300);
+        assert.equal(await estado(pg, 'E => E.notes.length'), antes, rotulo + ': tocar na ação não grava');
+        assert.deepEqual(await pg.evaluate(() => [...document.querySelectorAll('#nr .nr-op')].map((b) => b.dataset.a)), ['obs', 'confirmar']);
+        assert.match(await pg.textContent('#nr .nr-centro'), new RegExp(rotulo));
+        assert.equal(await pg.locator('#nr input, #nr textarea').count(), 0);
+        await pg.click('#nr .nr-op[data-a=confirmar]'); await pg.waitForTimeout(350);
+        assert.equal(await estado(pg, 'E => E.notes.length'), antes + 1, rotulo + ': Confirmar grava');
+        assert.equal(await estado(pg, 'E => E.notes[E.notes.length - 1].rapida.tipo'), tipo);
+        assert.match(await pg.textContent('#nr .nr-centro'), /Salvo/);
+        await pg.keyboard.press('Escape'); await pg.waitForTimeout(200);
+      }
+    }, { confirmar: true }],
+    ['tocar fora antes de confirmar descarta, com aviso "Descartado" e Desfazer do descarte por 5 s', ['1366x768'], async (pg) => {
+      const p = await centrarNaFaixa(pg, 0, 300, 1);
+      await pg.mouse.click(p.x, p.y, { button: 'right' }); await pg.waitForSelector('#nr .nr-op[data-t=dreno_menos]', { timeout: 3000 }); await pg.waitForTimeout(200);
+      await pg.click('#nr .nr-op[data-t=dreno_menos]'); await pg.waitForTimeout(300);
+      await pg.locator('#nrFundo').dispatchEvent('pointerdown'); await pg.waitForTimeout(300);
+      assert.equal(await pg.locator('#nr .nr-op').count(), 0, 'a roda fecha');
+      assert.equal(await estado(pg, 'E => E.notes.length'), 0, 'nada foi gravado');
+      assert.match(await pg.textContent('.toast-acao'), /Descartado/);
+      await pg.click('.toast-acao button'); await pg.waitForTimeout(300);
+      assert.deepEqual(await pg.evaluate(() => [...document.querySelectorAll('#nr .nr-op')].map((b) => b.dataset.a)), ['obs', 'confirmar'], 'o descarte foi desfeito: a roda de confirmação volta');
+      await pg.click('#nr .nr-op[data-a=confirmar]'); await pg.waitForTimeout(300);
+      assert.equal(await estado(pg, 'E => E.notes.length'), 1);
+      await pg.keyboard.press('Escape'); await pg.waitForTimeout(200);
+      // Esc também descarta
+      const q = await centrarNaFaixa(pg, 0, 301, 1);
+      await pg.mouse.click(q.x, q.y, { button: 'right' }); await pg.waitForSelector('#nr .nr-op[data-t=conserva]', { timeout: 3000 }); await pg.waitForTimeout(200);
+      await pg.click('#nr .nr-op[data-t=conserva]'); await pg.waitForTimeout(250);
+      await pg.keyboard.press('Escape'); await pg.waitForTimeout(250);
+      assert.equal(await estado(pg, 'E => E.notes.length'), 1, 'Esc antes de confirmar não grava');
+      await pg.waitForTimeout(5300);
+      assert.equal(await pg.locator('.toast-acao').count(), 0, 'o Desfazer do descarte some em 5 s');
+    }, { confirmar: true }],
+    ['chave "Confirmar antes de gravar" em Ajustes: desligada, um toque grava e a roda mostra Estender, Observação e Desfazer', ['1366x768'], async (pg) => {
+      await pg.click('#tabs [data-t=aj]'); await pg.waitForSelector('#s-conf', { timeout: 4000 });
+      assert.equal(await pg.getAttribute('#s-conf', 'aria-checked'), 'true', 'ligada por padrão');
+      await pg.click('#s-conf'); await pg.waitForTimeout(200);
+      assert.equal(await pg.getAttribute('#s-conf', 'aria-checked'), 'false');
+      assert.equal(await pg.evaluate(() => localStorage.getItem('pavecad-confirmar-gravar')), '0');
+      const p = await centrarNaFaixa(pg, 0, 300, 1);
+      await pg.mouse.click(p.x, p.y, { button: 'right' }); await pg.waitForSelector('#nr .nr-op[data-t=alterar]', { timeout: 3000 }); await pg.waitForTimeout(200);
+      await pg.click('#nr .nr-op[data-t=alterar]'); await pg.waitForTimeout(250);
+      await pg.click('#nr .nr-op[data-s]:not([disabled]):not([data-s="__outros"])'); await pg.waitForTimeout(350);
+      assert.equal(await estado(pg, 'E => E.props.length'), 1, 'um toque grava');
+      assert.deepEqual(await pg.evaluate(() => [...document.querySelectorAll('#nr .nr-op')].map((b) => b.dataset.a)), ['estender', 'obs', 'desfazer']);
+      await pg.keyboard.press('Escape');
+      await pg.click('#s-conf'); await pg.waitForTimeout(200);
+      assert.equal(await pg.evaluate(() => localStorage.getItem('pavecad-confirmar-gravar')), '1', 'religa');
+    }, { confirmar: true }],
+    ['a roda de confirmação cabe em 360x640: três botões de 56 px ou mais dentro da tela, sem sobrepor uns aos outros nem o resumo do centro', ['1366x768'], async (pg) => {
+      await pg.setViewportSize({ width: 360, height: 640 }); await pg.waitForTimeout(600);
+      const caixa = await pg.evaluate(() => { const r = document.querySelector('.stage').getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; });
+      let abertos = 0;
+      for (const [fx, fy] of [[0.5, 0.5], [0.06, 0.5], [0.94, 0.5], [0.5, 0.12], [0.5, 0.9], [0.06, 0.1], [0.94, 0.1], [0.06, 0.9]]) {
+        const p = await centrarNaFaixa(pg, 0, 300, 1);
+        const x = caixa.l + (caixa.r - caixa.l) * fx, y = caixa.t + (caixa.b - caixa.t) * fy;
+        // o ponto pressionado fica perto da borda: o mapa anda até a faixa cair ali
+        await pg.evaluate(({ dx, dy }) => window.__pavecad.map().panBy([dx, dy], { duration: 0 }), { dx: p.x - x, dy: p.y - y }); await pg.waitForTimeout(250);
+        const livre = await pg.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.classList.contains('maplibregl-canvas'), { x, y });
+        if (!livre) continue;
+        await pg.mouse.click(x, y, { button: 'right' }); await pg.waitForTimeout(250);
+        if (!(await pg.locator('#nr .nr-op[data-t=alterar]').count())) { await pg.keyboard.press('Escape'); continue; }
+        await pg.click('#nr .nr-op[data-t=alterar]'); await pg.waitForTimeout(250);
+        const sol = pg.locator('#nr .nr-op[data-s]:not([disabled]):not([data-s="__outros"])');
+        if (!(await sol.count())) { await pg.keyboard.press('Escape'); continue; }
+        await sol.first().click(); await pg.waitForTimeout(300);
+        const r = await pg.evaluate(() => {
+          const s = document.querySelector('.stage').getBoundingClientRect(), b = [...document.querySelectorAll('#nr .nr-op')].map((e) => e.getBoundingClientRect()), c = document.querySelector('#nr .nr-centro').getBoundingClientRect();
+          const cruza = (a, d) => a.left < d.right - 1 && a.right > d.left + 1 && a.top < d.bottom - 1 && a.bottom > d.top + 1;
+          return { n: b.length, dentro: b.every((q) => q.left >= s.left - 0.5 && q.right <= s.right + 0.5 && q.top >= s.top - 0.5 && q.bottom <= s.bottom + 0.5), minimo: Math.min(...b.map((q) => q.width)), entre: b.some((q, i) => b.some((o, j) => j > i && cruza(q, o))), centro: b.some((q) => cruza(q, c)) };
+        });
+        assert.equal(r.n, 3, `confirmação em ${fx},${fy}`); assert.ok(r.dentro, `dentro da tela em ${fx},${fy}`); assert.ok(r.minimo >= 56, `alvos de 56 px ou mais em ${fx},${fy}: ${r.minimo}`);
+        assert.ok(!r.entre, `sem sobreposição entre os botões em ${fx},${fy}`); assert.ok(!r.centro, `o resumo do centro não passa sob um botão em ${fx},${fy}`);
+        abertos++;
+        await pg.locator('#nrFundo').dispatchEvent('pointerdown'); await pg.waitForTimeout(200); await pg.evaluate(() => document.querySelector('.toast-acao')?.remove());
+      }
+      assert.ok(abertos >= 3, 'ao menos três pontos testados: ' + abertos);
+    }, { confirmar: true }],
+  ],
   // Armazenamento que não responde (aba privada, bloqueio no Brave/Android): a partida não pode ficar presa esperando o IndexedDB.
   t26: [
     ['celular com IndexedDB que nunca responde: "⋯" e "Abrir planilhas" respondem e o app avisa que nada será salvo', ['cel-412x915'], async (pg) => {
@@ -2309,19 +2431,23 @@ const TESTES = {
       await pg.waitForSelector('#nr .nr-s:not([disabled])', { timeout: 4000 }).catch(async () => { throw new Error('a roda de soluções não abriu: ' + (await pg.evaluate(() => { const n = document.querySelector('#nr'); return `${n.hidden} | ${n.textContent.slice(0, 120)} | ${n.className}`; }))); });
       await pg.waitForTimeout(500);
       await tocar('#nr .nr-s:not([disabled])', 'escolher a solução'); await pg.waitForTimeout(500);
-      assert.equal(await estadoApp('E => E.props.length'), 1, 'a alteração de solução foi gravada com um toque');
+      assert.equal(await estadoApp('E => E.props.length'), 0, 'escolher a solução não grava: falta Confirmar');
+      await tocar('#nr .nr-op[data-a=confirmar]', 'Confirmar'); await pg.waitForTimeout(500);
+      assert.equal(await estadoApp('E => E.props.length'), 1, 'Confirmar gravou a alteração de solução');
       await pg.keyboard.press('Escape'); await pg.waitForTimeout(300);
       // 8. dreno grava com um toque, sem texto
       ponto = await centrarNaFaixa(pg, 0, 312, 1);
-      await pressionar(ponto.x, ponto.y, 850); await tocar('#nr .nr-op[data-t=dreno_mais]', 'Colocar dreno'); await pg.waitForTimeout(500);
-      assert.equal(await estadoApp('E => E.notes.length'), 1, 'o dreno gravou com um toque');
+      await pressionar(ponto.x, ponto.y, 850); await tocar('#nr .nr-op[data-t=dreno_mais]', 'Colocar dreno'); await pg.waitForTimeout(400);
+      assert.equal(await estadoApp('E => E.notes.length'), 0, 'o dreno só grava depois de Confirmar');
+      await tocar('#nr .nr-op[data-a=confirmar]', 'Confirmar'); await pg.waitForTimeout(500);
+      assert.equal(await estadoApp('E => E.notes.length'), 1, 'o dreno gravou com Confirmar, sem texto');
       assert.equal(await pg.locator('#nr input, #nr textarea').count(), 0, 'o dreno não pede texto');
       await pg.keyboard.press('Escape'); await pg.waitForTimeout(300); await respondem('depois do dreno');
       // 9. gaveta e abas
       await tocar('#gavTxt', 'abrir a gaveta'); await tocar('#tabs [data-t=ana]', 'aba Análise'); await tocar('#tabs [data-t=exp]', 'aba Exportar'); await tocar('#tabs [data-t=seg]', 'aba Segmento');
       assert.equal(await pg.evaluate(() => document.querySelector('#tabs [aria-selected=true]').dataset.t), 'seg');
       assert.deepEqual(erros, [], 'nenhuma exceção não tratada');
-    }],
+    }, { confirmar: true }],
     ['Ajustes: diagnóstico com versão, Atualizar app, relatório dos últimos erros e modo diagnóstico de toque', ['1366x768'], async (pg, { ctx }) => {
       await ctx.grantPermissions(['clipboard-read', 'clipboard-write']).catch(() => {});
       await pg.evaluate(() => localStorage.removeItem('pavecad-erros'));
@@ -2475,7 +2601,7 @@ const TESTES = {
       assert.deepEqual(e, { topo: false, gaveta: false, gps: true, sair: true }, JSON.stringify(e));
       const p = await centrarNaFaixa(pg, 0, 300, 1);
       await pg.mouse.move(p.x, p.y); await pg.mouse.down(); await pg.waitForTimeout(900); await pg.mouse.up(); await pg.waitForTimeout(350);
-      assert.equal(await pg.locator('#nr .nr-op').count(), 4, 'o menu abre na tela limpa');
+      assert.equal(await pg.locator('#nr .nr-op').count(), 7, 'o menu abre na tela limpa');
       await pg.keyboard.press('Escape'); await pg.waitForTimeout(150);
       await pg.click('#cLimpo'); await pg.waitForTimeout(350);
       assert.equal(await pg.isVisible('#topc'), true, 'sair da tela limpa');
@@ -2487,7 +2613,7 @@ const TESTES = {
       for (const [x, y] of pontos) {
         await pg.mouse.click(Math.round(x), Math.round(y), { button: 'right' }); await pg.waitForTimeout(300);
         const r = await pg.evaluate(() => { const b = [...document.querySelectorAll('#nr .nr-op')].map((e) => e.getBoundingClientRect()); return { n: b.length, fora: b.filter((q) => q.left < 0 || q.top < 0 || q.right > innerWidth || q.bottom > innerHeight).length, sob: b.some((q, i) => b.some((o, j) => j > i && q.left < o.right - 1 && q.right > o.left + 1 && q.top < o.bottom - 1 && q.bottom > o.top + 1)) }; });
-        assert.equal(r.n, 4, `menu em ${Math.round(x)},${Math.round(y)}`); assert.equal(r.fora, 0, `itens fora da tela em ${Math.round(x)},${Math.round(y)}`); assert.equal(r.sob, false, 'itens sobrepostos');
+        assert.equal(r.n, 7, `menu em ${Math.round(x)},${Math.round(y)}`); assert.equal(r.fora, 0, `itens fora da tela em ${Math.round(x)},${Math.round(y)}`); assert.equal(r.sob, false, 'itens sobrepostos');
         await pg.keyboard.press('Escape'); await pg.waitForTimeout(150);
       }
     }],
@@ -2566,7 +2692,7 @@ const TESTES = {
       const wb = XLSX.readFile(await dx.path(), { cellDates: true, cellStyles: true });
       assert.deepEqual(wb.SheetNames, ['Notas', 'Resumo']);
       const ws = wb.Sheets.Notas, linhas = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true });
-      assert.deepEqual(linhas[0], ['Data', 'Hora', 'Tipo', 'Rodovia', 'Planilha', 'Sentido', 'Faixa', 'Solução atual', 'Solução nova', 'Efeito', 'Extensão antes (m)', 'Extensão depois (m)', 'Km inicial', 'Km final', 'Latitude', 'Longitude', 'UTM Leste', 'UTM Norte', 'Origem', 'Precisão (m)', 'Observação', 'Status']);
+      assert.deepEqual(linhas[0], ['Data', 'Hora', 'Tipo', 'Rodovia', 'Planilha', 'Sentido', 'Faixa', 'Solução atual', 'Solução nova', 'Efeito', 'Extensão antes (m)', 'Extensão depois (m)', 'Km inicial', 'Km final', 'Latitude', 'Longitude', 'UTM Leste', 'UTM Norte', 'Origem', 'Precisão (m)', 'Observação', 'Status', 'Desde', 'Até', 'Situação', 'Arquivo da foto']);
       assert.equal(linhas.length, 5, 'cabeçalho, dois drenos, uma alteração de solução e a anotação antiga');
       assert.equal(ws.A2.t, 'd', 'a data é uma data de verdade'); assert.equal(typeof ws.O3.v, 'number', 'latitude numérica');
       assert.equal(ws.A2.v.getFullYear(), 2026, 'a anotação antiga (2026-01-01) é a primeira por data');
@@ -2575,7 +2701,7 @@ const TESTES = {
       const alt = linhas.slice(2).find((l) => l[2] === 'Alterar solução');
       assert.ok(alt[7] && alt[8] && ['Aumenta', 'Reduz', 'Retira', 'Troca'].includes(alt[9]), 'solução atual, nova e efeito: ' + JSON.stringify(alt));
       assert.equal(alt[10], 0); assert.equal(alt[11], 0); assert.match(alt[12], /^\d+\+\d{3}$/); assert.match(alt[13], /^\d+\+\d{3}$/, 'km inicial e final');
-      assert.ok(ws['!autofilter'], 'filtro automático'); assert.ok(ws['!cols'].length === 22, 'larguras');
+      assert.ok(ws['!autofilter'], 'filtro automático'); assert.ok(ws['!cols'].length === 26, 'larguras');
       assert.equal(linhas[2][3], 'BR-900/GO'); assert.match(linhas[2][12], /^\d+\+\d{3}$/); assert.equal(linhas[2][18], 'Pressão');
       const resumo = XLSX.utils.sheet_to_json(wb.Sheets.Resumo, { header: 1 });
       assert.equal(resumo.find((r) => r[0] === 'Total')[1], 4);
@@ -2585,8 +2711,8 @@ const TESTES = {
       const buf = require('fs').readFileSync(await dc.path());
       assert.deepEqual([...buf.slice(0, 3)], [0xef, 0xbb, 0xbf], 'BOM UTF-8');
       const csv = buf.slice(3).toString('utf8').split('\r\n');
-      assert.equal(csv[0], 'Data;Hora;Tipo;Rodovia;Planilha;Sentido;Faixa;Solução atual;Solução nova;Efeito;Extensão antes (m);Extensão depois (m);Km inicial;Km final;Latitude;Longitude;UTM Leste;UTM Norte;Origem;Precisão (m);Observação;Status');
-      assert.equal(csv.length, 5); assert.match(csv[2], /;-12,\d{6};-47,\d{6};\d{6},\d{2};\d{7},\d{2};Pressão;;;Aberta$/);
+      assert.equal(csv[0], 'Data;Hora;Tipo;Rodovia;Planilha;Sentido;Faixa;Solução atual;Solução nova;Efeito;Extensão antes (m);Extensão depois (m);Km inicial;Km final;Latitude;Longitude;UTM Leste;UTM Norte;Origem;Precisão (m);Observação;Status;Desde;Até;Situação;Arquivo da foto');
+      assert.equal(csv.length, 5); assert.match(csv[2], /;-12,\d{6};-47,\d{6};\d{6},\d{2};\d{7},\d{2};Pressão;;;Aberta;;;;$/);
       // compartilhar: com Web Share, entrega o arquivo; sem, baixa
       await pg.evaluate(() => { window.__shared = null; navigator.canShare = (d) => !!(d && d.files && d.files.length); navigator.share = async (d) => { window.__shared = { nome: d.files[0].name, tipo: d.files[0].type, tam: d.files[0].size }; }; });
       await pg.click('#exShare'); await pg.waitForTimeout(800);

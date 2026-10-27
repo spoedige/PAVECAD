@@ -7,7 +7,7 @@ import { tituloDe } from '../dominio/titulo';
 import { atualizarRotulosKm, E, getP, kmVis, padraoAtivo, projName, rodoviaNome, visibleProjects, type AppProj } from './estado';
 import { abrirLidas, regeometrar, removerProjeto } from './projetos';
 import { renderDash, selo } from './dashboard';
-import { CHAVE_PRESSAO, PRESSAO_OPCOES, pressaoMs } from './notaRapida';
+import { CHAVE_PRESSAO, PRESSAO_OPCOES, confirmarAntes, definirConfirmarAntes, pressaoMs } from './notaRapida';
 import { ROTULO_CAMADA, atualizarChipCamada, guardarCamada } from './camadas';
 import { renderExp } from './exportar';
 import { abrirAlinhar, aoSairDeAlinhar, renderAlinhar } from './alinhar';
@@ -367,6 +367,7 @@ export function renderAj() {
       <div class="field"><div><div>Padrão além da cor</div><div class="note">Hachura nas classes críticas (RE, RP e as piores de IGG, FC e ATR). Liga sozinho no modo campo. O RP sempre tem hachura, até você desligar aqui</div></div><button class="sw2" id="s-pad" role="switch" aria-checked="${padraoAtivo()}" aria-label="Padrão além da cor"></button></div>
       <div class="field"><div><div>Modo privacidade</div><div class="note">Oculta nomes de planilha, rodovia e km na tela e nas exportações. Os dados no aparelho não mudam</div></div><button class="sw2" id="s-priv" role="switch" aria-checked="${E.privacidade}" aria-label="Modo privacidade"></button></div>
       <div class="field"><div><div>Duração da pressão no mapa</div><div class="note">Tempo segurando o dedo até abrir o menu de campo</div></div><div class="seg" id="s-press" role="group" aria-label="Duração da pressão">${PRESSAO_OPCOES.map((v) => `<button type="button" data-ms="${v}" aria-pressed="${pressaoMs() === v}">${v} ms</button>`).join('')}</div></div>
+      <div class="field"><div><div>Confirmar antes de gravar</div><div class="note">A roda de campo mostra Estender, Observação e Confirmar antes de gravar. Desligado, um toque grava e a roda mostra Estender, Observação e Desfazer</div></div><button class="sw2" id="s-conf" role="switch" aria-checked="${confirmarAntes()}" aria-label="Confirmar antes de gravar"></button></div>
       <div class="field"><div><div>Modo campo (sol)</div><div class="note">Contraste máximo, cores fortes, alvos de toque maiores</div></div><button class="sw2" id="s-field" role="switch" aria-checked="${E.field}" aria-label="Modo campo"></button></div></div></div>
     <div><div class="sect">Camadas</div><div class="list">
       ${([['drain', 'Drenos', 'Lado externo. Linha cheia tipo R, tracejada tipo P. Passe o mouse para ver detalhes'], ['poi', 'OAE e pedágio', 'Marcadores nos trechos observados'], ['km', 'Marcos e estacas', 'Estaca a cada 20 m com zoom máximo, 100 m e 500 m ao afastar'], ['notes', 'Anotações', '']] as const).map(([k, t, s]) => `<div class="field"><div><div>${t}</div>${s ? `<div class="note">${s}</div>` : ''}</div><button class="sw2" data-layer="${k}" role="switch" aria-checked="${E.layers[k]}" aria-label="${t}"></button></div>`).join('')}</div></div>
@@ -423,6 +424,7 @@ P(n) = P + e(n) · (nE , nN)</div>
   }));
   syncSeg($('#s-press'));
   $('#s-priv').onclick = () => setPrivacidade(!E.privacidade);
+  $('#s-conf').onclick = () => { const v = !confirmarAntes(); definirConfirmarAntes(v); $('#s-conf').setAttribute('aria-checked', String(v)); };
   $('#s-pad').onclick = () => {
     E.padrao = !padraoAtivo();
     try { localStorage.setItem('pavecad-padrao', E.padrao ? '1' : '0'); } catch { /* sem storage */ }

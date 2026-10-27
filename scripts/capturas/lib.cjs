@@ -16,7 +16,7 @@ const TEMAS = ['claro', 'escuro', 'campo'];
 const FIXTURES = ['rr_go_crescente.xlsx', 'rr_go_decrescente.xlsx'].map((f) => path.join(RAIZ, 'testes/fixtures', f));
 const TILE = { sat: fs.readFileSync(path.join(__dirname, 'tile-sat.png')), osm: fs.readFileSync(path.join(__dirname, 'tile-osm.png')) };
 
-/** opts.antes: script injetado antes do app. opts.vazio: abre sem carregar planilha. opts.exemplos: carrega os JSON de referencia/dados pelo botão de exemplo (só em desenvolvimento) em vez das 2 planilhas GO, e tira a marginal para ficar com 4 planilhas (GO e MG, crescente e decrescente). */
+/** opts.antes: script injetado antes do app. opts.confirmar: liga "Confirmar antes de gravar" (padrão do app); sem ele, os testes rodam no fluxo rápido. opts.vazio: abre sem carregar planilha. opts.exemplos: carrega os JSON de referencia/dados pelo botão de exemplo (só em desenvolvimento) em vez das 2 planilhas GO, e tira a marginal para ficar com 4 planilhas (GO e MG, crescente e decrescente). */
 async function abrir(browser, vp, opts = {}) {
   const ctx = await browser.newContext({
     viewport: { width: vp.w, height: vp.h }, hasTouch: vp.toque, isMobile: vp.toque, deviceScaleFactor: 1,
@@ -34,6 +34,8 @@ async function abrir(browser, vp, opts = {}) {
     route.fulfill({ status: 200, contentType: 'image/png', body: /arcgis|satellite/.test(u) ? TILE.sat : TILE.osm });
   });
   await ctx.route(/fonts\.(googleapis|gstatic)\.com/, (route) => route.abort());
+  // "Confirmar antes de gravar": os testes do fluxo rápido (um toque grava) rodam com a chave desligada; os do fluxo novo pedem opts.confirmar
+  await ctx.addInitScript((ligado) => { try { if (localStorage.getItem('pavecad-confirmar-gravar') === null) localStorage.setItem('pavecad-confirmar-gravar', ligado ? '1' : '0'); } catch { /* sem storage */ } }, !!opts.confirmar);
   if (opts.antes) await ctx.addInitScript(opts.antes); // roda antes do app (simula navegador com armazenamento que não responde)
   await pg.goto(URL);
   await pg.waitForTimeout(1200);
