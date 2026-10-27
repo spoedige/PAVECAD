@@ -38,6 +38,9 @@ export const ICONE: Record<TipoRapido, string> = {
   retirar: SVG('<path d="M3 15l9 4.5 9-4.5M3 11l9 4.5 9-4.5L12 6.5z"/><path d="M10 3.5h4"/>'),
   dreno_mais: SVG('<path d="M12 3c3 3.8 5.5 6.6 5.5 10a5.5 5.5 0 0 1-11 0C6.5 9.6 9 6.8 12 3z"/><path d="M12 11v5M9.5 13.5h5"/>'),
   dreno_menos: SVG('<path d="M12 3c3 3.8 5.5 6.6 5.5 10a5.5 5.5 0 0 1-11 0C6.5 9.6 9 6.8 12 3z"/><path d="M9.5 13.5h5"/>'),
+  conserva: SVG('<path d="M14.5 4.5a4 4 0 0 0-4.7 5.2L4 15.5 8.5 20l5.8-5.8a4 4 0 0 0 5.2-4.7l-2.6 2.6-2.6-.7-.7-2.6z"/>'),
+  observacao: SVG('<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>'),
+  foto: SVG('<path d="M4 8h3l1.5-2.5h7L17 8h3v11H4z"/><circle cx="12" cy="13.5" r="3.5"/>'),
 };
 const IC = {
   alterar: SVG('<path d="M3 15l9 4.5 9-4.5M3 11l9 4.5 9-4.5L12 6.5z"/><path d="M8 3.5h8m-2-2 2 2-2 2"/>'),
