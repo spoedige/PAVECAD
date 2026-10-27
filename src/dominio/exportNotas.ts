@@ -116,12 +116,12 @@ export function linhasDeNotas(notas: NotaExport[], o: OpcoesExport): Linha[] {
 }
 
 /** As fotos das notas "Foto", com o nome que a coluna "Arquivo da foto" traz (a mesma ordem e a mesma regra de nomes). */
-export function fotosDeNotas(notas: NotaExport[], o: OpcoesExport): { nome: string; data: string; lat: number; lon: number; t: string }[] {
+export function fotosDeNotas(notas: NotaExport[], o: OpcoesExport): { id: string; nome: string; data: string; lat: number; lon: number; t: string }[] {
   const linhas = linhasDeNotas(notas, o), ordem = [...notas].sort((a, b) => a.t.localeCompare(b.t));
-  const out: { nome: string; data: string; lat: number; lon: number; t: string }[] = [];
+  const out: { id: string; nome: string; data: string; lat: number; lon: number; t: string }[] = [];
   ordem.forEach((n, i) => {
     if (!linhas[i].arquivoFoto || !n.photos?.length) return;
-    out.push({ nome: linhas[i].arquivoFoto, data: n.photos[0], lon: n.coords[0][0], lat: n.coords[0][1], t: n.t });
+    out.push({ id: n.id, nome: linhas[i].arquivoFoto, data: n.photos[0], lon: n.coords[0][0], lat: n.coords[0][1], t: n.t });
   });
   return out;
 }

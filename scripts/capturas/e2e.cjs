@@ -2360,6 +2360,160 @@ const TESTES = {
       assert.ok(abertos >= 3, 'ao menos três pontos testados: ' + abertos);
     }, { confirmar: true }],
   ],
+  // Ver conserva, Observação (texto livre com rascunho) e Foto (georreferenciada no ponto pressionado).
+  t29: [
+    ['Ver conserva: um toque grava; na Revisão alterna Pendente e Verificado, com filtro próprio e a data do projeto por planilha; a exportação leva Desde, Até e Situação', ['1366x768'], async (pg) => {
+      const p = await centrarNaFaixa(pg, 0, 300, 1);
+      await pg.mouse.click(p.x, p.y, { button: 'right' }); await pg.waitForSelector('#nr .nr-op[data-t=conserva]', { timeout: 3000 }); await pg.waitForTimeout(200);
+      await pg.click('#nr .nr-op[data-t=conserva]'); await pg.waitForTimeout(350);
+      assert.equal(await pg.locator('#nr input, #nr textarea').count(), 0, 'sem teclado');
+      assert.equal(await estado(pg, 'E => E.notes.length'), 1);
+      assert.equal(await estado(pg, 'E => E.notes[0].rapida.tipo'), 'conserva');
+      assert.equal(await estado(pg, 'E => E.notes[0].rapida.resolvida'), false, 'nasce Pendente');
+      assert.match(await pg.textContent('#nr .nr-centro'), /Salvo/);
+      await pg.keyboard.press('Escape'); await pg.waitForTimeout(200);
+      await aba(pg, 'notas'); await pg.waitForTimeout(300);
+      const item = () => pg.locator('#t-notas .nri', { hasText: 'Ver conserva' });
+      assert.match(await item().first().textContent(), /Pendente/);
+      assert.equal(await pg.locator('#t-notas [data-fc]').count(), 3, 'filtro Todas, Pendentes e Verificadas');
+      await pg.click('#t-notas details.qual summary'); await pg.waitForTimeout(250); // o grupo da planilha abre
+      // data do projeto: um campo por planilha
+      assert.equal(await pg.locator('#t-notas [data-desde]').count(), 1);
+      await pg.fill('#t-notas [data-desde]', '2025-03-01'); await pg.press('#t-notas [data-desde]', 'Tab'); await pg.waitForTimeout(300);
+      // alternar: um toque
+      await pg.click('#t-notas [data-nres]'); await pg.waitForTimeout(300);
+      assert.match(await item().first().textContent(), /Verificado/);
+      assert.equal(await estado(pg, 'E => E.notes[0].rapida.resolvida'), true);
+      await pg.click('#t-notas [data-fc=pendente]'); await pg.waitForTimeout(250);
+      assert.equal(await item().count(), 0, 'o filtro Pendentes esconde a verificada');
+      await pg.click('#t-notas [data-fc=verificada]'); await pg.waitForTimeout(250);
+      assert.equal(await item().count(), 1);
+      await pg.click('#t-notas [data-fc=todas]'); await pg.waitForTimeout(250);
+      assert.equal(await pg.evaluate(() => document.querySelector('#t-notas [data-desde]').value), '2025-03-01', 'a data do projeto fica');
+      // exportação
+      await aba(pg, 'exp'); await pg.waitForTimeout(400);
+      const [dc] = await Promise.all([pg.waitForEvent('download'), pg.click('#exCsv')]);
+      const csv = require('fs').readFileSync(await dc.path(), 'utf8').split(/\r?\n/);
+      const cab = csv[0].split(';'), lin = csv[1].replace(/"[^"]*(""[^"]*)*"/g, '""').split(';');
+      assert.deepEqual(cab.slice(-4), ['Desde', 'Até', 'Situação', 'Arquivo da foto']);
+      assert.equal(lin[2], '""'); assert.match(csv[1], /"Ver conserva"/);
+      assert.equal(lin[lin.length - 4], '01/03/2025', 'Desde'); assert.match(lin[lin.length - 3], /^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}$/, 'Até'); assert.equal(lin[lin.length - 2], 'Verificado');
+    }],
+    ['Observação livre: abre o campo de texto, guarda o rascunho enquanto digita, recupera depois de recarregar, Salvar grava no ponto e Cancelar descarta', ['1366x768'], async (pg) => {
+      const p = await centrarNaFaixa(pg, 0, 300, 1);
+      await pg.mouse.click(p.x, p.y, { button: 'right' }); await pg.waitForSelector('#nr .nr-op[data-t=observacao]', { timeout: 3000 }); await pg.waitForTimeout(200);
+      assert.equal(await pg.locator('#nr textarea').count(), 0, 'o teclado só abre ao tocar em Observação');
+      await pg.click('#nr .nr-op[data-t=observacao]'); await pg.waitForTimeout(300);
+      assert.equal(await pg.evaluate(() => document.activeElement?.tagName), 'TEXTAREA', 'o campo de texto recebe o foco');
+      assert.equal(await estado(pg, 'E => E.notes.length'), 0);
+      await pg.keyboard.type('bueiro entupido no km 170'); await pg.waitForTimeout(200);
+      assert.match(await pg.evaluate(() => localStorage.getItem('pavecad-rascunho-obs')), /bueiro entupido no km 170/, 'o rascunho é guardado enquanto digita');
+      // o app fecha no meio da digitação
+      await pg.reload(); await pg.waitForFunction(() => window.__pavecad && window.__pavecad.E.P.length === 2, null, { timeout: 60000 }); await pg.waitForTimeout(2500);
+      assert.equal(await pg.inputValue('#nr textarea'), 'bueiro entupido no km 170', 'o rascunho volta ao reabrir');
+      await pg.click('#nr [data-a=salvar]'); await pg.waitForTimeout(400);
+      const n = await estado(pg, 'E => E.notes.map((x) => ({ tipo: x.rapida.tipo, texto: x.text, km: x.rapida.km, lon: x.coords[0][0], lat: x.coords[0][1] }))');
+      assert.equal(n.length, 1); assert.equal(n[0].tipo, 'observacao'); assert.equal(n[0].texto, 'bueiro entupido no km 170'); assert.ok(n[0].km, 'grava km, faixa e sentido do ponto: ' + JSON.stringify(n[0]));
+      assert.equal(await pg.evaluate(() => localStorage.getItem('pavecad-rascunho-obs')), null, 'o rascunho some depois de salvar');
+      await pg.keyboard.press('Escape'); await pg.waitForTimeout(200);
+      // Cancelar descarta o rascunho
+      const q = await centrarNaFaixa(pg, 0, 320, 1);
+      await pg.mouse.click(q.x, q.y, { button: 'right' }); await pg.waitForSelector('#nr .nr-op[data-t=observacao]', { timeout: 3000 }); await pg.waitForTimeout(200);
+      await pg.click('#nr .nr-op[data-t=observacao]'); await pg.waitForTimeout(250);
+      await pg.keyboard.type('rascunho que será cancelado'); await pg.click('#nr [data-a=cancelar]'); await pg.waitForTimeout(250);
+      assert.equal(await pg.evaluate(() => localStorage.getItem('pavecad-rascunho-obs')), null); assert.equal(await estado(pg, 'E => E.notes.length'), 1);
+      // tocar fora com texto guarda o rascunho e oferece reabrir
+      await pg.mouse.click(q.x, q.y, { button: 'right' }); await pg.waitForSelector('#nr .nr-op[data-t=observacao]', { timeout: 3000 }); await pg.waitForTimeout(200);
+      await pg.click('#nr .nr-op[data-t=observacao]'); await pg.waitForTimeout(250);
+      await pg.keyboard.type('texto guardado'); await pg.locator('#nrFundo').dispatchEvent('pointerdown'); await pg.waitForTimeout(300);
+      assert.equal(await estado(pg, 'E => E.notes.length'), 1, 'tocar fora não grava'); assert.match(await pg.textContent('.toast-acao'), /Rascunho/);
+      await pg.click('.toast-acao button'); await pg.waitForTimeout(300);
+      assert.equal(await pg.inputValue('#nr textarea'), 'texto guardado');
+    }],
+    ['Foto: a câmera abre pelo input nativo, a foto é reduzida a 1600 px e grava no ponto pressionado; marcador com ícone e miniatura; a roda do marcador tem Ver foto, Trocar foto, Observação e Excluir', ['1366x768'], async (pg) => {
+      const jpeg = async (w, h) => Buffer.from(await pg.evaluate(({ w, h }) => { const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d'); g.fillStyle = '#c33'; g.fillRect(0, 0, w, h); g.fillStyle = '#fff'; g.fillRect(w / 10, h / 10, w / 4, h / 4); return c.toDataURL('image/jpeg', 0.92).split(',')[1]; }, { w, h }), 'base64');
+      assert.equal(await pg.evaluate(() => { const i = document.querySelector('#fotoCampoIn'); return i && i.accept + '|' + i.getAttribute('capture'); }), 'image/*|environment', 'caminho nativo da câmera');
+      const p = await centrarNaFaixa(pg, 0, 300, 1);
+      await pg.mouse.click(p.x, p.y, { button: 'right' }); await pg.waitForSelector('#nr .nr-op[data-t=foto]', { timeout: 3000 }); await pg.waitForTimeout(200);
+      const alvo = await pg.evaluate(({ x, y }) => { const m = window.__pavecad.map(), b = m.getCanvasContainer().getBoundingClientRect(), ll = m.unproject([x - b.left, y - b.top]); return { lon: ll.lng, lat: ll.lat }; }, p);
+      const [fc] = await Promise.all([pg.waitForEvent('filechooser', { timeout: 4000 }), pg.click('#nr .nr-op[data-t=foto]')]);
+      assert.ok(fc, 'tocar em Foto abre o seletor da câmera');
+      await fc.setFiles({ name: 'camera.jpg', mimeType: 'image/jpeg', buffer: await jpeg(3000, 2000) });
+      await pg.waitForFunction(() => window.__pavecad.E.notes.length === 1, null, { timeout: 8000 }); await pg.waitForTimeout(400);
+      const n = await estado(pg, 'E => ({ tipo: E.notes[0].rapida.tipo, fotos: E.notes[0].photos.length, lon: E.notes[0].coords[0][0], lat: E.notes[0].coords[0][1], km: E.notes[0].rapida.km, faixa: E.notes[0].rapida.faixa, src: E.notes[0].photos[0].slice(0, 23) })');
+      assert.equal(n.tipo, 'foto'); assert.equal(n.fotos, 1); assert.equal(n.src, 'data:image/jpeg;base64,'); assert.ok(n.km && n.faixa === 1, 'km e faixa do ponto: ' + JSON.stringify(n));
+      assert.ok(Math.abs(n.lon - alvo.lon) < 2e-6 && Math.abs(n.lat - alvo.lat) < 2e-6, 'a posição da foto é o ponto pressionado');
+      const dim = await pg.evaluate(() => new Promise((ok) => { const i = new Image(); i.onload = () => ok([i.width, i.height]); i.src = window.__pavecad.E.notes[0].photos[0]; }));
+      assert.deepEqual(dim, [1600, 1067], 'lado maior de 1600 px, na proporção');
+      assert.match(await pg.textContent('#nr .nr-centro'), /Salvo/);
+      assert.deepEqual(await pg.evaluate(() => [...document.querySelectorAll('#nr .nr-op')].map((b) => b.dataset.a)), ['obs', 'desfazer']);
+      await pg.keyboard.press('Escape'); await pg.waitForTimeout(200);
+      // marcador: ícone próprio e miniatura com zoom
+      await pg.evaluate(() => window.__pavecad.map().setZoom(18.2)); await pg.waitForTimeout(1500);
+      const m = await pg.evaluate(() => { const mp = window.__pavecad.map(); return { ic: mp.queryRenderedFeatures({ layers: ['notes-ic'] }).length, th: mp.hasImage('foto:' + window.__pavecad.E.notes[0].id), camada: !!mp.getLayer('notes-foto') }; });
+      assert.ok(m.ic >= 1, 'marcador com ícone próprio'); assert.ok(m.th && m.camada, 'miniatura registrada para o zoom alto');
+      // roda do marcador
+      const centro = await pg.evaluate(() => { const mp = window.__pavecad.map(), n = window.__pavecad.E.notes[0], pt = mp.project(n.coords[0]), b = mp.getCanvasContainer().getBoundingClientRect(); return { x: b.left + pt.x, y: b.top + pt.y }; });
+      await pg.mouse.click(centro.x, centro.y, { button: 'right' }); await pg.waitForSelector('#nr .nr-op[data-a=verfoto]', { timeout: 3000 }); await pg.waitForTimeout(200);
+      assert.deepEqual(await pg.evaluate(() => [...document.querySelectorAll('#nr .nr-op')].map((b) => b.dataset.a)), ['verfoto', 'trocarfoto', 'obs', 'excluir']);
+      await pg.click('#nr .nr-op[data-a=verfoto]'); await pg.waitForTimeout(250);
+      assert.equal(await pg.locator('#nr .nr-ver img').count(), 1, 'Ver foto mostra a imagem'); await pg.click('#nr .nr-ver [data-a=voltar]'); await pg.waitForTimeout(250);
+      const [fc2] = await Promise.all([pg.waitForEvent('filechooser', { timeout: 4000 }), pg.click('#nr .nr-op[data-a=trocarfoto]')]);
+      const antes = await estado(pg, 'E => E.notes[0].photos[0].length');
+      await fc2.setFiles({ name: 'outra.jpg', mimeType: 'image/jpeg', buffer: await jpeg(800, 600) });
+      await pg.waitForFunction((a) => window.__pavecad.E.notes[0].photos[0].length !== a, antes, { timeout: 8000 });
+      assert.equal(await estado(pg, 'E => E.notes.length'), 1, 'Trocar foto não cria outra nota');
+      await pg.keyboard.press('Escape'); await pg.waitForTimeout(200);
+      await pg.mouse.click(centro.x, centro.y, { button: 'right' }); await pg.waitForSelector('#nr .nr-op[data-a=excluir]', { timeout: 3000 }); await pg.waitForTimeout(200);
+      await pg.click('#nr .nr-op[data-a=excluir]'); await pg.waitForTimeout(300);
+      assert.equal(await estado(pg, 'E => E.notes.length'), 0, 'Excluir remove');
+      await pg.click('#nr .nr-op[data-a=desfazer]'); await pg.waitForTimeout(300);
+      assert.equal(await estado(pg, 'E => E.notes.length'), 1, 'Desfazer devolve a foto');
+    }],
+    ['Foto: o XLSX e o CSV saem num ZIP com a pasta fotos/ (nome km..._Fx.._data_hora.jpg, EXIF GPS) e a coluna Arquivo da foto; o KMZ só leva fotos com o chip; o backup vira ZIP e restaura', ['1366x768'], async (pg) => {
+      const fs = require('fs'), { unzipSync, strFromU8 } = require('fflate');
+      const jpeg = async () => Buffer.from(await pg.evaluate(() => { const c = document.createElement('canvas'); c.width = 2400; c.height = 1600; const g = c.getContext('2d'); g.fillStyle = '#36c'; g.fillRect(0, 0, 2400, 1600); return c.toDataURL('image/jpeg', 0.9).split(',')[1]; }), 'base64');
+      const p = await centrarNaFaixa(pg, 0, 300, 1);
+      await pg.mouse.click(p.x, p.y, { button: 'right' }); await pg.waitForSelector('#nr .nr-op[data-t=foto]', { timeout: 3000 }); await pg.waitForTimeout(200);
+      const [fc] = await Promise.all([pg.waitForEvent('filechooser', { timeout: 4000 }), pg.click('#nr .nr-op[data-t=foto]')]);
+      await fc.setFiles({ name: 'c.jpg', mimeType: 'image/jpeg', buffer: await jpeg() });
+      await pg.waitForFunction(() => window.__pavecad.E.notes.length === 1, null, { timeout: 8000 }); await pg.keyboard.press('Escape'); await pg.waitForTimeout(200);
+      const lonlat = await estado(pg, 'E => E.notes[0].coords[0]');
+      await aba(pg, 'exp'); await pg.waitForTimeout(500);
+      const baixa = async (sel) => { const [d] = await Promise.all([pg.waitForEvent('download', { timeout: 60000 }), pg.click(sel)]); return { nome: d.suggestedFilename(), buf: fs.readFileSync(await d.path()) }; };
+      const x = await baixa('#exXlsx');
+      assert.match(x.nome, /^notas_PAVECAD_.*\.zip$/, 'com fotos o XLSX sai em ZIP: ' + x.nome);
+      const z = unzipSync(new Uint8Array(x.buf)), nomes = Object.keys(z);
+      const xl = nomes.find((k) => /\.xlsx$/.test(k)), ft = nomes.filter((k) => /^fotos\/.+\.jpg$/.test(k));
+      assert.ok(xl, 'a planilha vai dentro do ZIP'); assert.equal(ft.length, 1, 'uma foto na pasta fotos/: ' + nomes.join(', '));
+      assert.match(ft[0], /^fotos\/km\d+\+\d{3}_Fx1_\d{8}_\d{6}\.jpg$/, 'nome da foto: ' + ft[0]);
+      const jpg = Buffer.from(z[ft[0]]); assert.deepEqual([...jpg.slice(0, 2)], [0xff, 0xd8], 'JPEG');
+      assert.ok(jpg.includes(Buffer.from('Exif\0\0')) && jpg.includes(Buffer.from('WGS84')), 'EXIF com GPS');
+      // a coordenada do EXIF é a do ponto pressionado: lê latitude e longitude em graus, minutos e segundos
+      const exif = (() => { const i = jpg.indexOf(Buffer.from('Exif\0\0')) + 6, t = jpg.slice(i); const g32 = (o) => t.readUInt32LE(o), g16 = (o) => t.readUInt16LE(o); const ifd = (o) => { const n = g16(o), m = {}; for (let k = 0; k < n; k++) { const e = o + 2 + k * 12; m[g16(e)] = e + 8; } return m; }; const g = ifd(g32(ifd(g32(4))[0x8825])); const rat = (e) => { const b = g32(e); return [0, 1, 2].map((k) => g32(b + k * 8) / g32(b + k * 8 + 4)); }; const dec = ([d, m, s]) => d + m / 60 + s / 3600; return { lat: dec(rat(g[2])) * (String.fromCharCode(t[g[1]]) === 'S' ? -1 : 1), lon: dec(rat(g[4])) * (String.fromCharCode(t[g[3]]) === 'W' ? -1 : 1) }; })();
+      assert.ok(Math.abs(exif.lon - lonlat[0]) < 1e-5 && Math.abs(exif.lat - lonlat[1]) < 1e-5, 'EXIF = ponto pressionado: ' + JSON.stringify([exif, lonlat]));
+      const XLSX = require('xlsx-js-style'); const wb = XLSX.read(Buffer.from(z[xl]), { type: 'buffer' });
+      const linhas = XLSX.utils.sheet_to_json(wb.Sheets.Notas, { header: 1 });
+      assert.equal(linhas[0][25], 'Arquivo da foto'); assert.equal('fotos/' + linhas[1][25], ft[0], 'a coluna aponta para o arquivo');
+      const c = await baixa('#exCsv'); assert.match(c.nome, /\.zip$/);
+      const zc = unzipSync(new Uint8Array(c.buf)); assert.ok(Object.keys(zc).some((k) => /\.csv$/.test(k)) && Object.keys(zc).some((k) => /^fotos\//.test(k)));
+      // KMZ: sem o chip, sem fotos; com o chip (que liga as notas), a foto vai na pasta fotos/ e a descrição aponta para ela
+      const k1 = await baixa('#exKmz'); assert.equal(Object.keys(unzipSync(new Uint8Array(k1.buf))).filter((k) => /^fotos\//.test(k)).length, 0, 'KMZ padrão não leva fotos');
+      await pg.click('#xKmz .xchip[data-g=fotos]'); await pg.waitForTimeout(400);
+      assert.equal(await pg.getAttribute('#xKmz .xchip[data-g=fotos]', 'aria-pressed'), 'true');
+      const k2 = await baixa('#exKmz'), zk = unzipSync(new Uint8Array(k2.buf));
+      assert.equal(Object.keys(zk).filter((k) => /^fotos\/.+\.jpg$/.test(k)).length, 1, 'KMZ com fotos: ' + Object.keys(zk).join(', '));
+      assert.match(strFromU8(zk['doc.kml']), /<img src="fotos\/km[^"]+\.jpg"/, 'a descrição aponta para a imagem');
+      // backup: ZIP com backup.json e fotos/, que restaura as fotos
+      const b = await baixa('#bkDown'); assert.match(b.nome, /\.zip$/, 'com fotos o backup sai em ZIP');
+      const zb = unzipSync(new Uint8Array(b.buf)); assert.ok(zb['backup.json']); assert.equal(Object.keys(zb).filter((k) => /^fotos\//.test(k)).length, 1);
+      const j = JSON.parse(strFromU8(zb['backup.json'])); assert.match(j.notas[0].photos[0], /^fotos\//, 'as notas apontam para a pasta');
+      await pg.evaluate(() => { const E = window.__pavecad.E; E.notes.length = 0; });
+      const tmp = require('path').join(require('os').tmpdir(), 'pavecad-backup-teste.zip'); fs.writeFileSync(tmp, b.buf);
+      await pg.setInputFiles('#importIn', tmp); await pg.waitForFunction(() => window.__pavecad.E.notes.length === 1, null, { timeout: 8000 });
+      assert.match(await estado(pg, 'E => E.notes[0].photos[0].slice(0, 23)'), /^data:image\/jpeg;base64,$/, 'a foto voltou do ZIP');
+    }],
+  ],
   // Armazenamento que não responde (aba privada, bloqueio no Brave/Android): a partida não pode ficar presa esperando o IndexedDB.
   t26: [
     ['celular com IndexedDB que nunca responde: "⋯" e "Abrir planilhas" respondem e o app avisa que nada será salvo', ['cel-412x915'], async (pg) => {

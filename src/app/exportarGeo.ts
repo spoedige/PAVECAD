@@ -5,7 +5,9 @@ import {
 } from '../dominio/exportGeo';
 import { estimarIfc, gerarIfc, LIMITACAO_Z, MOTIVO_SEM_ALINHAMENTO, verificarIfc } from '../formats/ifc';
 import { estimarKml, gerarKml, verificarKml, type NotaKml } from '../formats/kml';
+import { TIPOS_RAPIDOS } from '../dominio/notaRapida';
 import { E, NOTE_CATS, baseOf, kmFmt, projName, rodoviaNome, visibleProjects } from './estado';
+import { fotosAtuais } from './exportNotas';
 import { esc, toast } from './ui';
 
 /** Cartões KMZ/KML e IFC da aba Exportar: chips de camada, filtro e detalhe, tamanho estimado, geração em lotes e relatório. */
@@ -27,12 +29,16 @@ export function fontesAtuais(): FonteExport[] {
   }));
 }
 
-function notasKml(): NotaKml[] {
+/** KMZ: as fotos das notas só entram com o chip "Incluir fotos" (e com as notas de campo ligadas). */
+let fotosKmz = false;
+
+function notasKml(foto?: Map<string, string>): NotaKml[] {
   return E.notes.map((n) => {
     const p = n.loc ? E.P.find((x) => x.id === n.loc!.pid) : undefined;
     return {
-      tipo: n.type, coords: n.coords, categoria: NOTE_CATS[n.cat].l, texto: n.text, criado: n.t,
+      tipo: n.type, coords: n.coords, categoria: n.rapida ? TIPOS_RAPIDOS[n.rapida.tipo].rotulo : NOTE_CATS[n.cat].l, texto: n.text, criado: n.t,
       planilha: p && !E.privacidade ? projName(p) : null, km: n.loc && !E.privacidade ? n.loc.km : null,
+      ...(foto?.has(n.id) ? { foto: foto.get(n.id) } : {}),
     };
   });
 }
@@ -64,7 +70,7 @@ function chipsDe(fmt: Cartao, fontes: FonteExport[]): string {
     grupo('Sentido', [['todos', 'Todos'], ['crescente', 'Crescente'], ['decrescente', 'Decrescente']].map(([v, r]) => chip('sentido', v, r, o.sentido === v)).join('')),
     grupo('Faixa', faixas.join('')),
     grupo('Nível de detalhe', detalhes.map(([v, r]) => chip('detalhe', v, r, o.detalhe === v)).join('')),
-    grupo('Notas de campo', chip('notas', 'notas', 'Incluir notas de campo', o.notas)),
+    grupo('Notas de campo', chip('notas', 'notas', 'Incluir notas de campo', o.notas) + (fmt === 'kmz' ? chip('fotos', 'fotos', 'Incluir fotos', fotosKmz && o.notas) : '')),
   ].join('');
 }
 
@@ -140,7 +146,9 @@ async function gerar(fmt: 'kmz' | 'kml' | 'ifc', rerender: () => void) {
   try {
     await ceder();
     const modelo = montarModelo(fontes, o, E.props);
-    const notas = o.notas ? notasKml() : [];
+    // fotos no KMZ: só com o chip e só no KMZ (no KML puro o caminho relativo não existiria)
+    const fotos = fmt === 'kmz' && fotosKmz && o.notas ? fotosAtuais() : [];
+    const notas = o.notas ? notasKml(new Map(fotos.map((f) => [f.id, 'fotos/' + f.nome]))) : [];
     const titulo = incluidas.length === 1 ? incluidas[0].planilha : `${incluidas.length} planilhas`;
     if (fmt === 'ifc') {
       if (!modelo.faixas.length && !modelo.propostas.length) { toast('Nada para exportar com estas opções'); return; }
@@ -158,7 +166,9 @@ async function gerar(fmt: 'kmz' | 'kml' | 'ifc', rerender: () => void) {
       let blob: Blob, nome: string;
       if (fmt === 'kmz') {
         const { zipSync, strToU8 } = await import('fflate');
-        blob = new Blob([zipSync({ 'doc.kml': strToU8(kml) }, { level: 9 }) as BlobPart], { type: 'application/vnd.google-earth.kmz' });
+        const ent: Record<string, Uint8Array | [Uint8Array, { level: 0 | 9 }]> = { 'doc.kml': [strToU8(kml), { level: 9 }] };
+        for (const f of fotos) ent['fotos/' + f.nome] = [f.bytes, { level: 0 }];
+        blob = new Blob([zipSync(ent) as BlobPart], { type: 'application/vnd.google-earth.kmz' });
         nome = nomeArquivo('PAVECAD', 'kmz', titulo);
       } else {
         blob = new Blob([kml], { type: 'application/vnd.google-earth.kml+xml' });
@@ -192,7 +202,8 @@ export function ligarCartoesGeo(raiz: HTMLElement, rerender: () => void) {
       else if (g === 'sentido') o.sentido = v as OpcoesExport['sentido'];
       else if (g === 'faixa') o.faixa = v === 'todas' ? 'todas' : Number(v);
       else if (g === 'detalhe') o.detalhe = v as OpcoesExport['detalhe'];
-      else if (g === 'notas') o.notas = !o.notas;
+      else if (g === 'notas') { o.notas = !o.notas; if (!o.notas) fotosKmz = false; }
+      else if (g === 'fotos') { fotosKmz = !(fotosKmz && o.notas); if (fotosKmz) o.notas = true; }
       else if (g === 'rodovia') {
         const todas = [...new Set(fontesAtuais().map((f) => f.rodovia))];
         const atual = new Set(o.rodovias ?? todas);

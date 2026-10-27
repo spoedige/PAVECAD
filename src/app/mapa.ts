@@ -1,3 +1,4 @@
+import { registrarMarcadoresDeNotas } from './marcadores';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import type { GeoJSONSource, MapMouseEvent, PointLike } from 'maplibre-gl';
@@ -75,6 +76,7 @@ export function initMap(onReady: () => void) {
     map.addLayer({ id: 'notes-fill', type: 'fill', source: 'notes', filter: ['==', ['geometry-type'], 'Polygon'], paint: { 'fill-color': catc, 'fill-opacity': 0.22 } });
     map.addLayer({ id: 'notes-line', type: 'line', source: 'notes', filter: ['!=', ['geometry-type'], 'Point'], paint: { 'line-color': catc, 'line-width': 3.5 } });
     map.addLayer({ id: 'notes-pt', type: 'circle', source: 'notes', filter: ['==', ['geometry-type'], 'Point'], paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 8, 6, 18, 10], 'circle-color': catc, 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 2.5 } });
+    registrarMarcadoresDeNotas(map);
     map.addSource('props', { type: 'geojson', data: EMPTY });
     map.addSource('psel', { type: 'geojson', data: EMPTY });
     map.addSource('phl', { type: 'geojson', data: EMPTY });
@@ -486,7 +488,7 @@ export function hitAt(pt: PointLike & { x: number; y: number }): Hit | null {
   const vis = visibleProjects();
   const has = (l: string) => map.getLayer(l);
   if (E.layers.notes) {
-    const n = map.queryRenderedFeatures(b, { layers: ['notes-pt', 'notes-line', 'notes-fill'].filter(has) });
+    const n = map.queryRenderedFeatures(b, { layers: ['notes-ic', 'notes-pt', 'notes-line', 'notes-fill'].filter(has) });
     if (n.length) {
       const nt = E.notes.find((x) => x.id === n[0].properties.id) ?? (E.editing?.id === n[0].properties.id ? E.editing : undefined);
       if (nt) return { note: nt };
@@ -894,7 +896,7 @@ export function applyLayers() {
   updateStakes();
   $('.stage').classList.toggle('hide-km', !E.layers.km);
   $('.stage').classList.toggle('hide-poi', !E.layers.poi);
-  if (E.mapReady) for (const l of ['notes-fill', 'notes-line', 'notes-pt']) map.setLayoutProperty(l, 'visibility', E.layers.notes ? 'visible' : 'none');
+  if (E.mapReady) for (const l of ['notes-fill', 'notes-line', 'notes-pt', 'notes-ic', 'notes-foto']) map.setLayoutProperty(l, 'visibility', E.layers.notes ? 'visible' : 'none');
 }
 
 export function setData(id: string, data: GeoJSON.FeatureCollection) { src(id)?.setData(data); }

@@ -52,7 +52,25 @@ export function novosPorId<T extends { id: string }>(atuais: T[], doBackup: T[])
   return { novos, repetidos: doBackup.length - novos.length };
 }
 
+/** Com fotos, o backup sai como ZIP: backup.json (as notas apontam para fotos/NOTA_N.jpg) e a pasta fotos/ com as imagens. */
+export const PASTA_FOTOS = 'fotos/';
+export const ARQUIVO_JSON_BACKUP = 'backup.json';
+export function separarFotos<T extends { id: string; photos?: string[] }>(notas: T[]): { notas: T[]; arquivos: { nome: string; data: string }[] } {
+  const arquivos: { nome: string; data: string }[] = [];
+  const out = notas.map((n) => {
+    if (!n.photos?.length) return n;
+    const refs = n.photos.map((data, i) => { const nome = `${n.id}_${i + 1}.jpg`; arquivos.push({ nome, data }); return PASTA_FOTOS + nome; });
+    return { ...n, photos: refs };
+  });
+  return { notas: out, arquivos };
+}
+/** Troca as referências fotos/... pelas imagens do ZIP (data URL). Referência sem arquivo é descartada. */
+export function juntarFotos<T extends { photos?: string[] }>(notas: T[], ler: (nome: string) => string | null): T[] {
+  return notas.map((n) => (n.photos?.length ? { ...n, photos: n.photos.map((r) => (r.startsWith(PASTA_FOTOS) ? ler(r.slice(PASTA_FOTOS.length)) : r)).filter((x): x is string => !!x) } : n));
+}
+
 export const nomeArquivoBackup = (d: Date = new Date()): string => {
   const z = (v: number) => String(v).padStart(2, '0');
   return `pavecad-backup-${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}.json`;
 };
+export const nomeArquivoBackupZip = (d: Date = new Date()): string => nomeArquivoBackup(d).replace(/\.json$/, '.zip');

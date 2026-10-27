@@ -114,3 +114,19 @@ describe('EXIF GPS', () => {
     expect(g).toBe(12); expect(m).toBe(47); expect(s).toBeCloseTo(28.4424, 3);
   });
 });
+
+describe('backup com fotos', () => {
+  it('separa as fotos em arquivos e junta de volta', async () => {
+    const { separarFotos, juntarFotos, nomeArquivoBackupZip } = await import('../src/dominio/backup');
+    const notas = [{ id: 'n1', photos: ['data:image/jpeg;base64,AAA', 'data:image/jpeg;base64,BBB'] }, { id: 'n2', photos: [] }, { id: 'n3' }];
+    const s = separarFotos(notas);
+    expect(s.notas[0].photos).toEqual(['fotos/n1_1.jpg', 'fotos/n1_2.jpg']);
+    expect(s.arquivos.map((a) => a.nome)).toEqual(['n1_1.jpg', 'n1_2.jpg']);
+    expect(s.notas[1]).toBe(notas[1]); expect(s.notas[2]).toBe(notas[2]);
+    const j = juntarFotos(s.notas, (nome) => s.arquivos.find((a) => a.nome === nome)?.data ?? null);
+    expect(j[0].photos).toEqual(notas[0].photos);
+    // referência sem arquivo é descartada
+    expect(juntarFotos(s.notas, () => null)[0].photos).toEqual([]);
+    expect(nomeArquivoBackupZip(new Date(2026, 9, 5))).toBe('pavecad-backup-2026-10-05.zip');
+  });
+});

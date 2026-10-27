@@ -17,6 +17,8 @@ export interface NotaKml {
   criado: string;
   planilha: string | null;
   km: string | null;
+  /** Caminho da foto dentro do KMZ (fotos/NOME.jpg), quando o usuário liga "Incluir fotos". */
+  foto?: string;
 }
 
 export interface EntradaKml {
@@ -156,7 +158,7 @@ export async function gerarKml(e: EntradaKml): Promise<string> {
       const g = nt.tipo === 'pin' ? `<Point><coordinates>${coordLL(nt.coords[0])}</coordinates></Point>`
         : nt.tipo === 'line' ? `<LineString><tessellate>1</tessellate><coordinates>${nt.coords.map(coordLL).join(' ')}</coordinates></LineString>`
           : `<Polygon><outerBoundaryIs><LinearRing><coordinates>${[...nt.coords, nt.coords[0]].map(coordLL).join(' ')}</coordinates></LinearRing></outerBoundaryIs></Polygon>`;
-      pn.filhos.push(`<Placemark><name>${esc(nt.categoria)}</name><description>${esc(nt.texto)}</description><styleUrl>#nota</styleUrl>${dados({ categoria: nt.categoria, texto: nt.texto, criado: nt.criado, planilha: nt.planilha ?? undefined, km: nt.km ?? undefined })}${g}</Placemark>`);
+      pn.filhos.push(`<Placemark><name>${esc(nt.categoria)}</name><description>${nt.foto ? `<![CDATA[${(esc(nt.texto) + `<br/><img src="${esc(nt.foto)}" width="400"/>`).replace(/]]>/g, ']]&gt;')}]]>` : esc(nt.texto)}</description><styleUrl>#nota</styleUrl>${dados({ categoria: nt.categoria, texto: nt.texto, criado: nt.criado, planilha: nt.planilha ?? undefined, km: nt.km ?? undefined })}${g}</Placemark>`);
       await lote();
     }
   }

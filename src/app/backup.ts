@@ -1,6 +1,7 @@
 import * as catalogo from '../dominio/catalogo';
 import { getLimites, setLimites, type Limites } from '../dominio/indicadores';
-import { lerBackup, montarBackup, nomeArquivoBackup, novosPorId } from '../dominio/backup';
+import { ARQUIVO_JSON_BACKUP, PASTA_FOTOS, juntarFotos, lerBackup, montarBackup, nomeArquivoBackup, nomeArquivoBackupZip, novosPorId, separarFotos } from '../dominio/backup';
+import { bytesDeDataUrlParaArray } from '../dominio/imagem';
 import { reposicionar, type Proposta } from '../dominio/propostas';
 import { E, type Nota } from './estado';
 import * as db from './persist';
@@ -18,9 +19,28 @@ export async function baixarBackupCompleto() {
   try {
     const planilhas = await db.todos<{ id: string; parsed: unknown; zone?: number }>('projetos');
     const b = montarBackup({ notas: E.notes, propostas: E.props, catalogo: catalogo.exportar(), limiares: getLimites(), planilhas });
-    baixar(new Blob([JSON.stringify(b)], { type: 'application/json' }), nomeArquivoBackup());
+    if (E.notes.some((n) => n.photos?.length)) {
+      // com fotos: ZIP com backup.json e a pasta fotos/
+      const { zipSync, strToU8 } = await import('fflate');
+      const sep = separarFotos(b.notas as Nota[]);
+      const ent: Record<string, Uint8Array | [Uint8Array, { level: 0 }]> = { [ARQUIVO_JSON_BACKUP]: strToU8(JSON.stringify({ ...b, notas: sep.notas })) };
+      for (const a of sep.arquivos) ent[PASTA_FOTOS + a.nome] = [bytesDeDataUrlParaArray(a.data), { level: 0 }];
+      baixar(new Blob([zipSync(ent) as BlobPart], { type: 'application/zip' }), nomeArquivoBackupZip());
+    } else baixar(new Blob([JSON.stringify(b)], { type: 'application/json' }), nomeArquivoBackup());
     toast(`Backup gerado: ${b.planilhas.length} planilha(s), ${b.notas.length} nota(s), ${b.propostas.length} proposta(s)`);
   } catch { toast('Download indisponível aqui'); }
+}
+
+/** Lê um backup em ZIP (backup.json e fotos/) e devolve o JSON com as fotos de volta nas notas. Null quando o ZIP não é um backup. */
+export async function lerBackupZip(buf: ArrayBuffer): Promise<unknown | null> {
+  const { unzipSync, strFromU8 } = await import('fflate');
+  const z = unzipSync(new Uint8Array(buf));
+  const js = z[ARQUIVO_JSON_BACKUP];
+  if (!js) return null;
+  const j = JSON.parse(strFromU8(js)) as { notas?: { photos?: string[] }[] };
+  const dataUrl = (nome: string) => { const b = z[PASTA_FOTOS + nome]; if (!b) return null; let s = ''; for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode(...b.subarray(i, i + 0x8000)); return 'data:image/jpeg;base64,' + btoa(s); };
+  if (Array.isArray(j.notas)) j.notas = juntarFotos(j.notas, dataUrl);
+  return j;
 }
 
 export interface ResultadoBackup { resumo: string; recarregar: boolean }

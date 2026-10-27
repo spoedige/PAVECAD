@@ -104,6 +104,8 @@ export const E = {
   ajustesSalvos: {} as Record<string, AjusteLargura[]>,
   /** Deslocamento salvo, por nome de planilha. */
   deslocSalvos: {} as Record<string, Desloc>,
+  /** "Ver conserva": data do projeto (AAAA-MM-DD) de cada planilha, por nome. Vale para todas as notas de conserva dela. */
+  conservaDesde: {} as Record<string, string>,
 };
 
 /** Ganchos para os módulos de interface, sem import circular com o mapa. */

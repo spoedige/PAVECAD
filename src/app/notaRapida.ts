@@ -721,7 +721,7 @@ export function abrirMenuNota(lng: number, lat: number, pt: { x: number; y: numb
 function marcadorEm(x: number, y: number): { prop?: Proposta; nota?: Nota } | null {
   const map = getMap();
   if (!map.getLayer('notes-pt')) return null;
-  const f = map.queryRenderedFeatures([[x - 18, y - 18], [x + 18, y + 18]], { layers: ['notes-pt'] })[0];
+  const f = map.queryRenderedFeatures([[x - 18, y - 18], [x + 18, y + 18]], { layers: ['notes-ic', 'notes-pt'].filter((l) => map.getLayer(l)) })[0];
   const id = f?.properties?.id as string | undefined;
   if (!id) return null;
   if (id.startsWith('prop:')) { const prop = E.props.find((r) => r.id === id.slice(5)); return prop ? { prop } : null; }
