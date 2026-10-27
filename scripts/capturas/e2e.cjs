@@ -2620,6 +2620,25 @@ const TESTES = {
       assert.equal(await estadoApp('E => E.notes.length'), 1, 'o dreno gravou com Confirmar, sem texto');
       assert.equal(await pg.locator('#nr input, #nr textarea').count(), 0, 'o dreno não pede texto');
       await pg.keyboard.press('Escape'); await pg.waitForTimeout(300); await respondem('depois do dreno');
+      // 8b. as outras bolinhas da roda de 7: Ver conserva (com Confirmar), Observação (texto) e Foto (câmera)
+      ponto = await centrarNaFaixa(pg, 0, 330, 1);
+      await pressionar(ponto.x, ponto.y, 850); assert.equal(await menuAberto(), 7, 'a roda tem 7 bolinhas no celular');
+      await tocar('#nr .nr-op[data-t=conserva]', 'Ver conserva'); await tocar('#nr .nr-op[data-a=confirmar]', 'Confirmar'); await pg.waitForTimeout(400);
+      assert.equal(await estadoApp('E => E.notes.filter((n) => n.rapida.tipo === "conserva").length'), 1, 'Ver conserva gravou com Confirmar');
+      await pg.keyboard.press('Escape'); await pg.waitForTimeout(300);
+      ponto = await centrarNaFaixa(pg, 0, 345, 1);
+      await pressionar(ponto.x, ponto.y, 850);
+      await tocar('#nr .nr-op[data-t=observacao]', 'Observação'); await pg.waitForSelector('#nr textarea', { timeout: 3000 });
+      await pg.keyboard.type('anotação no celular'); await tocar('#nr [data-a=salvar]', 'Salvar'); await pg.waitForTimeout(400);
+      assert.equal(await estadoApp('E => E.notes.filter((n) => n.rapida.tipo === "observacao" && n.text === "anotação no celular").length'), 1, 'Observação gravou o texto');
+      await pg.keyboard.press('Escape'); await pg.waitForTimeout(300);
+      ponto = await centrarNaFaixa(pg, 0, 360, 1);
+      await pressionar(ponto.x, ponto.y, 850);
+      const jpg = Buffer.from(await pg.evaluate(() => { const c = document.createElement('canvas'); c.width = 1800; c.height = 1200; c.getContext('2d').fillRect(0, 0, 1800, 1200); return c.toDataURL('image/jpeg', 0.8).split(',')[1]; }), 'base64');
+      const [fch] = await Promise.all([pg.waitForEvent('filechooser', { timeout: 4000 }), tocar('#nr .nr-op[data-t=foto]', 'Foto')]);
+      await fch.setFiles({ name: 'f.jpg', mimeType: 'image/jpeg', buffer: jpg });
+      await pg.waitForFunction(() => window.__pavecad.E.notes.some((n) => n.rapida.tipo === 'foto'), null, { timeout: 8000 });
+      await pg.keyboard.press('Escape'); await pg.waitForTimeout(300); await respondem('depois das sete bolinhas');
       // 9. gaveta e abas
       await tocar('#gavTxt', 'abrir a gaveta'); await tocar('#tabs [data-t=ana]', 'aba Análise'); await tocar('#tabs [data-t=exp]', 'aba Exportar'); await tocar('#tabs [data-t=seg]', 'aba Segmento');
       assert.equal(await pg.evaluate(() => document.querySelector('#tabs [aria-selected=true]').dataset.t), 'seg');
