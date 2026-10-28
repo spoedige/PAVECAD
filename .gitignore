@@ -2,3 +2,15 @@ node_modules
 dist
 *.log
 .DS_Store
+
+.env
+.env.*
+!.env.example
+/capturas/
+
+# capturas geradas localmente
+scripts/capturas/saida*
+
+# dados reais (nunca versionar): use scripts/anonimizar.cjs para gerar os fixtures
+/dados-reais/
+/referencia/fontes/index3.html

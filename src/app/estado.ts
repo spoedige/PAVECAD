@@ -1,0 +1,210 @@
+import type { DadosRapida } from '../dominio/notaRapida';
+import type maplibregl from 'maplibre-gl';
+import type { Feature } from 'geojson';
+import type { GeoOptions } from '../geometry/build';
+import type { Project } from '../geometry/project';
+import type { Camadas } from '../mapa/camadas';
+import type { Normais } from '../mapa/worker';
+import type { RowModel } from '../dominio/modelo';
+import type { IndKey, ModeKey } from '../dominio/indicadores';
+import type { Alvo, Proposta } from '../dominio/propostas';
+import type { AjusteLargura } from '../dominio/larguras';
+import type { Desloc } from '../geometry/deslocamento';
+import type { Lane, Row } from '../formats/types';
+import type { SolutionCode } from '../formats/km';
+import type { MapMouseEvent } from 'maplibre-gl';
+import { modelOf } from '../dominio/modelo';
+import { kmLabel } from '../formats/km';
+import { definirFormatoKm } from '../dominio/propostas';
+
+export interface AppProj extends Project {
+  id: string;
+  label: string;
+  visible: boolean;
+  opts: GeoOptions;
+  normals: (Normais | null)[];
+  camadas: Camadas;
+  model: RowModel[];
+  polyByFid: Map<number, Feature>;
+  bounds: [[number, number], [number, number]];
+  markers: maplibregl.Marker[];
+  /** Linhas como vieram da planilha. `rows` já traz os ajustes de largura aplicados. */
+  rowsPlanilha: Row[];
+  ajustes: AjusteLargura[];
+  /** Eixo como veio da planilha, em metros projetados. `x` e `y` já trazem o deslocamento longitudinal. */
+  x0: Float64Array;
+  y0: Float64Array;
+  desloc: Desloc;
+}
+
+export interface Sel { pid: string; row: number; lane: number }
+export type BaseKey = 'none' | 'osm' | 'esri';
+export type Ferramenta = 'prop' | null;
+
+export const NOTE_CATS = {
+  obs: { l: 'Observação', c: '#5e5ce6' },
+  def: { l: 'Defeito', c: '#ff2d55' },
+  dre: { l: 'Dreno', c: '#00a99d' },
+  rev: { l: 'Revisar solução', c: '#ff9f0a' },
+} as const;
+export type NoteCat = keyof typeof NOTE_CATS;
+
+export interface Nota {
+  id: string;
+  type: 'pin' | 'line' | 'area';
+  /** [lon, lat] */
+  coords: number[][];
+  cat: NoteCat;
+  text: string;
+  photos: string[];
+  t: string;
+  loc: { pid: string; name: string; km: string; lane: number } | null;
+  isNew?: boolean;
+  /** Nota rápida de campo (pressão no mapa, botão direito ou botão Nota). As anotações antigas não têm. */
+  rapida?: DadosRapida;
+}
+
+export type FocoPred = (L: Lane, t: SolutionCode, r: Row, p: AppProj) => boolean;
+
+export const E = {
+  P: [] as AppProj[],
+  seq: 0,
+  mode: 'sol' as ModeKey,
+  sel: null as Sel | null,
+  dim: new Set<string>(),
+  field: false,
+  base: 'none' as BaseKey,
+  activeGroup: null as string | null,
+  layers: { drain: true, km: true, poi: true, notes: true } as Record<'drain' | 'km' | 'poi' | 'notes', boolean>,
+  mapReady: false,
+  tool: null as Ferramenta,
+  /** Até quando (ms) o clique que sobra de uma pressão longa no mapa deve ser ignorado. */
+  cliqueSuprimidoAte: 0,
+  notes: [] as Nota[],
+  editing: null as Nota | null,
+  props: [] as Proposta[],
+  propSel: [] as Alvo[],
+  propMode: 'run' as 'run' | 'one',
+  propTo: 'FS4',
+  propNote: '',
+  focus: null as { label: string; n: number; pred: FocoPred } | null,
+  anInd: 'iri' as IndKey,
+  /** Modo privacidade: nomes, rodovias e km saem da tela e das exportações. Os dados guardados não mudam. */
+  privacidade: false,
+  /** Padrão além da cor (hachura nas classes críticas). null = automático: ligado no modo campo. */
+  padrao: null as boolean | null,
+  settingsPid: null as string | null,
+  /** Planilhas marcadas na aba Ajustes: geometria e deslocamento valem para todas. */
+  settingsSel: new Set<string>(),
+  uniCollapsed: false,
+  tab: 'seg' as 'seg' | 'ana' | 'notas' | 'exp' | 'aj' | 'al',
+  /** Cor de identificação de cada planilha, por nome (escolhida no dashboard de projetos). */
+  coresProj: {} as Record<string, string>,
+  /** Ajustes de largura salvos, por nome de planilha. Valem quando a planilha é aberta. */
+  ajustesSalvos: {} as Record<string, AjusteLargura[]>,
+  /** Deslocamento salvo, por nome de planilha. */
+  deslocSalvos: {} as Record<string, Desloc>,
+};
+
+/** Ganchos para os módulos de interface, sem import circular com o mapa. */
+export const H = {
+  onSelect: (_opt: { tab?: boolean; semGaveta?: boolean }) => {},
+  onNoteHit: (_id: string) => {},
+  /** Define a posição manual por toque no mapa; devolve true quando consumiu o clique. */
+  onPosManual: (_e: MapMouseEvent): boolean => false,
+  /** Ferramentas ativas consomem o clique; devolve true quando consumiu. */
+  onClick: (_e: MapMouseEvent): boolean => false,
+  onView: () => {},
+  /** O catálogo mudou (código novo visto, edição, importação). */
+  onCatalogo: () => {},
+};
+
+export const visibleProjects = () => E.P.filter((p) => p.visible);
+export const getP = (id: string) => E.P.find((p) => p.id === id);
+const short = (p: Pick<AppProj, 'meta'>) => (/Marginal/i.test(p.meta.via) ? p.meta.via.replace(/\s*-\s*Crescente|\s*-\s*Decrescente/, '') : p.meta.via);
+/** O Planservi já traz o nome pronto ("RD-001 · TH36 · Crescente"). */
+export const projName = (p: Pick<AppProj, 'meta'>) => {
+  if (E.privacidade) {
+    const i = E.P.indexOf(p as AppProj);
+    return `Planilha${i >= 0 ? ' ' + (i + 1) : ''} · ${p.meta.travel > 0 ? 'Crescente' : 'Decrescente'}`;
+  }
+  return p.meta.format === 'planservi' ? p.meta.name : `${p.meta.uf.split('/')[1] || p.meta.uf} ${short(p)}`;
+};
+
+/** Paleta de identificação das planilhas, na ordem em que foram abertas. */
+const PALETA_PROJ = ['#0a84ff', '#ff9500', '#34c759', '#af52de', '#ff2d55', '#00c7be', '#a2845e', '#5856d6'];
+export const corDoProjeto = (p: Pick<AppProj, 'meta'>) => E.coresProj[p.meta.name] ?? PALETA_PROJ[Math.max(0, E.P.findIndex((q) => q.meta.name === p.meta.name)) % PALETA_PROJ.length];
+
+/** Hachura ativa? A escolha explícita vale; sem escolha, liga junto com o modo campo. */
+export const padraoAtivo = () => E.padrao ?? E.field;
+/** RP (diagonal), GAP (pontos) e Micro (linhas) têm padrão por padrão em todos os temas: a cor deles fica a menos de 15 de ΔE00 de outra classe sob daltonismo. Só some se o usuário desligar "Padrão além da cor". */
+export const padraoDosPares = () => E.padrao ?? true;
+
+/** Nome da rodovia (ou do grupo) para exibir: "Rodovia A", "Rodovia B"... na ordem em que aparecem, no modo privacidade. */
+export function rodoviaNome(uf: string): string {
+  if (!E.privacidade) return uf;
+  const todas = [...new Set(E.P.map((p) => p.meta.uf))];
+  const i = todas.indexOf(uf);
+  return `Rodovia ${i >= 0 ? String.fromCharCode(65 + (i % 26)) : ''}`.trim();
+}
+
+/** Km exibido. No modo privacidade o km é contado a partir do início da primeira planilha (inteiro), para não revelar o trecho. */
+export const kmBase = () => (E.privacidade && E.P.length ? Math.floor(Math.min(...E.P.map((p) => p.kmNum[0]))) : 0);
+export const kmVis = (k: number) => k - kmBase();
+export const kmReal = (k: number) => k + kmBase();
+export const kmFmt = (k: number) => kmLabel(kmVis(k));
+/** Refaz os rótulos de km de todas as planilhas e o formato usado nas propostas. Chamar ao ligar o modo, abrir ou fechar planilha. */
+export function atualizarRotulosKm() {
+  definirFormatoKm(kmFmt);
+  for (const p of E.P) p.kmLab = p.kmNum.map(kmFmt);
+}
+
+
+export const novoId = () => 'p' + ++E.seq;
+
+/** O id é gerado antes, com novoId(), porque o worker o grava nas feições. */
+export function criarProjeto(
+  id: string, base: Project, extra: { opts: GeoOptions; normals: (Normais | null)[]; camadas: Camadas },
+): AppProj {
+  let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+  for (const r of base.rows) {
+    x0 = Math.min(x0, r.lon); x1 = Math.max(x1, r.lon); y0 = Math.min(y0, r.lat); y1 = Math.max(y1, r.lat);
+  }
+  const polyByFid = new Map<number, Feature>();
+  for (const f of extra.camadas.polys.features) polyByFid.set(f.properties.fid as number, f as unknown as Feature);
+  const proj: AppProj = {
+    ...base, ...extra, id, label: base.meta.name, visible: true, model: modelOf(base.rows),
+    polyByFid, bounds: [[x0, y0], [x1, y1]], markers: [], rowsPlanilha: base.rows, ajustes: [],
+    x0: Float64Array.from(base.x), y0: Float64Array.from(base.y), desloc: { l: 0, t: 0 },
+  };
+  registrarInvalidos(proj, extra.camadas);
+  return proj;
+}
+
+/** Parte do projeto que vai ao worker; o resto é estado de interface. */
+export function baseOf(p: AppProj): Project {
+  const { meta, rows, log, codes, segs, segOf, crs, x, y, kmNum, kmLab } = p;
+  return { meta, rows, log, codes, segs, segOf, crs, x, y, kmNum, kmLab };
+}
+
+/** Polígonos que falharam na validação ficam no log da planilha (um só registro, refeito a cada geometria). */
+export function registrarInvalidos(p: Pick<AppProj, 'log' | 'kmLab'>, c: Camadas) {
+  p.log = p.log.filter((l) => l.code !== 'poligonos-invalidos');
+  const inv = c.invalidos ?? [];
+  if (!inv.length) return;
+  const porLinha = new Map<number, string>();
+  for (const x of inv) if (!porLinha.has(x.row)) porLinha.set(x.row, x.motivo);
+  const nome: Record<string, string> = { curto: 'menos de 1 m', cruzado: 'cruzado', 'sem-area': 'sem área' };
+  const lista = [...porLinha].slice(0, 30).map(([r, m]) => `${p.kmLab[r]} (${nome[m] ?? m})`).join(', ');
+  p.log.push({ level: 'warn', code: 'poligonos-invalidos', msg: `${inv.length} polígono${inv.length > 1 ? 's' : ''} em ${porLinha.size} segmento${porLinha.size > 1 ? 's' : ''} não passou${inv.length > 1 ? 'aram' : ''} na validação (anel simples, comprimento acima de 1 m); desenhado${inv.length > 1 ? 's' : ''} só a linha central. Km: ${lista}${porLinha.size > 30 ? ` e mais ${porLinha.size - 30}` : ''}` });
+}
+
+/** Aplica o resultado de uma nova geometria ao projeto. */
+export function aplicarGeometria(p: AppProj, r: { opts: GeoOptions; normals: (Normais | null)[]; camadas: Camadas }) {
+  p.opts = r.opts;
+  registrarInvalidos(p, r.camadas);
+  p.normals = r.normals;
+  p.camadas = r.camadas;
+  p.polyByFid = new Map();
+  for (const f of r.camadas.polys.features) p.polyByFid.set(f.properties.fid as number, f as unknown as Feature);
+}

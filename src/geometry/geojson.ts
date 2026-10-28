@@ -10,23 +10,25 @@ export interface FC {
 }
 
 /** Adaptador para MapLibre. `attrs` junta solução e parâmetros a cada polígono. */
-export function polysToGeoJSON(p: Project, g: Geometry, attrs: (q: LanePoly) => Props = () => ({})): FC {
+export function polysToGeoJSON(p: Project, g: Geometry, attrs: (q: LanePoly) => Props = () => ({}), pid: string = p.meta.name): FC {
   return {
     type: 'FeatureCollection',
     features: g.polys.map((q) => ({
       type: 'Feature',
-      properties: { pid: p.meta.name, fid: q.fid, row: q.row, lane: q.lane, ...attrs(q) },
-      geometry: { type: 'Polygon', coordinates: [q.ring.map((pt) => lonLat(p, pt))] },
+      properties: { pid, fid: q.fid, row: q.row, lane: q.lane, ...attrs(q) },
+      geometry: q.invalido && q.central
+        ? { type: 'LineString', coordinates: q.central.map((pt) => lonLat(p, pt)) }
+        : { type: 'Polygon', coordinates: [q.ring.map((pt) => lonLat(p, pt))] },
     })),
   };
 }
 
-export function drainsToGeoJSON(p: Project, runs: DrainRun[]): FC {
+export function drainsToGeoJSON(p: Project, runs: DrainRun[], pid: string = p.meta.name): FC {
   return {
     type: 'FeatureCollection',
     features: runs.map((d) => ({
       type: 'Feature',
-      properties: { t: d.type, pid: p.meta.name, r0: d.r0, r1: d.r1 },
+      properties: { t: d.type, pid, r0: d.r0, r1: d.r1 },
       geometry: { type: 'LineString', coordinates: d.pts.map((pt) => lonLat(p, pt)) },
     })),
   };

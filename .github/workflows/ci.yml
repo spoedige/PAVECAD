@@ -1,0 +1,57 @@
+name: CI
+on:
+  push:
+  pull_request:
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  # Testes de interface (Playwright, só Chromium). Etapa separada: não bloqueia nem atrasa a verificação acima.
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Versão do Playwright
+        id: pw
+        run: echo "versao=$(node -p "require('playwright/package.json').version")" >> "$GITHUB_OUTPUT"
+      - name: Cache do Chromium do Playwright
+        id: cache-pw
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ runner.os }}-${{ steps.pw.outputs.versao }}
+      - name: Instalar Chromium e dependências do sistema
+        if: steps.cache-pw.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+      - name: Instalar só as dependências do sistema (Chromium veio do cache)
+        if: steps.cache-pw.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+      # O layout é medido com a fonte do desenho (Inter). Sem ela o runner cai numa fonte mais larga e os testes de largura falham.
+      - name: Fonte Inter
+        run: sudo apt-get install -y --no-install-recommends fonts-inter && fc-list | grep -ci inter
+      - name: Subir o servidor de desenvolvimento
+        run: |
+          npm run dev -- --port 5199 --strictPort > dev.log 2>&1 &
+          for i in $(seq 1 60); do curl -sf http://localhost:5199/ > /dev/null && exit 0; sleep 1; done
+          cat dev.log
+          exit 1
+      - run: npm run e2e
+      - name: Log do servidor (em caso de falha)
+        if: failure()
+        run: cat dev.log

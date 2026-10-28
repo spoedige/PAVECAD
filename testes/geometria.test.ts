@@ -122,7 +122,7 @@ describe('geometria: reta ao norte', () => {
 });
 
 describe('geometria: planilhas GO', () => {
-  for (const [arq, travel] of [['U_BR-050_GO_Crescente.xlsx', 1], ['U_BR-050_GO_Decrescente.xlsx', -1]] as const) {
+  for (const [arq, travel] of [['rr_go_crescente.xlsx', 1], ['rr_go_decrescente.xlsx', -1]] as const) {
     describe(arq, () => {
       const p = prepareProject(lerPlanilha(arq));
       const g = buildGeometry(p);
@@ -176,7 +176,7 @@ describe('geometria: planilhas GO', () => {
   }
 
   it('edgesOf respeita as opções', () => {
-    const p = prepareProject(lerPlanilha('U_BR-050_GO_Crescente.xlsx'));
+    const p = prepareProject(lerPlanilha('rr_go_crescente.xlsx'));
     const e = edgesOf(p.rows[0], DEFAULT_OPTS);
     expect(e.e).toEqual([0, 3.6, 7.2, 9.7]);
   });
