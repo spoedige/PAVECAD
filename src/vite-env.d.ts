@@ -8,3 +8,7 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+/** Definidos no build (vite.config.ts). */
+declare const __APP_COMMIT__: string;
+declare const __APP_DATA__: string;

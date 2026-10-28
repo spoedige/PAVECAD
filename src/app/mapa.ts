@@ -1,3 +1,4 @@
+import { registrarMarcadoresDeNotas } from './marcadores';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import type { GeoJSONSource, MapMouseEvent, PointLike } from 'maplibre-gl';
@@ -9,7 +10,7 @@ import { parseKmTexto } from '../formats/km';
 import { codigosOriginais } from '../formats/planservi';
 import { baseSources, CHAVE_NITIDEZ, MAP_MAX_ZOOM, nitidezSalva, recarregarEsri, type Nitidez } from '../mapa/base';
 import { agendarRotulos, PRIO, prioDeEstaca, resolverRotulos } from './rotulos';
-import { alinhado, cabeRotuloInterno, dentroDoOrcamento, direcaoNaTela, deslocamentoParaFora, metrosPorPixel, passoComOrcamento, PISTAS_JUNTAS_M, prioDoMarco, rotuloInterno, rumoDe } from '../mapa/marcos';
+import { ORCAMENTO, alinhado, cabeRotuloInterno, dentroDoOrcamento, direcaoNaTela, deslocamentoParaFora, metrosPorPixel, passoComOrcamento, PISTAS_JUNTAS_M, prioDoMarco, rotuloInterno, rumoDe } from '../mapa/marcos';
 import { E, H, NOTE_CATS, getP, kmFmt, kmReal, padraoAtivo, padraoDosPares, projName, visibleProjects, type AppProj, type FocoPred } from './estado';
 import { ehCelular } from './layout';
 import { $, cssv, esc, fmt, syncSeg, toast } from './ui';
@@ -75,6 +76,7 @@ export function initMap(onReady: () => void) {
     map.addLayer({ id: 'notes-fill', type: 'fill', source: 'notes', filter: ['==', ['geometry-type'], 'Polygon'], paint: { 'fill-color': catc, 'fill-opacity': 0.22 } });
     map.addLayer({ id: 'notes-line', type: 'line', source: 'notes', filter: ['!=', ['geometry-type'], 'Point'], paint: { 'line-color': catc, 'line-width': 3.5 } });
     map.addLayer({ id: 'notes-pt', type: 'circle', source: 'notes', filter: ['==', ['geometry-type'], 'Point'], paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 8, 6, 18, 10], 'circle-color': catc, 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 2.5 } });
+    registrarMarcadoresDeNotas(map);
     map.addSource('props', { type: 'geojson', data: EMPTY });
     map.addSource('psel', { type: 'geojson', data: EMPTY });
     map.addSource('phl', { type: 'geojson', data: EMPTY });
@@ -97,6 +99,10 @@ export function initMap(onReady: () => void) {
     onReady();
   });
 
+  // saúde dos tiles do fundo: falhas em sequência indicam que não há rede de verdade (navigator.onLine não é confiável no celular)
+  const ehBase = (id: unknown) => typeof id === 'string' && /^(osm|esri|mt-)/.test(id);
+  map.on('error', (e) => { if (ehBase((e as { sourceId?: string }).sourceId)) H.onTileErro(); });
+  map.on('data', (e) => { const d = e as { dataType?: string; sourceId?: string; tile?: unknown }; if (d.dataType === 'source' && d.tile && ehBase(d.sourceId)) H.onTileOk(); });
   map.on('click', onMapClick);
   const tip = $('#tip');
   map.on('mousemove', (e) => {
@@ -482,7 +488,7 @@ export function hitAt(pt: PointLike & { x: number; y: number }): Hit | null {
   const vis = visibleProjects();
   const has = (l: string) => map.getLayer(l);
   if (E.layers.notes) {
-    const n = map.queryRenderedFeatures(b, { layers: ['notes-pt', 'notes-line', 'notes-fill'].filter(has) });
+    const n = map.queryRenderedFeatures(b, { layers: ['notes-ic', 'notes-pt', 'notes-line', 'notes-fill'].filter(has) });
     if (n.length) {
       const nt = E.notes.find((x) => x.id === n[0].properties.id) ?? (E.editing?.id === n[0].properties.id ? E.editing : undefined);
       if (nt) return { note: nt };
@@ -666,6 +672,19 @@ const metrosEntre = (a: { lat: number; lon: number }, b: { lat: number; lon: num
  *  Passo: o menor de PASSOS com pelo menos 64 px entre rótulos; se passar de 400 rótulos na vista, sobe o passo (nunca desliga tudo).
  *  Cada sentido leva o rótulo no lado externo da sua pista (o do acostamento); pistas a menos de 20 m dividem um rótulo só, no eixo,
  *  com uma seta por sentido. Com quadradinho de 100 px ou mais, o rótulo também vai dentro, só com o marco da solução ("209+440"). */
+/** Retângulo da tela (px do mapa) onde os rótulos de km podem aparecer: no celular, abaixo da barra superior e acima da gaveta (ou à esquerda do painel lateral). */
+function areaSegura(): { top: number; bottom: number; right: number } | null {
+  if (!ehCelular()) return null;
+  const topc = document.getElementById('topc'), ins = document.getElementById('inspector');
+  const top = topc && topc.checkVisibility() ? topc.getBoundingClientRect().bottom + 6 : 0;
+  let bottom = innerHeight, right = innerWidth;
+  if (ins && ins.checkVisibility()) {
+    const r = ins.getBoundingClientRect();
+    if (r.left > innerWidth * 0.35) right = r.left - 6; else bottom = r.top - 6;
+  }
+  return { top, bottom, right };
+}
+
 export function updateStakes() {
   const t0 = performance.now();
   stakeMk.forEach((m) => m.remove());
@@ -677,16 +696,20 @@ export function updateStakes() {
   const c = map.getCenter(), bb = map.getBounds(), bearing = map.getBearing();
   const ppm = 1 / metrosPorPixel(z, c.lat), M = 0.002;
   const vis = visibleProjects(), ref = refProjeto();
+  // celular: nada de rótulo sob a barra superior nem sob a gaveta (área de segurança) e menos rótulos, para não esconder o traçado
+  const seg = areaSegura();
+  const livreNaTela = (lon: number, lat: number) => { if (!seg) return true; const q = map.project([lon, lat]); return q.y >= seg.top && q.y <= seg.bottom && q.x <= seg.right; };
+  const orcamento = seg ? Math.round(ORCAMENTO * 0.6) : ORCAMENTO;
   const emVista = vis.map((p) => {
     const idx: number[] = [];
     for (let i = 0; i < p.rows.length; i++) {
       const r = p.rows[i];
-      if (p.normals[i] && r.lon >= bb.getWest() - M && r.lon <= bb.getEast() + M && r.lat >= bb.getSouth() - M && r.lat <= bb.getNorth() + M) idx.push(i);
+      if (p.normals[i] && r.lon >= bb.getWest() - M && r.lon <= bb.getEast() + M && r.lat >= bb.getSouth() - M && r.lat <= bb.getNorth() + M && livreNaTela(r.lon, r.lat)) idx.push(i);
     }
     return { p, idx };
   });
   const contar = (passo: number) => { let n = 0; for (const { p, idx } of emVista) for (const i of idx) if (alinhado(mDe(p, i), passo)) n++; return n; };
-  const passo = passoComOrcamento(ppm, contar);
+  const passo = passoComOrcamento(ppm, contar, orcamento);
   let cand: { p: AppProj; i: number; m: number; d: number }[] = [];
   for (const { p, idx } of emVista) {
     const vistos = new Set<number>(); // 9+1000 e 10+000 são o mesmo km: um rótulo só
@@ -698,7 +721,7 @@ export function updateStakes() {
     }
   }
   infoMarcos.candidatos = cand.length;
-  cand = dentroDoOrcamento(cand);
+  cand = dentroDoOrcamento(cand, orcamento);
   const feats: Expr[] = [];
   const comInterno = cabeRotuloInterno(ppm); // o marco de 20 m já aparece dentro do quadradinho: na borda ficam só km, 500 m e 100 m
   const novoMarker = (el: HTMLElement, lngLat: [number, number], offset: [number, number] = [0, 0]) => stakeMk.push(new maplibregl.Marker({ element: el, anchor: 'center', offset }).setLngLat(lngLat).addTo(map));
@@ -873,7 +896,7 @@ export function applyLayers() {
   updateStakes();
   $('.stage').classList.toggle('hide-km', !E.layers.km);
   $('.stage').classList.toggle('hide-poi', !E.layers.poi);
-  if (E.mapReady) for (const l of ['notes-fill', 'notes-line', 'notes-pt']) map.setLayoutProperty(l, 'visibility', E.layers.notes ? 'visible' : 'none');
+  if (E.mapReady) for (const l of ['notes-fill', 'notes-line', 'notes-pt', 'notes-ic', 'notes-foto']) map.setLayoutProperty(l, 'visibility', E.layers.notes ? 'visible' : 'none');
 }
 
 export function setData(id: string, data: GeoJSON.FeatureCollection) { src(id)?.setData(data); }

@@ -8,9 +8,14 @@ export const TIPOS_RAPIDOS = {
   retirar: { rotulo: 'Retirar solução', curto: 'Retirar', cat: 'rev' },
   dreno_mais: { rotulo: 'Colocar dreno', curto: 'Dreno +', cat: 'dre' },
   dreno_menos: { rotulo: 'Retirar dreno', curto: 'Dreno −', cat: 'dre' },
+  /** Lembrete para conferir, no escritório, a conserva de rotina feita no local entre a data do projeto e o dia da nota. */
+  conserva: { rotulo: 'Ver conserva', curto: 'Conserva', cat: 'obs' },
+  /** Texto livre no ponto pressionado (a antiga "Anotação livre"). */
+  observacao: { rotulo: 'Observação', curto: 'Obs.', cat: 'obs' },
+  foto: { rotulo: 'Foto', curto: 'Foto', cat: 'obs' },
 } as const;
 export type TipoRapido = keyof typeof TIPOS_RAPIDOS;
-export const ORDEM_TIPOS: TipoRapido[] = ['melhorar', 'retirar', 'dreno_mais', 'dreno_menos'];
+export const ORDEM_TIPOS: TipoRapido[] = ['melhorar', 'retirar', 'dreno_mais', 'dreno_menos', 'conserva', 'observacao', 'foto'];
 export type OrigemNota = 'pressao' | 'gps';
 export type EstadoLocal = 'dentro' | 'proximo' | 'fora' | 'sem-planilha';
 export type SentidoNota = 'Crescente' | 'Decrescente';
@@ -29,8 +34,14 @@ export interface DadosRapida {
   /** 1 a 6 = faixa, 0 = acostamento, null = não definida. */
   faixa: number | null;
   estado: EstadoLocal;
+  /** Nota resolvida; na "Ver conserva", é o "Verificado" (senão, "Pendente"). */
   resolvida: boolean;
+  /** Foto: posição real do GPS no instante da foto, quando havia. É dado auxiliar: a posição da foto é o ponto pressionado. */
+  gps?: { lat: number; lon: number; precisao: number | null } | null;
 }
+
+/** Situação de uma "Ver conserva". */
+export const situacaoConserva = (r: Pick<DadosRapida, 'resolvida'>) => (r.resolvida ? 'Verificado' : 'Pendente');
 
 /** Até onde (m) o segmento mais próximo vale quando o ponto cai fora dos polígonos. */
 export const LIMITE_PROXIMO_M = 30;

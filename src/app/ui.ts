@@ -64,6 +64,7 @@ export function gestoVertical(el: HTMLElement, o: { aoBaixo: () => void; aoCima:
     window.removeEventListener('pointerup', aoSoltar);
     window.removeEventListener('pointercancel', aoCancelar);
     const dy = e.clientY - y0;
+    if (cancelado) moveu = false; // gesto interrompido: o próximo toque no elemento não é engolido
     if (cancelado || !moveu) return;
     if (dy >= limite) o.aoBaixo(); else if (dy <= -limite) o.aoCima();
   };

@@ -68,7 +68,7 @@ function cartao(p: AppProj): string {
     ${ind ? `<div class="pc-i">${ind}</div>` : ''}
     <div class="pc-q">${selo(p)}<span class="${q.alertas ? 'alerta' : 'muted'}">${q.alertas ? `${q.alertas} alerta${q.alertas > 1 ? 's' : ''} de qualidade` : 'sem alertas de qualidade'}</span></div>
     <div class="pc-c muted"><span class="num">${props}</span> proposta${props === 1 ? '' : 's'} · <span class="num">${notas}</span> nota${notas === 1 ? '' : 's'}</div>
-    <div class="pc-a"><button class="btn" data-alinhar-p="${p.id}">Alinhar</button>
+    <div class="pc-a"><button class="btn" data-alinhar-p="${p.id}">Alinhar: abrir Ajustes</button>
       <label class="btn pc-cor" title="Cor de identificação da planilha">Cor <input type="color" data-cor="${p.id}" value="${corDoProjeto(p)}" aria-label="Cor de ${esc(projName(p))}"></label>
       <button class="btn d" data-del="${p.id}" aria-label="Remover ${esc(projName(p))}">${IC.trash} Remover</button></div>
   </article>`;

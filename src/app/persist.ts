@@ -3,8 +3,15 @@ export type Store = 'notes' | 'props' | 'config' | 'projetos';
 const STORES: Store[] = ['notes', 'props', 'config', 'projetos'];
 let db: IDBDatabase | null = null;
 
+/** Espera máxima pelo banco. Em alguns navegadores de celular (aba privada, bloqueio de armazenamento) o `open` nunca responde: sem limite, a inicialização inteira ficava parada. */
+export const LIMITE_BANCO_MS = 3000;
+export let bancoIndisponivel = false;
+
 export function abrirDb(): Promise<void> {
   return new Promise((res) => {
+    const t = setTimeout(() => { if (!db) bancoIndisponivel = true; res(); }, LIMITE_BANCO_MS);
+    const fim = res;
+    res = () => { clearTimeout(t); fim(); };
     try {
       const rq = indexedDB.open('pavecad', 2);
       rq.onupgradeneeded = () => {

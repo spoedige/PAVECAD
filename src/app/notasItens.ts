@@ -1,4 +1,4 @@
-import { TIPOS_RAPIDOS } from '../dominio/notaRapida';
+import { TIPOS_RAPIDOS, situacaoConserva } from '../dominio/notaRapida';
 import { parseKmTexto } from '../formats/km';
 import { E, kmFmt, type Nota } from './estado';
 import { getMap } from './mapa';
@@ -17,13 +17,16 @@ const kmDe = (n: Nota) => { const k = n.rapida?.km; if (!k) return ''; if (!E.pr
 export function itemNotaHtml(n: Nota): string {
   const r = n.rapida!, t = TIPOS_RAPIDOS[r.tipo];
   const onde = r.estado === 'sem-planilha' ? 'trecho não definido' : r.estado === 'fora' ? 'fora do trecho' : `km ${esc(kmDe(n))}${r.faixa === null ? '' : r.faixa === 0 ? ' · Acost.' : ` · Fx ${r.faixa}`}`;
-  const aberta = obsAberta.has(n.id);
+  const aberta = obsAberta.has(n.id), conserva = r.tipo === 'conserva';
+  const rotRes = conserva ? (r.resolvida ? 'Voltar para pendente' : 'Marcar como verificado') : (r.resolvida ? 'Reabrir' : 'Marcar como resolvida');
+  const sit = conserva ? ` · <b class="nri-sit ${r.resolvida ? 'ok' : 'pend'}">${situacaoConserva(r)}</b>` : r.resolvida ? ' · resolvida' : '';
+  const mini = r.tipo === 'foto' && n.photos?.[0] ? `<img class="nri-th" src="${esc(n.photos[0])}" alt="Foto" loading="lazy">` : '';
   return `<div class="nri${r.resolvida ? ' resolvida' : ''}" data-nri="${n.id}">
     <div class="row nri-l"><button type="button" class="nri-go" data-nv="${n.id}" aria-label="Ir ao local: ${esc(t.rotulo)}, ${onde}">
-        <span class="nrl-ic" aria-hidden="true">${ICONE[r.tipo]}</span>
-        <span class="grow"><b class="num">${onde}</b><span class="muted nri-s">${esc(t.rotulo)} · ${hora(n.t)}${r.origem === 'gps' ? ' · GPS' : ''}${r.resolvida ? ' · resolvida' : ''}</span>${n.text ? `<span class="nri-obs">${esc(n.text)}</span>` : ''}</span></button>
+        <span class="nrl-ic" aria-hidden="true">${mini || ICONE[r.tipo]}</span>
+        <span class="grow"><b class="num">${onde}</b><span class="muted nri-s">${esc(t.rotulo)} · ${hora(n.t)}${r.origem === 'gps' ? ' · GPS' : ''}${sit}</span>${n.text ? `<span class="nri-obs">${esc(n.text)}</span>` : ''}</span></button>
       <button type="button" class="iconbtn" data-nobs="${n.id}" aria-label="Observação" aria-expanded="${aberta}" title="Observação"><svg class="i" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg></button>
-      <button type="button" class="iconbtn" data-nres="${n.id}" aria-label="${r.resolvida ? 'Reabrir' : 'Marcar como resolvida'}" title="${r.resolvida ? 'Reabrir' : 'Resolvida'}"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button>
+      <button type="button" class="iconbtn" data-nres="${n.id}" aria-label="${rotRes}" title="${rotRes}"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button>
       <button type="button" class="iconbtn" data-nx="${n.id}" aria-label="Excluir nota" title="Excluir"><svg class="i" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button></div>
     ${aberta ? `<div class="nri-obsrow"><input type="text" data-nobsin="${n.id}" enterkeyhint="done" autocomplete="off" placeholder="Observação" aria-label="Observação da nota" value="${esc(n.text)}"><button type="button" class="btn p" data-nobsok="${n.id}">OK</button></div>` : ''}</div>`;
 }

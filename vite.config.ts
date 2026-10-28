@@ -1,13 +1,22 @@
 import { defineConfig } from 'vitest/config';
+import { execSync } from 'node:child_process';
 import { VitePWA } from 'vite-plugin-pwa';
+
+/** Versão do app no build: hash do commit (Vercel ou git local) e data. Aparece em Ajustes, no diagnóstico. */
+const commit = (() => {
+  const v = process.env.VERCEL_GIT_COMMIT_SHA;
+  if (v) return v.slice(0, 7);
+  try { return execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim(); } catch { return 'dev'; }
+})();
 
 const TILES = /^https:\/\/(tile\.openstreetmap\.org|server\.arcgisonline\.com|api\.maptiler\.com)\//;
 
 export default defineConfig({
+  define: { __APP_COMMIT__: JSON.stringify(commit), __APP_DATA__: JSON.stringify(new Date().toISOString()) },
   test: { include: ['testes/**/*.test.ts'], testTimeout: 60000 },
   plugins: process.env.VITEST ? [] : [
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: 'autoUpdate', // o service worker novo assume sozinho e a página recarrega: no modo 'prompt' a versão antiga ficava em cache até alguém tocar em "Atualizar"
       includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
       manifest: {
         name: 'PaveCAD · Mapa de Soluções de Restauração',

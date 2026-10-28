@@ -28,7 +28,7 @@ const linhas = linhasDeNotas(notas, opcoes);
 describe('linhas das notas', () => {
   it('ordem da mais antiga para a mais nova, com as colunas pedidas', () => {
     expect(linhas.map((l) => l.tipo)).toEqual(['Defeito', 'Melhorar solução', 'Colocar dreno', 'Retirar solução']);
-    expect([...COLUNAS]).toEqual(['Data', 'Hora', 'Tipo', 'Rodovia', 'Planilha', 'Sentido', 'Faixa', 'Solução atual', 'Solução nova', 'Efeito', 'Extensão antes (m)', 'Extensão depois (m)', 'Km inicial', 'Km final', 'Latitude', 'Longitude', 'UTM Leste', 'UTM Norte', 'Origem', 'Precisão (m)', 'Observação', 'Status']);
+    expect([...COLUNAS]).toEqual(['Data', 'Hora', 'Tipo', 'Rodovia', 'Planilha', 'Sentido', 'Faixa', 'Solução atual', 'Solução nova', 'Efeito', 'Extensão antes (m)', 'Extensão depois (m)', 'Km inicial', 'Km final', 'Latitude', 'Longitude', 'UTM Leste', 'UTM Norte', 'Origem', 'Precisão (m)', 'Observação', 'Status', 'Desde', 'Até', 'Situação', 'Arquivo da foto']);
   });
 
   it('nota rápida: origem, precisão, faixa e status; anotação antiga entra com os dados que tiver', () => {
@@ -132,7 +132,7 @@ describe('XLSX', () => {
   });
 
   it('filtro automático, larguras e primeira linha congelada', () => {
-    expect(ws['!autofilter']?.ref).toBe('A1:V5');
+    expect(ws['!autofilter']?.ref).toBe('A1:Z5');
     expect(ws['!cols']).toHaveLength(COLUNAS.length);
     expect(ws['!cols']!.every((c) => (c.wch ?? 0) >= 6)).toBe(true);
     const xml = fflate.strFromU8(fflate.unzipSync(bytes)['xl/worksheets/sheet1.xml']);

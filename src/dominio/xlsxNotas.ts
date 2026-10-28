@@ -36,7 +36,7 @@ export function montarXlsx(X: XlsxLib, F: FflateLib, linhas: Linha[]): Uint8Arra
   // campo vazio fica sem célula (e não uma célula de texto vazio)
   const v = (x: string | number | null) => (x === '' || x === null ? null : x);
   const dados = linhas.map((l) => [l.data, l.hora, l.tipo, v(l.rodovia), v(l.planilha), v(l.sentido), v(l.faixa), v(l.solucaoAtual), v(l.solucaoNova), v(l.efeito), v(l.extAntes), v(l.extDepois), v(l.kmIni), v(l.kmFim),
-    l.lat, l.lon, l.utmE, l.utmN, l.origem, v(l.precisao), v(l.observacao), l.status]);
+    l.lat, l.lon, l.utmE, l.utmN, l.origem, v(l.precisao), v(l.observacao), l.status, v(l.desde), v(l.ate), v(l.situacao), v(l.arquivoFoto)]);
   const ws = X.utils.aoa_to_sheet([[...COLUNAS], ...dados]);
   const set = (r: number, c: number, f: (x: Cel) => void) => { const a = ws[X.utils.encode_cell({ r, c })] as Cel | undefined; if (a) f(a); };
   COLUNAS.forEach((_, c) => set(0, c, (x) => { x.s = NEGRITO; }));

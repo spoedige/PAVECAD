@@ -1,3 +1,4 @@
+import { atualizarMiniaturas } from './marcadores';
 import type { MapMouseEvent } from 'maplibre-gl';
 import { areaM2, fmtLen, lenM } from '../dominio/medidas';
 import { addProposta, nomeArquivoCsv, propostasCsv, reposicionar, runAt, runLabel, runStats, type Alvo, type EixoCsv, type Proposta } from '../dominio/propostas';
@@ -9,7 +10,7 @@ import { E, H, NOTE_CATS, getP, kmFmt, kmReal, projName, type AppProj, type Nota
 import { IC } from './icones';
 import { getMap, hitAt, renderLegend, select, setData } from './mapa';
 import * as db from './persist';
-import { restaurarBackup } from './backup';
+import { lerBackupZip, restaurarBackup } from './backup';
 import { setTab } from './paineis';
 import { bindItensNotas, itemNotaHtml } from './notasItens';
 import { atualizarContadorNotas } from './pinoNotas';
@@ -306,7 +307,7 @@ export function refreshNotesLayer() {
   atualizarContadorNotas(totalExportavel());
   if (!E.mapReady) return;
   const lista = E.notes.filter((n) => !E.editing || E.editing.id !== n.id || !E.editing.isNew).concat(E.editing ? [E.editing] : []);
-  const feicoes: GeoJSON.Feature[] = lista.map((n) => ({ type: 'Feature', properties: { id: n.id, cat: n.cat }, geometry: noteGeom(n) }));
+  const feicoes: GeoJSON.Feature[] = lista.map((n) => ({ type: 'Feature', properties: { id: n.id, cat: n.cat, tipo: n.rapida?.tipo ?? '' }, geometry: noteGeom(n) }));
   // propostas feitas em campo ganham um marcador, para a pressão sobre ele abrir a edição
   for (const r of E.props) {
     if (!r.campo || r.orfa || !r.pid) continue;
@@ -314,6 +315,7 @@ export function refreshNotesLayer() {
     if (c) feicoes.push({ type: 'Feature', properties: { id: 'prop:' + r.id, cat: 'rev' }, geometry: { type: 'Point', coordinates: c } });
   }
   setData('notes', { type: 'FeatureCollection', features: feicoes });
+  atualizarMiniaturas(getMap(), E.notes.filter((n) => n.rapida?.tipo === 'foto' && n.photos?.[0]).map((n) => ({ id: n.id, src: n.photos[0] })));
 }
 
 /** Planilha e km de uma nota. No modo privacidade, refeitos com o nome e o km ocultos (a nota guarda os reais). */
@@ -332,14 +334,30 @@ const ROT_TIPO: Record<string, string> = { repetido: 'ponto repetido', salto: 's
 const ROT_INV: Record<string, string> = { curto: 'segmento com menos de 1 m', cruzado: 'polígono cruzado', 'sem-area': 'polígono sem área' };
 /** Planilhas sem ocorrência ficam escondidas quando há ocorrências em outras (menos que o usuário peça para mostrar). */
 let mostrarVazias = false;
+/** Data do projeto das notas "Ver conserva" de uma planilha (AAAA-MM-DD; vazia apaga). */
+export function salvarDesde(pname: string, data: string) {
+  if (data) E.conservaDesde[pname] = data; else delete E.conservaDesde[pname];
+  if (data) db.gravar('config', { id: 'desde:' + pname, pname, data }); else db.apagar('config', 'desde:' + pname);
+}
+
+/** Filtro das notas "Ver conserva" na lista de ocorrências. */
+type FiltroConserva = 'todas' | 'pendente' | 'verificada';
+let filtroConserva: FiltroConserva = 'todas';
+const passaFiltro = (n: Nota) => n.rapida?.tipo !== 'conserva' || filtroConserva === 'todas' || (filtroConserva === 'verificada') === !!n.rapida.resolvida;
+/** AAAA-MM-DD do campo de data. Vazio quando o valor não é uma data. */
+const dataValida = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(new Date(v + 'T00:00:00').getTime());
 function ocorrenciasHtml(): string {
-  const rapidas = E.notes.filter((n) => n.rapida) as Nota[];
+  const todas = E.notes.filter((n) => n.rapida) as Nota[];
+  const rapidas = todas.filter(passaFiltro);
+  const conservas = todas.filter((n) => n.rapida!.tipo === 'conserva');
+  const nPend = conservas.filter((n) => !n.rapida!.resolvida).length;
+  const filtroHtml = conservas.length ? `<div class="chips fc" role="group" aria-label="Filtro das notas Ver conserva"><span class="muted">Ver conserva</span>${([['todas', 'Todas', conservas.length], ['pendente', 'Pendentes', nPend], ['verificada', 'Verificadas', conservas.length - nPend]] as const).map(([k, l, q]) => `<button type="button" class="chipbtn" data-fc="${k}" aria-pressed="${filtroConserva === k}">${l} (${q})</button>`).join('')}</div>` : '';
   const doProjeto = (id: string) => rapidas.filter((n) => n.loc?.pid === id && getP(id));
   const com = E.P.filter((p) => p.qualidade || p.camadas.invalidos?.length || doProjeto(p.id).length);
   // notas fora do trecho, sem planilha ou de planilha que já saiu da lista: um grupo por nome
   const orfas = new Map<string, Nota[]>();
   for (const n of rapidas) if (!(n.loc && getP(n.loc.pid))) { const k = n.rapida!.planilha ?? ''; (orfas.get(k) ?? orfas.set(k, []).get(k)!).push(n); }
-  if (!com.length && !orfas.size) return '';
+  if (!com.length && !orfas.size) return filtroHtml ? `<div><div class="sect">Ocorrências</div>${filtroHtml}<p class="vazio">Nenhuma nota com este filtro.</p></div>` : '';
   const grupos: { n: number; html: string }[] = [];
   const notasHtml = (ns: Nota[]) => ns.slice().sort((a, b) => b.t.localeCompare(a.t)).map(itemNotaHtml).join('');
   for (const p of com) {
@@ -364,7 +382,9 @@ function ocorrenciasHtml(): string {
       sentidos.length ? `${sentidos.length} acima de ${q!.maxSentidos} m entre os sentidos` : '',
       inv.length ? `${inv.length} polígono${inv.length === 1 ? '' : 's'} só em linha` : '',
     ].filter(Boolean).join(' · ') || 'Nenhuma ocorrência';
-    const corpo = n ? `<div class="list" style="margin-top:8px">${notasHtml(notas)}${itens.slice(0, MAX_OC).join('')}${itens.length > MAX_OC ? `<p class="note" style="padding:8px 10px;margin:0">e mais ${itens.length - MAX_OC} ocorrências, no log da aba Ajustes.</p>` : ''}</div>` : '<p class="vazio" style="margin-top:8px">Nenhuma ocorrência.</p>';
+    const temConserva = notas.some((x) => x.rapida?.tipo === 'conserva');
+    const desde = temConserva ? `<div class="field desde"><label for="dd-${p.id}">Conserva desde (data do projeto)</label><input type="date" id="dd-${p.id}" data-desde="${esc(p.meta.name)}" value="${esc(E.conservaDesde[p.meta.name] ?? '')}"></div>` : '';
+    const corpo = n ? `<div class="list" style="margin-top:8px">${desde}${notasHtml(notas)}${itens.slice(0, MAX_OC).join('')}${itens.length > MAX_OC ? `<p class="note" style="padding:8px 10px;margin:0">e mais ${itens.length - MAX_OC} ocorrências, no log da aba Ajustes.</p>` : ''}</div>` : '<p class="vazio" style="margin-top:8px">Nenhuma ocorrência.</p>';
     grupos.push({ n, html: `<details class="qual" data-qp="${p.id}"><summary><span><b>${esc(projName(p))}</b><span class="muted num" style="display:block;font-size:var(--fs-meta);font-weight:400">${esc(resumo)}</span></span><span class="num ${n ? '' : 'muted'}">${n}</span></summary>${corpo}</details>` });
   }
   for (const [nome, ns] of orfas) {
@@ -374,7 +394,7 @@ function ocorrenciasHtml(): string {
   const algumaComOcorrencia = grupos.some((g) => g.n > 0), vazias = grupos.filter((g) => g.n === 0).length;
   const visiveis = algumaComOcorrencia && !mostrarVazias ? grupos.filter((g) => g.n > 0) : grupos;
   const alternar = algumaComOcorrencia && vazias ? `<button type="button" class="btn" id="qVazias" style="margin-top:6px">${mostrarVazias ? 'Esconder' : 'Mostrar'} planilhas sem ocorrências (${vazias})</button>` : '';
-  return `<div><div class="sect">Ocorrências</div>${visiveis.map((g) => g.html).join('')}${alternar}<p class="note" style="margin-top:7px">Notas de campo e pontos reconstruídos pelo km quando a coordenada da planilha estava repetida, saltando ou retrocedendo. A planilha original não muda. O mesmo resumo está no log da aba Ajustes.</p></div>`;
+  return `<div><div class="sect">Ocorrências</div>${filtroHtml}${visiveis.map((g) => g.html).join('')}${alternar}<p class="note" style="margin-top:7px">Notas de campo e pontos reconstruídos pelo km quando a coordenada da planilha estava repetida, saltando ou retrocedendo. A planilha original não muda. O mesmo resumo está no log da aba Ajustes.</p></div>`;
 }
 
 export function renderNotes() {
@@ -421,6 +441,8 @@ export function renderNotes() {
   el.querySelectorAll<HTMLDetailsElement>('details.qual').forEach((d) => { if (qualAbertas.has(d.dataset.qp!)) d.open = true; d.addEventListener('toggle', () => { d.open ? qualAbertas.add(d.dataset.qp!) : qualAbertas.delete(d.dataset.qp!); }); });
   bindProps(el);
   bindItensNotas(el);
+  el.querySelectorAll<HTMLElement>('[data-fc]').forEach((b) => (b.onclick = () => { filtroConserva = b.dataset.fc as FiltroConserva; renderNotes(); }));
+  el.querySelectorAll<HTMLInputElement>('[data-desde]').forEach((i) => i.addEventListener('change', () => { salvarDesde(i.dataset.desde!, dataValida(i.value) ? i.value : ''); toast('Data do projeto salva'); }));
   const vz = document.getElementById('qVazias');
   if (vz) vz.onclick = () => { mostrarVazias = !mostrarVazias; renderNotes(); };
 }
@@ -475,9 +497,11 @@ export async function initRevisao() {
     const input = e.target as HTMLInputElement, f = input.files?.[0];
     if (!f) return;
     const fr = new FileReader();
+    const zip = /\.zip$/i.test(f.name);
     fr.onload = async () => {
       try {
-        const j = JSON.parse(String(fr.result));
+        const j = zip ? await lerBackupZip(fr.result as ArrayBuffer) : JSON.parse(String(fr.result));
+        if (j === null) { toast('O ZIP não é um backup do PAVECAD'); input.value = ''; return; }
         const completo = await restaurarBackup(j);
         if (completo !== null) {
           refreshNotesLayer(); renderNotes();
@@ -487,7 +511,7 @@ export async function initRevisao() {
       } catch { toast('Arquivo inválido'); }
       input.value = '';
     };
-    fr.readAsText(f);
+    if (zip) fr.readAsArrayBuffer(f); else fr.readAsText(f);
   });
 
   $<HTMLInputElement>('#photoIn').addEventListener('change', (e) => {

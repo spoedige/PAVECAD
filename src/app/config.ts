@@ -5,6 +5,7 @@ import { trColor } from '../dominio/solucoes';
 import { parseKmTexto } from '../formats/km';
 import { E, H, getP, kmFmt, kmReal, projName, type AppProj } from './estado';
 import { renderCampo } from './campo';
+import { registrarErro } from './diagnostico';
 import { applyPaint } from './mapa';
 import { renderAll } from './paineis';
 import * as db from './persist';
@@ -38,6 +39,12 @@ export function atualizarAviso() {
   $('#cfgDot').style.display = catalogo.naoMapeados().length ? 'block' : 'none';
 }
 
+/** Uma página nunca fica em branco: se a renderização falhar, o erro é guardado (Ajustes > Diagnóstico) e a página explica. */
+function mostrarFalha(body: HTMLElement, e: unknown) {
+  registrarErro(e, 'Campo e offline', e instanceof Error ? e.stack : '');
+  body.innerHTML = '<div><h2 class="h2">Campo e offline</h2><p class="lead">Esta página não pôde ser carregada neste aparelho. O erro foi guardado em Ajustes, Diagnóstico.</p></div>';
+}
+
 function render() {
   document.querySelectorAll<HTMLElement>('#cfgTabs button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.ct === aba)));
   syncSeg($('#cfgTabs'));
@@ -46,7 +53,7 @@ function render() {
   if (aba === 'sol') renderSolucoes(body);
   else if (aba === 'larg') renderLarguras(body);
   else if (aba === 'lim') renderLimiares(body);
-  else if (aba === 'campo') void renderCampo(body);
+  else if (aba === 'campo') { try { void renderCampo(body).catch((e) => mostrarFalha(body, e)); } catch (e) { mostrarFalha(body, e); } }
   else void renderDados(body);
 }
 

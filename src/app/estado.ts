@@ -97,13 +97,15 @@ export const E = {
   /** Planilhas marcadas na aba Ajustes: geometria e deslocamento valem para todas. */
   settingsSel: new Set<string>(),
   uniCollapsed: false,
-  tab: 'seg' as 'seg' | 'ana' | 'notas' | 'exp' | 'aj' | 'al',
+  tab: 'seg' as 'seg' | 'ana' | 'notas' | 'exp' | 'aj',
   /** Cor de identificação de cada planilha, por nome (escolhida no dashboard de projetos). */
   coresProj: {} as Record<string, string>,
   /** Ajustes de largura salvos, por nome de planilha. Valem quando a planilha é aberta. */
   ajustesSalvos: {} as Record<string, AjusteLargura[]>,
   /** Deslocamento salvo, por nome de planilha. */
   deslocSalvos: {} as Record<string, Desloc>,
+  /** "Ver conserva": data do projeto (AAAA-MM-DD) de cada planilha, por nome. Vale para todas as notas de conserva dela. */
+  conservaDesde: {} as Record<string, string>,
 };
 
 /** Ganchos para os módulos de interface, sem import circular com o mapa. */
@@ -115,6 +117,9 @@ export const H = {
   /** Ferramentas ativas consomem o clique; devolve true quando consumiu. */
   onClick: (_e: MapMouseEvent): boolean => false,
   onView: () => {},
+  /** Um tile do fundo falhou ou carregou (detecção de falta de rede). */
+  onTileErro: () => {},
+  onTileOk: () => {},
   /** O catálogo mudou (código novo visto, edição, importação). */
   onCatalogo: () => {},
 };

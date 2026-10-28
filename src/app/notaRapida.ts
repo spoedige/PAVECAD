@@ -1,8 +1,9 @@
+import { registrarErro } from './diagnostico';
 import { kmLabel } from '../formats';
 import * as catalogo from '../dominio/catalogo';
 import type { Local, LocP } from '../dominio/localizar';
 import {
-  TIPOS_RAPIDOS, dadosDeLocal, posicionarRoda, precisaLembrar, resolverLocal, type OrigemNota, type Resolucao, type TipoRapido,
+  TIPOS_RAPIDOS, dadosDeLocal, type DadosRapida, posicionarRoda, precisaLembrar, resolverLocal, type OrigemNota, type Resolucao, type TipoRapido,
 } from '../dominio/notaRapida';
 import { efeitoDe, runAt, type Proposta } from '../dominio/propostas';
 import { trColor, trShort } from '../dominio/solucoes';
@@ -12,8 +13,11 @@ import { montarLevantamento } from './levantamento';
 import { ehCelular } from './layout';
 import { getMap, setData } from './mapa';
 import { obterPosicao } from './posicao';
+import { gps } from './gps';
 import { aplicarProposta, atualizarProposta, refreshNotesLayer, removerProposta, renderNotes } from './revisao';
-import { cssv, esc, toast } from './ui';
+import { cssv, esc, toast, toastAcao } from './ui';
+import { kmFmt } from './estado';
+import { reduzirImagem } from './foto';
 
 /** Tempo de pressão (ms) e movimento (px) que separam "segurar" de "arrastar". O tempo é configurável em Ajustes (400, 500 ou 700 ms). */
 export const PRESSAO_MS = 500;
@@ -27,6 +31,16 @@ export const pressaoMs = (): number => {
   return PRESSAO_MS;
 };
 const TAM = 64;
+/** Bolinhas da roda principal (7 itens) e do segundo nível. */
+const TAM_PRINCIPAL = 56, TAM_CONFIRMAR = 76;
+/** "Confirmar antes de gravar": ligada por padrão. Desligada, um toque grava e a roda mostra Estender, Observação e Desfazer. */
+export const CHAVE_CONFIRMAR = 'pavecad-confirmar-gravar';
+export const confirmarAntes = (): boolean => { try { return localStorage.getItem(CHAVE_CONFIRMAR) !== '0'; } catch { return true; } };
+export const definirConfirmarAntes = (v: boolean) => { try { localStorage.setItem(CHAVE_CONFIRMAR, v ? '1' : '0'); } catch { /* sem storage */ } };
+/** O rascunho da Observação livre guarda o texto enquanto o usuário digita, para nunca se perder. */
+export const CHAVE_RASCUNHO = 'pavecad-rascunho-obs';
+/** Quanto tempo o "Descartado" oferece o Desfazer. */
+const DESCARTE_MS = 5000;
 /** Quanto tempo a roda fica aberta depois de gravar, com Estender, Observação e Desfazer. */
 const POS_GRAVAR_MS = 5000;
 
@@ -37,6 +51,9 @@ export const ICONE: Record<TipoRapido, string> = {
   retirar: SVG('<path d="M3 15l9 4.5 9-4.5M3 11l9 4.5 9-4.5L12 6.5z"/><path d="M10 3.5h4"/>'),
   dreno_mais: SVG('<path d="M12 3c3 3.8 5.5 6.6 5.5 10a5.5 5.5 0 0 1-11 0C6.5 9.6 9 6.8 12 3z"/><path d="M12 11v5M9.5 13.5h5"/>'),
   dreno_menos: SVG('<path d="M12 3c3 3.8 5.5 6.6 5.5 10a5.5 5.5 0 0 1-11 0C6.5 9.6 9 6.8 12 3z"/><path d="M9.5 13.5h5"/>'),
+  conserva: SVG('<path d="M14.5 4.5a4 4 0 0 0-4.7 5.2L4 15.5 8.5 20l5.8-5.8a4 4 0 0 0 5.2-4.7l-2.6 2.6-2.6-.7-.7-2.6z"/>'),
+  observacao: SVG('<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>'),
+  foto: SVG('<path d="M4 8h3l1.5-2.5h7L17 8h3v11H4z"/><circle cx="12" cy="13.5" r="3.5"/>'),
 };
 const IC = {
   alterar: SVG('<path d="M3 15l9 4.5 9-4.5M3 11l9 4.5 9-4.5L12 6.5z"/><path d="M8 3.5h8m-2-2 2 2-2 2"/>'),
@@ -47,11 +64,14 @@ const IC = {
   desfazer: SVG('<path d="M9 7 4 12l5 5"/><path d="M4 12h10a6 6 0 0 1 0 12"/>'),
   sentido: SVG('<path d="M4 9h14l-3-3M20 15H6l3 3"/>'),
   excluir: SVG('<path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13"/>'),
+  ok: SVG('<path d="M5 12.5l4.5 4.5L19 7.5"/>'),
   alterarNota: SVG('<path d="M7 4v16M7 4 4 7M7 4l3 3M17 20V4M17 20l-3-3M17 20l3-3"/>'),
 };
 
-type Fase = 'principal' | 'solucao' | 'outros' | 'salvo' | 'estender' | 'obs' | 'editar' | 'param';
+type Fase = 'principal' | 'solucao' | 'outros' | 'confirmar' | 'salvo' | 'estender' | 'obs' | 'texto' | 'foto' | 'verfoto' | 'editar' | 'param';
 interface Alvo { p: AppProj; i: number; lane: number; from: string }
+/** O registro que a roda de confirmação ainda não gravou: Estender e Observação mudam este rascunho, só "Confirmar" grava. */
+interface Pendente { tipo: 'alterar' | 'dreno_mais' | 'dreno_menos' | 'conserva'; prop?: Proposta; texto: string }
 interface Menu {
   fase: Fase;
   lng: number; lat: number; pt: { x: number; y: number }; origem: OrigemNota; precisao: number | null; res: Resolucao;
@@ -69,6 +89,11 @@ interface Menu {
   aviso?: string;
   /** Volta de Observação e Estender. */
   voltar: Fase;
+  pendente?: Pendente;
+  /** Foto em andamento: troca a foto de uma nota que já existe, em vez de criar uma. */
+  trocaFoto?: boolean;
+  /** Texto com que o campo da Observação livre abriu (o rascunho guardado, se houver). */
+  rascTexto?: string;
 }
 let menu: Menu | null = null;
 let raiz: HTMLElement, anel: HTMLElement, live: HTMLElement;
@@ -94,6 +119,14 @@ function fecharMenu() {
   menu = null;
   raiz.hidden = true; raiz.replaceChildren();
 }
+/** Tocar fora com um registro ainda não confirmado descarta o registro: "Descartado", com Desfazer por 5 s. */
+function fecharOuDescartar() {
+  const m = menu;
+  if (!m?.pendente) { fecharMenu(); return; }
+  const guardado = m;
+  fecharMenu();
+  toastAcao('Descartado', 'Desfazer', () => { if (menu) return; menu = guardado; menu.fase = 'confirmar'; pintar(); }, DESCARTE_MS);
+}
 /** A roda some sozinha depois de `ms` sem toque. */
 const agendar = (ms = POS_GRAVAR_MS) => { clearTimeout(timerRoda); timerRoda = setTimeout(fecharMenu, ms); };
 const parar = () => clearTimeout(timerRoda);
@@ -110,16 +143,18 @@ function textoDoLocal(m: Menu): string {
 /* ---------------------------------------------------------------- */
 /* Desenho                                                           */
 /* ---------------------------------------------------------------- */
-interface Bolha { id: string; attr: string; html: string; cls?: string; off?: boolean; pressed?: boolean; titulo?: string }
+interface Bolha { id: string; attr: string; html: string; cls?: string; off?: boolean; pressed?: boolean; titulo?: string; /** Lado da bolinha; sem valor, o da roda. */ tam?: number }
 const bolhas = (itens: Bolha[], r: { botoes: { x: number; y: number }[] }, tam: number) => itens.map((b, k) => {
-  const { x, y } = r.botoes[k];
-  return `<button type="button" class="nr-op ${b.cls ?? ''}" ${b.attr} ${b.off ? 'disabled' : ''} ${b.pressed !== undefined ? `aria-pressed="${b.pressed}"` : ''} aria-label="${esc(b.titulo ?? b.id)}" style="left:${x - tam / 2}px;top:${y - tam / 2}px;width:${tam}px;height:${tam}px">${b.html}</button>`;
+  const { x, y } = r.botoes[k], t = b.tam ?? tam;
+  return `<button type="button" class="nr-op ${b.cls ?? ''}" ${b.attr} ${b.off ? 'disabled' : ''} ${b.pressed !== undefined ? `aria-pressed="${b.pressed}"` : ''} aria-label="${esc(b.titulo ?? b.id)}" style="left:${x - t / 2}px;top:${y - t / 2}px;width:${t}px;height:${t}px">${b.html}</button>`;
 }).join('');
 
 /** Monta a roda: fundo, ponto pressionado, texto no centro e as bolhas. `centro` vem em HTML. */
 function roda(itens: Bolha[], centro: string, o: { tam?: number; raio?: number; passoMin?: number; centroBtn?: boolean } = {}) {
-  const m = menu!, tam = o.tam ?? TAM;
-  const r = posicionarRoda(m.pt, area(), itens.length, tam, o.raio ?? 116, 8, o.passoMin ?? 0);
+  const m = menu!, tam = o.tam ?? Math.max(TAM, ...itens.map((b) => b.tam ?? 0));
+  // com texto no centro (segundo nível), a roda gira em volta do centro do texto, que não passa da borda da tela: assim nenhum botão fica sob ele
+  const base = m.fase === 'principal' ? m.pt : { x: Math.min(area().w - 74, Math.max(74, m.pt.x)), y: m.pt.y };
+  const r = posicionarRoda(base, area(), itens.length, tam, o.raio ?? 116, 8, o.passoMin ?? 0);
   // o rótulo do centro (132 px) não passa da borda da tela quando o ponto está perto dela
   const c = { x: Math.min(area().w - 74, Math.max(74, r.centro.x)), y: r.centro.y }, aviso = m.res.avisoPrecisao && m.precisao !== null ? ` · GPS ±${Math.round(m.precisao)} m` : '';
   const cab = o.centroBtn ? `<button type="button" class="nr-centro nr-centro-b" data-a="pronto" style="left:${c.x}px;top:${c.y}px">${centro}</button>`
@@ -128,7 +163,7 @@ function roda(itens: Bolha[], centro: string, o: { tam?: number; raio?: number; 
     ? `<div class="nr-cap${m.res.avisoPrecisao || m.aviso ? ' aviso' : ''}" style="left:${Math.min(area().w - 84, Math.max(84, m.pt.x))}px;top:${m.pt.y + (r.angulo >= 0 && r.angulo <= 180 ? -34 : 16)}px">${m.aviso ? esc(m.aviso) : textoDoLocal(m) + aviso}</div>` : '';
   raiz.innerHTML = `<div class="nr-fundo" id="nrFundo"></div><div class="nr-ponto" style="left:${m.pt.x}px;top:${m.pt.y}px"></div>${r.deslocada || m.fase !== 'principal' ? cab : ''}${bolhas(itens, r, tam)}${legenda}`;
   raiz.hidden = false;
-  raiz.querySelector('#nrFundo')!.addEventListener('pointerdown', (e) => { e.preventDefault(); fecharMenu(); });
+  raiz.querySelector('#nrFundo')!.addEventListener('pointerdown', (e) => { e.preventDefault(); fecharOuDescartar(); });
   (raiz.querySelector('.nr-op:not([disabled])') as HTMLElement | null)?.focus({ preventScroll: true });
 }
 const alvoClique = (sel: string, f: (b: HTMLElement) => void) => raiz.querySelectorAll<HTMLElement>(sel).forEach((b) => b.addEventListener('click', () => f(b)));
@@ -141,6 +176,10 @@ function pintar() {
   if (m.fase === 'principal') pintarPrincipal(m);
   else if (m.fase === 'solucao') pintarSolucao(m);
   else if (m.fase === 'outros') pintarOutros(m);
+  else if (m.fase === 'confirmar') pintarConfirmar(m);
+  else if (m.fase === 'texto') pintarTexto(m);
+  else if (m.fase === 'foto') pintarFoto(m);
+  else if (m.fase === 'verfoto') pintarVerFoto(m);
   else if (m.fase === 'salvo') pintarSalvo(m);
   else if (m.fase === 'estender') pintarEstender(m);
   else if (m.fase === 'obs') pintarObs(m);
@@ -150,17 +189,23 @@ function pintar() {
 
 function pintarPrincipal(m: Menu) {
   parar();
+  const t = TAM_PRINCIPAL;
   roda([
-    { id: 'Alterar solução', attr: 'data-t="alterar"', html: IC.alterar + nomeBolha('Alterar', 'solução') },
-    { id: 'Colocar dreno', attr: 'data-t="dreno_mais"', html: ICONE.dreno_mais + nomeBolha('Colocar', 'dreno') },
-    { id: 'Retirar dreno', attr: 'data-t="dreno_menos"', html: ICONE.dreno_menos + nomeBolha('Retirar', 'dreno') },
-    { id: 'Ver parâmetros', attr: 'data-t="parametros"', html: IC.parametros + nomeBolha('Ver', 'parâmetros') },
-  ], '', { passoMin: 46 });
+    { id: 'Alterar solução', attr: 'data-t="alterar"', cls: 'nr-p', tam: t, html: IC.alterar + nomeBolha('Alterar', 'solução') },
+    { id: 'Colocar dreno', attr: 'data-t="dreno_mais"', cls: 'nr-p', tam: t, html: ICONE.dreno_mais + nomeBolha('Colocar', 'dreno') },
+    { id: 'Retirar dreno', attr: 'data-t="dreno_menos"', cls: 'nr-p', tam: t, html: ICONE.dreno_menos + nomeBolha('Retirar', 'dreno') },
+    { id: 'Ver parâmetros', attr: 'data-t="parametros"', cls: 'nr-p', tam: t, html: IC.parametros + nomeBolha('Ver', 'parâmetros') },
+    { id: 'Ver conserva', attr: 'data-t="conserva"', cls: 'nr-p', tam: t, html: ICONE.conserva + nomeBolha('Ver', 'conserva') },
+    { id: 'Observação', attr: 'data-t="observacao"', cls: 'nr-p', tam: t, html: ICONE.observacao + '<span>Observação</span>' },
+    { id: 'Foto', attr: 'data-t="foto"', cls: 'nr-p', tam: t, html: ICONE.foto + '<span>Foto</span>' },
+  ], '', { passoMin: 34 });
   alvoClique('.nr-op', (b) => {
     const t = b.dataset.t!;
     if (t === 'alterar') abrirAlterar();
     else if (t === 'parametros') abrirParametros();
-    else gravarDreno(t as 'dreno_mais' | 'dreno_menos');
+    else if (t === 'observacao') abrirTexto();
+    else if (t === 'foto') abrirFoto(b);
+    else iniciarNota(t as 'dreno_mais' | 'dreno_menos' | 'conserva');
   });
 }
 
@@ -220,31 +265,42 @@ function pintarOutros(m: Menu) {
     <div class="nr-lista" role="listbox" aria-label="Todas as soluções" style="left:${left}px;top:${top}px;width:${larg}px;max-height:${altMax}px">
       <button type="button" class="nr-li" data-s="-" ${atual === '-' ? 'disabled' : ''}><i class="nr-sw" style="background:${cssv('--none')}"></i><b>–</b><span>Sem intervenção</span></button>${itens}
       <button type="button" class="nr-li nr-volta" data-a="voltar">← Voltar</button></div>`;
-  raiz.querySelector('#nrFundo')!.addEventListener('pointerdown', (e) => { e.preventDefault(); fecharMenu(); });
+  raiz.querySelector('#nrFundo')!.addEventListener('pointerdown', (e) => { e.preventDefault(); fecharOuDescartar(); });
   alvoClique('[data-s]', (b) => escolherSolucao(b.dataset.s!));
   alvoClique('[data-a=voltar]', () => { m.fase = 'solucao'; pintar(); });
 }
 
 function escolherSolucao(to: string) {
   const m = menu!;
-  if (m.modo === 'editar') trocarSolucaoDaProposta(m, to); else gravarAlteracao(m, to);
+  if (m.modo === 'editar') { trocarSolucaoDaProposta(m, to); return; }
+  if (to === m.alvo!.from) return;
+  // com "Confirmar antes de gravar", a solução escolhida vira um rascunho: nada grava antes do "Confirmar"
+  if (confirmarAntes()) { m.pendente = { tipo: 'alterar', prop: criarProposta(m, to), texto: '' }; m.fase = 'confirmar'; pintar(); } else gravarAlteracao(m, to);
 }
 
-function gravarAlteracao(m: Menu, to: string) {
-  const a = m.alvo!, p = a.p;
-  if (to === a.from) return;
-  const efeito = efeitoDe(a.from, to);
-  const rec: Proposta = {
+function criarProposta(m: Menu, to: string): Proposta {
+  const a = m.alvo!, p = a.p, efeito = efeitoDe(a.from, to);
+  return {
     id: 'q' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), pid: p.id, pname: p.meta.name, lane: a.lane, r0: a.i, r1: a.i,
     km0: p.kmNum[a.i], km1: p.kmNum[a.i], from: a.from, to, note: '', t: new Date().toISOString(),
     campo: { efeito, antes: 0, depois: 0, origem: m.origem, precisao: m.origem === 'gps' && m.precisao !== null ? Math.round(m.precisao) : null, lat: +m.lat.toFixed(7), lon: +m.lng.toFixed(7) },
   };
+}
+
+function gravarAlteracao(m: Menu, to: string) {
+  if (to === m.alvo!.from) return;
+  efetivarProposta(m, criarProposta(m, to));
+}
+
+/** Grava a proposta (a da gravação direta ou o rascunho confirmado) e abre o "Salvo". */
+function efetivarProposta(m: Menu, rec: Proposta) {
+  const a = m.alvo!, p = a.p, efeito = rec.campo!.efeito;
   const r = aplicarProposta(rec, p);
   m.prop = r.rec;
   m.passos.push(r.desfazer, () => contarNova(-1));
   contarNova(1);
-  m.rotulo = `${esc(trShort(a.from))} → ${esc(trShort(to))} · ${efeito}`;
-  m.regravar = () => gravarAlteracao(m, to);
+  m.rotulo = `${esc(trShort(a.from))} → ${esc(trShort(rec.to))} · ${efeito}`;
+  m.regravar = () => { const nova = criarProposta(m, rec.to); nova.note = rec.note; efetivarProposta(m, nova); };
   concluir(m);
 }
 
@@ -274,13 +330,21 @@ function dadosDaNota(l: Local | null, estado: Resolucao['estado']) {
 const locDaNota = (l: Local | null, estado: Resolucao['estado']): Nota['loc'] =>
   l && (estado === 'dentro' || estado === 'proximo') ? { pid: l.p.id, name: projName(l.p as never), km: kmLabel(l.p.kmNum[l.i]), lane: l.lane ?? 0 } : null;
 
-function gravarDreno(tipo: 'dreno_mais' | 'dreno_menos') {
+type TipoNovo = 'dreno_mais' | 'dreno_menos' | 'conserva';
+/** Drenos e Ver conserva: com "Confirmar antes de gravar" abre a roda de confirmação; sem ela, grava com um toque. */
+function iniciarNota(tipo: TipoNovo) {
+  const m = menu!;
+  if (confirmarAntes()) { m.pendente = { tipo, texto: '' }; m.fase = 'confirmar'; pintar(); } else gravarNota(tipo);
+}
+
+/** Grava uma nota de ponto no local pressionado: dreno, Ver conserva, Observação ou Foto. */
+function gravarNota(tipo: TipoRapido, texto = '', fotos: string[] = [], gps: DadosRapida['gps'] = null) {
   const m = menu!, estado = m.res.estado, l = m.res.local;
   const n: Nota = {
     id: 'n' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
-    type: 'pin', coords: [[+m.lng.toFixed(7), +m.lat.toFixed(7)]], cat: TIPOS_RAPIDOS[tipo].cat, text: '', photos: [], t: new Date().toISOString(),
+    type: 'pin', coords: [[+m.lng.toFixed(7), +m.lat.toFixed(7)]], cat: TIPOS_RAPIDOS[tipo].cat, text: texto, photos: fotos, t: new Date().toISOString(),
     loc: locDaNota(l, estado),
-    rapida: { tipo, origem: m.origem, precisao: m.origem === 'gps' && m.precisao !== null ? Math.round(m.precisao) : null, ...dadosDaNota(l, estado), resolvida: false },
+    rapida: { tipo, origem: m.origem, precisao: m.origem === 'gps' && m.precisao !== null ? Math.round(m.precisao) : null, ...dadosDaNota(l, estado), resolvida: false, ...(gps ? { gps } : {}) },
   };
   E.notes.push(n);
   db.gravar('notes', n);
@@ -290,9 +354,16 @@ function gravarDreno(tipo: 'dreno_mais' | 'dreno_menos') {
   contarNova(1);
   m.passos.push(() => { removerNota(n); contarNova(-1); });
   m.rotulo = `${esc(TIPOS_RAPIDOS[tipo].rotulo)}${n.rapida?.km ? ' · km ' + esc(n.rapida.km) : ''}`;
-  m.regravar = () => gravarDreno(tipo);
+  m.regravar = () => gravarNota(tipo, texto, fotos, gps);
   if (precisaLembrar(notasNovasSemExportar()) && notasNovasSemExportar() === 10) setTimeout(() => toast('10 notas novas sem exportar. Baixe a planilha em Notas.', 5000), 6500);
   concluir(m);
+}
+
+/** "Confirmar": grava o rascunho, com a observação que o usuário tenha digitado (ou sem ela). */
+function confirmar(m: Menu) {
+  const pd = m.pendente!;
+  m.pendente = undefined;
+  if (pd.tipo === 'alterar') { pd.prop!.note = pd.texto; efetivarProposta(m, pd.prop!); } else gravarNota(pd.tipo, pd.texto);
 }
 
 function removerNota(n: Nota) {
@@ -342,8 +413,11 @@ const EXT = [20, 40, 100] as const;
 /** Linhas-base (o segmento pressionado) de uma proposta de campo: o trecho menos o que foi estendido. */
 function baseDaProposta(r: Proposta) { const c = r.campo!; return { b0: r.r0 + Math.round(c.antes / 20), b1: r.r1 - Math.round(c.depois / 20) }; }
 
+/** A alteração em edição: o rascunho ainda não confirmado ou a que já foi gravada. */
+const propAtual = (m: Menu) => m.pendente?.prop ?? m.prop;
+
 function estender(m: Menu, qual: { antes?: number; depois?: number; toda?: boolean }) {
-  const r = m.prop!, p = getP(r.pid ?? '');
+  const r = propAtual(m)!, p = getP(r.pid ?? '');
   if (!p || !r.campo) return;
   const c = r.campo, { b0, b1 } = baseDaProposta(r), sg = p.segs.find((s) => b0 >= s.a && b0 <= s.b) ?? { a: b0, b: b1 };
   let n0 = r.r0, n1 = r.r1;
@@ -352,44 +426,80 @@ function estender(m: Menu, qual: { antes?: number; depois?: number; toda?: boole
   if (qual.depois !== undefined) n1 = Math.min(sg.b, b1 + Math.round(qual.depois / 20));
   if (n0 === r.r0 && n1 === r.r1) { toast('Não há mais trecho contínuo nessa direção', 2500); return; }
   const nova: Proposta = { ...r, id: 'q' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), r0: n0, r1: n1, km0: p.kmNum[n0], km1: p.kmNum[n1], campo: { ...c, antes: (b0 - n0) * 20, depois: (n1 - b1) * 20 } };
+  // rascunho: só troca o que será gravado; já gravada: troca a proposta gravada e o Desfazer volta
+  if (m.pendente) { m.pendente.prop = nova; return; }
   const ap = aplicarProposta(nova, p, [r]);
   m.prop = ap.rec;
   m.passos.push(ap.desfazer);
 }
 
 function pintarEstender(m: Menu) {
-  const c = m.prop!.campo!;
+  const c = propAtual(m)!.campo!;
   const itens: Bolha[] = [
     ...EXT.map((d) => ({ id: `Antes ${d} m`, attr: `data-e="a${d}"`, cls: 'nr-e', pressed: c.antes === d, html: `<small>Antes</small><b>${d} m</b>` })),
     ...EXT.map((d) => ({ id: `Depois ${d} m`, attr: `data-e="d${d}"`, cls: 'nr-e', pressed: c.depois === d, html: `<small>Depois</small><b>${d} m</b>` })),
     { id: 'Toda a extensão da solução atual', attr: 'data-e="toda"', cls: 'nr-e', html: '<span>Toda a<br>extensão</span>' },
   ];
   roda(itens, `<small>Estender</small><b>${c.antes + c.depois + 20} m</b><span class="nr-pronto">Pronto</span>`, { raio: 124, centroBtn: true });
-  agendar();
+  if (m.pendente) parar(); else agendar();
   alvoClique('.nr-op', (b) => {
     const e = b.dataset.e!;
     if (e === 'toda') estender(m, { toda: true });
     else estender(m, e[0] === 'a' ? { antes: +e.slice(1) } : { depois: +e.slice(1) });
-    m.rotulo = `${esc(trShort(m.prop!.from))} → ${esc(trShort(m.prop!.to))} · ${m.prop!.campo!.efeito}`;
+    const r = propAtual(m)!;
+    if (!m.pendente) m.rotulo = `${esc(trShort(r.from))} → ${esc(trShort(r.to))} · ${r.campo!.efeito}`;
     pintar();
   });
-  alvoClique('[data-a=pronto]', () => { m.fase = 'salvo'; pintar(); });
+  alvoClique('[data-a=pronto]', () => { m.fase = m.pendente ? 'confirmar' : 'salvo'; pintar(); });
+}
+
+/* ---------------------------------------------------------------- */
+/* Roda de confirmação: Estender, Observação e Confirmar              */
+/* ---------------------------------------------------------------- */
+const TEXTO_CURTO = 32;
+function resumoDaAcao(m: Menu): { titulo: string; sub: string } {
+  const pd = m.pendente!, obs = pd.texto ? `“${esc(pd.texto.length > TEXTO_CURTO ? pd.texto.slice(0, TEXTO_CURTO) + '…' : pd.texto)}”` : '';
+  if (pd.prop) {
+    const r = pd.prop, p = getP(r.pid ?? '');
+    const km = p ? `km ${esc(p.kmLab[r.r0])}${r.r1 > r.r0 ? ' a ' + esc(kmFmt(p.kmNum[r.r1] + 0.02)) : ''}` : '';
+    return { titulo: `${esc(trShort(r.from))} → ${esc(trShort(r.to))} · ${esc(r.campo!.efeito)}`, sub: [km, obs].filter(Boolean).join('<br>') };
+  }
+  return { titulo: esc(TIPOS_RAPIDOS[pd.tipo as TipoRapido].rotulo), sub: [textoDoLocal(m), obs].filter(Boolean).join('<br>') };
+}
+
+function pintarConfirmar(m: Menu) {
+  parar();
+  const pd = m.pendente!, itens: Bolha[] = [];
+  if (pd.prop) itens.push({ id: 'Estender', attr: 'data-a="estender"', cls: 'nr-p', tam: TAM_PRINCIPAL, html: IC.estender + '<span>Estender</span>' });
+  itens.push({ id: 'Observação', attr: 'data-a="obs"', cls: 'nr-p', tam: TAM_PRINCIPAL, pressed: !!pd.texto, html: IC.obs + '<span>Observação</span>' });
+  itens.push({ id: 'Confirmar', attr: 'data-a="confirmar"', cls: 'nr-ok', tam: TAM_CONFIRMAR, html: IC.ok + '<b>Confirmar</b>' });
+  const { titulo, sub } = resumoDaAcao(m);
+  roda(itens, `<b>${titulo}</b><small>${sub}</small>`, { raio: 124 });
+  raiz.querySelector('.nr-centro')?.classList.add('nr-resumo');
+  alvoClique('.nr-op', (b) => {
+    const a = b.dataset.a;
+    if (a === 'confirmar') confirmar(m);
+    else if (a === 'estender') { m.fase = 'estender'; pintar(); }
+    else if (a === 'obs') { m.voltar = 'confirmar'; m.fase = 'obs'; pintar(); }
+  });
+  (raiz.querySelector('[data-a=confirmar]') as HTMLElement | null)?.focus({ preventScroll: true });
 }
 
 function pintarObs(m: Menu) {
   parar();
-  const atual = (m.prop?.note ?? m.nota?.text ?? '') as string, a = area(), larg = Math.min(300, a.w - 16);
+  const atual = (m.pendente ? m.pendente.texto : m.prop?.note ?? m.nota?.text ?? '') as string, a = area(), larg = Math.min(300, a.w - 16);
   const top = Math.max(8, Math.min(a.h - 120, m.pt.y - 60)), left = Math.min(a.w - 8 - larg, Math.max(8, m.pt.x - larg / 2));
   raiz.innerHTML = `<div class="nr-fundo" id="nrFundo"></div>
     <div class="nr-obs" style="left:${left}px;top:${top}px;width:${larg}px"><b>Observação</b>
       <input type="text" enterkeyhint="done" autocomplete="off" aria-label="Observação" value="${esc(atual)}">
       <div class="nr-obs-bt"><button type="button" class="btn" data-a="cancelar">Cancelar</button><button type="button" class="btn p" data-a="ok">OK</button></div></div>`;
   raiz.hidden = false;
-  raiz.querySelector('#nrFundo')!.addEventListener('pointerdown', (e) => { e.preventDefault(); fecharMenu(); });
+  raiz.querySelector('#nrFundo')!.addEventListener('pointerdown', (e) => { e.preventDefault(); fecharOuDescartar(); });
   const inp = raiz.querySelector('input')!;
   const sair = () => { m.fase = m.voltar; pintar(); };
   const gravar = () => {
     const t = inp.value.trim();
+    if (m.pendente) { m.pendente.texto = t; sair(); return; }
     if (m.prop) { const antes = m.prop.note; m.prop.note = t; atualizarProposta(m.prop); const r = m.prop; m.passos.push(() => { r.note = antes; atualizarProposta(r); }); }
     else if (m.nota) { const n = m.nota, antes = n.text; n.text = t; db.gravar('notes', n); if (E.tab === 'notas') renderNotes(); m.passos.push(() => { n.text = antes; db.gravar('notes', n); if (E.tab === 'notas') renderNotes(); }); }
     sair();
@@ -399,6 +509,126 @@ function pintarObs(m: Menu) {
   // preventDefault: sem isso o Enter, já com a roda redesenhada, ainda clicaria no botão que ganhou o foco
   inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); gravar(); } });
   inp.focus();
+}
+
+/* ---------------------------------------------------------------- */
+/* Observação livre: texto no ponto pressionado, com rascunho         */
+/* ---------------------------------------------------------------- */
+interface Rascunho { lng: number; lat: number; texto: string; origem: OrigemNota; precisao: number | null; t: string }
+export function lerRascunho(): Rascunho | null {
+  try { const r = JSON.parse(localStorage.getItem(CHAVE_RASCUNHO) ?? 'null') as Rascunho | null; return r && typeof r.texto === 'string' ? r : null; } catch { return null; }
+}
+const guardarRascunho = (m: Menu, texto: string) => {
+  try { localStorage.setItem(CHAVE_RASCUNHO, JSON.stringify({ lng: m.lng, lat: m.lat, texto, origem: m.origem, precisao: m.precisao, t: new Date().toISOString() } satisfies Rascunho)); } catch { /* sem storage */ }
+};
+const limparRascunho = () => { try { localStorage.removeItem(CHAVE_RASCUNHO); } catch { /* sem storage */ } };
+
+function abrirTexto() {
+  const m = menu!;
+  m.fase = 'texto';
+  pintar();
+}
+
+function pintarTexto(m: Menu) {
+  parar();
+  if (m.rascTexto === undefined) { const r = lerRascunho(); m.rascTexto = r?.texto ?? ''; if (r?.texto.trim()) toast('Rascunho recuperado', 2500); }
+  const a = area(), larg = Math.min(320, a.w - 16);
+  const top = Math.max(8, Math.min(a.h - 190, m.pt.y - 90)), left = Math.min(a.w - 8 - larg, Math.max(8, m.pt.x - larg / 2));
+  raiz.innerHTML = `<div class="nr-fundo" id="nrFundo"></div><div class="nr-ponto" style="left:${m.pt.x}px;top:${m.pt.y}px"></div>
+    <div class="nr-obs" role="group" aria-label="Observação" style="left:${left}px;top:${top}px;width:${larg}px"><b>Observação</b>
+      <textarea rows="4" enterkeyhint="enter" autocomplete="off" aria-label="Texto da observação" placeholder="Escreva ou dite a observação">${esc(m.rascTexto)}</textarea>
+      <div class="nr-obs-bt"><button type="button" class="btn" data-a="cancelar">Cancelar</button><button type="button" class="btn p" data-a="salvar">Salvar</button></div></div>`;
+  raiz.hidden = false;
+  const ta = raiz.querySelector('textarea')!;
+  ta.addEventListener('input', () => { m.rascTexto = ta.value; guardarRascunho(m, ta.value); });
+  // tocar fora não perde o texto: o rascunho fica guardado e a mensagem oferece reabrir
+  raiz.querySelector('#nrFundo')!.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    const texto = ta.value;
+    fecharMenu();
+    if (texto.trim()) { guardarRascunho(m, texto); toastAcao('Rascunho de observação guardado', 'Abrir', () => { if (!menu) { menu = { ...m, fase: 'texto', rascTexto: texto, passos: [] }; pintar(); } }, 8000); }
+  });
+  raiz.querySelector('[data-a=cancelar]')!.addEventListener('click', () => { limparRascunho(); fecharMenu(); });
+  raiz.querySelector('[data-a=salvar]')!.addEventListener('click', () => {
+    const texto = ta.value.trim();
+    limparRascunho();
+    m.res = resolverLocal(E.P as LocP[], m.lat, m.lng, m.precisao);
+    gravarNota('observacao', texto);
+  });
+  ta.focus();
+}
+
+/** Volta o rascunho guardado ao reabrir o app: o campo abre no ponto onde a observação começou. */
+export function recuperarRascunho() {
+  const r = lerRascunho();
+  if (!r || !r.texto.trim() || menu || !E.mapReady && !getMap()) return;
+  const map = getMap(), box = map.getCanvasContainer().getBoundingClientRect(), s = stage().getBoundingClientRect(), p = map.project([r.lng, r.lat]);
+  const a = area(), pt = { x: Math.min(a.w - 20, Math.max(20, box.left - s.left + p.x)), y: Math.min(a.h - 20, Math.max(20, box.top - s.top + p.y)) };
+  const res = resolverLocal(E.P as LocP[], r.lat, r.lng, r.precisao);
+  menu = { fase: 'texto', lng: r.lng, lat: r.lat, pt, origem: r.origem, precisao: r.precisao, res, modo: 'nova', passos: [], rotulo: '', voltar: 'salvo', rascTexto: r.texto };
+  pintar();
+}
+
+/* ---------------------------------------------------------------- */
+/* Foto: câmera do aparelho, georreferenciada no ponto pressionado    */
+/* ---------------------------------------------------------------- */
+let entradaFoto!: HTMLInputElement;
+/** O menu que pediu a foto: a câmera pode demorar, e a roda precisa saber onde gravar quando a imagem voltar. */
+let menuDaFoto: Menu | null = null;
+
+function abrirFoto(_b: HTMLElement, troca = false) {
+  const m = menu!;
+  menuDaFoto = m; m.trocaFoto = troca;
+  entradaFoto.value = '';
+  entradaFoto.click(); // precisa sair do toque: o navegador só abre a câmera dentro do gesto do usuário
+  m.fase = 'foto'; pintar();
+}
+
+function pintarFoto(m: Menu) {
+  parar();
+  const a = area(), larg = Math.min(260, a.w - 16);
+  const top = Math.max(8, Math.min(a.h - 130, m.pt.y - 60)), left = Math.min(a.w - 8 - larg, Math.max(8, m.pt.x - larg / 2));
+  raiz.innerHTML = `<div class="nr-fundo" id="nrFundo"></div><div class="nr-ponto" style="left:${m.pt.x}px;top:${m.pt.y}px"></div>
+    <div class="nr-obs" role="status" style="left:${left}px;top:${top}px;width:${larg}px"><b>Foto</b><span class="nr-nota">Aguardando a câmera. A foto fica neste ponto do mapa.</span>
+      <div class="nr-obs-bt"><button type="button" class="btn" data-a="cancelar">Cancelar</button></div></div>`;
+  raiz.hidden = false;
+  raiz.querySelector('#nrFundo')!.addEventListener('pointerdown', (e) => e.preventDefault()); // a câmera pode estar aberta: tocar fora não fecha
+  raiz.querySelector('[data-a=cancelar]')!.addEventListener('click', () => { menuDaFoto = null; fecharMenu(); });
+}
+
+/** Posição real do GPS no instante da foto, só como dado auxiliar (o tablet não tem GPS: a posição da foto é o ponto pressionado). */
+const gpsAuxiliar = (): DadosRapida['gps'] => (gps.on && gps.last && !gps.estado.manual ? { lat: +gps.last.lat.toFixed(7), lon: +gps.last.lon.toFixed(7), precisao: Number.isFinite(gps.last.acc) ? Math.round(gps.last.acc) : null } : null);
+
+async function receberFoto(arq: File) {
+  const m = menuDaFoto;
+  menuDaFoto = null;
+  if (!m) return;
+  let url: string;
+  try { url = await reduzirImagem(arq); } catch (e) {
+    registrarErro(e, 'foto', e instanceof Error ? (e.stack ?? '') : '');
+    toast('Não foi possível ler a foto');
+    if (menu === m) fecharMenu();
+    return;
+  }
+  menu = m; // a roda pode ter sido fechada enquanto a câmera estava aberta
+  if (m.trocaFoto && m.nota) {
+    const n = m.nota, antes = n.photos.slice();
+    n.photos = [url]; db.gravar('notes', n); refreshNotesLayer(); if (E.tab === 'notas') renderNotes();
+    m.passos.push(() => { n.photos = antes; db.gravar('notes', n); refreshNotesLayer(); if (E.tab === 'notas') renderNotes(); });
+    m.rotulo = 'Foto trocada';
+    m.trocaFoto = false;
+    concluir(m);
+  } else gravarNota('foto', '', [url], gpsAuxiliar());
+}
+
+function pintarVerFoto(m: Menu) {
+  parar();
+  const src = m.nota?.photos?.[0] ?? '';
+  raiz.innerHTML = `<div class="nr-fundo" id="nrFundo"></div>
+    <div class="nr-ver" role="dialog" aria-label="Foto"><img src="${esc(src)}" alt="Foto da nota"><button type="button" class="btn p" data-a="voltar">Fechar</button></div>`;
+  raiz.hidden = false;
+  raiz.querySelector('#nrFundo')!.addEventListener('pointerdown', (e) => { e.preventDefault(); m.fase = 'editar'; pintar(); });
+  raiz.querySelector('[data-a=voltar]')!.addEventListener('click', () => { m.fase = 'editar'; pintar(); });
 }
 
 /* ---------------------------------------------------------------- */
@@ -422,6 +652,11 @@ function pintarEditar(m: Menu) {
   const itens: Bolha[] = [];
   const r = m.prop, n = m.nota;
   const dreno = n?.rapida && (n.rapida.tipo === 'dreno_mais' || n.rapida.tipo === 'dreno_menos');
+  const ehFoto = n?.rapida?.tipo === 'foto';
+  if (ehFoto) {
+    itens.push({ id: 'Ver foto', attr: 'data-a="verfoto"', html: ICONE.foto + nomeBolha('Ver', 'foto') });
+    itens.push({ id: 'Trocar foto', attr: 'data-a="trocarfoto"', html: ICONE.foto + nomeBolha('Trocar', 'foto') });
+  }
   if (r || dreno) itens.push({ id: 'Alterar', attr: 'data-a="alterar"', html: (r ? IC.alterar : IC.alterarNota) + '<span>Alterar</span>' });
   if (r) itens.push({ id: 'Estender', attr: 'data-a="estender"', html: IC.estender + '<span>Estender</span>' });
   itens.push({ id: 'Observação', attr: 'data-a="obs"', html: IC.obs + '<span>Observação</span>' });
@@ -430,6 +665,8 @@ function pintarEditar(m: Menu) {
   roda(itens, `<small>${r ? 'Alteração' : 'Nota'}</small><b>${resumo}</b>`);
   alvoClique('.nr-op', (b) => {
     const a = b.dataset.a;
+    if (a === 'verfoto') { m.fase = 'verfoto'; pintar(); return; }
+    if (a === 'trocarfoto') { abrirFoto(b, true); return; }
     if (a === 'alterar') {
       if (r) { m.modo = 'editar'; m.fase = 'solucao'; pintar(); return; }
       const nn = n!, nova: TipoRapido = nn.rapida!.tipo === 'dreno_mais' ? 'dreno_menos' : 'dreno_mais', antiga = nn.rapida!.tipo;
@@ -457,7 +694,7 @@ function pintarParam(m: Menu) {
   parar();
   const l = m.res.local;
   raiz.innerHTML = '<div class="nr-fundo" id="nrFundo"></div>';
-  raiz.querySelector('#nrFundo')!.addEventListener('pointerdown', (e) => { e.preventDefault(); fecharMenu(); });
+  raiz.querySelector('#nrFundo')!.addEventListener('pointerdown', (e) => { e.preventDefault(); fecharOuDescartar(); });
   raiz.hidden = false;
   if (!l) return;
   montarLevantamento(raiz, l.p as unknown as AppProj, l.i, l.lane, fecharMenu);
@@ -484,7 +721,7 @@ export function abrirMenuNota(lng: number, lat: number, pt: { x: number; y: numb
 function marcadorEm(x: number, y: number): { prop?: Proposta; nota?: Nota } | null {
   const map = getMap();
   if (!map.getLayer('notes-pt')) return null;
-  const f = map.queryRenderedFeatures([[x - 18, y - 18], [x + 18, y + 18]], { layers: ['notes-pt'] })[0];
+  const f = map.queryRenderedFeatures([[x - 18, y - 18], [x + 18, y + 18]], { layers: ['notes-ic', 'notes-pt'].filter((l) => map.getLayer(l)) })[0];
   const id = f?.properties?.id as string | undefined;
   if (!id) return null;
   if (id.startsWith('prop:')) { const prop = E.props.find((r) => r.id === id.slice(5)); return prop ? { prop } : null; }
@@ -495,7 +732,8 @@ function marcadorEm(x: number, y: number): { prop?: Proposta; nota?: Nota } | nu
 /** Esc fecha o menu. Devolve true quando consumiu. */
 export function fecharNotaRapida(): boolean {
   if (!menu) return false;
-  fecharMenu();
+  if (menu.fase === 'foto') return true; // câmera aberta: Esc não perde a foto que vai voltar
+  fecharOuDescartar();
   return true;
 }
 
@@ -516,6 +754,13 @@ export function initNotaRapida() {
   live.className = 'nr-live'; live.hidden = true; live.setAttribute('aria-hidden', 'true');
   stage().appendChild(live);
   try { void navigator.storage?.persist?.(); } catch { /* sem persistência garantida */ }
+  // câmera do aparelho pelo caminho nativo: funciona no PWA e sem permissão extra do navegador
+  entradaFoto = document.createElement('input');
+  entradaFoto.type = 'file'; entradaFoto.accept = 'image/*'; entradaFoto.setAttribute('capture', 'environment'); entradaFoto.hidden = true; entradaFoto.id = 'fotoCampoIn';
+  const semFoto = () => { menuDaFoto = null; if (menu?.fase === 'foto') fecharMenu(); };
+  entradaFoto.addEventListener('change', () => { const f = entradaFoto.files?.[0]; if (f) void receberFoto(f); else semFoto(); });
+  entradaFoto.addEventListener('cancel', semFoto);
+  stage().appendChild(entradaFoto);
 
   const map = getMap();
   const cont = map.getCanvasContainer();
@@ -529,7 +774,7 @@ export function initNotaRapida() {
     if (!anel.hidden && animar) { anel.classList.remove('nr-roda'); anel.classList.add('nr-sai'); clearTimeout(sai); sai = setTimeout(() => { anel.hidden = true; anel.classList.remove('nr-sai'); }, 150); }
     else { anel.hidden = true; anel.classList.remove('nr-roda', 'nr-sai'); }
   };
-  const livre = () => E.mapReady && !E.tool && E.tab !== 'al' && !menu;
+  const livre = () => E.mapReady && !E.tool && !menu;
   const noMapa = (e: PointerEvent) => (e.target as HTMLElement).classList.contains('maplibregl-canvas');
   const abrirEm = (cx: number, cy: number) => {
     const box = cont.getBoundingClientRect(), pt = relativo(cx, cy), ll = map.unproject([cx - box.left, cy - box.top]);
@@ -557,23 +802,33 @@ export function initNotaRapida() {
     } else limparDestaque();
   };
 
-  cont.addEventListener('pointerdown', (e) => {
+  /** Qualquer erro num gesto de entrada limpa o estado da pressão e é guardado em Ajustes > Diagnóstico: um gesto que falha nunca pode deixar o mapa sem responder. */
+  const seguro = (onde: string, f: () => void) => {
+    try { f(); } catch (err) {
+      registrarErro(err, onde, err instanceof Error ? err.stack : '');
+      try { cancelar(false); if (menu) fecharMenu(); } catch { /* o estado já está limpo o bastante */ }
+    }
+  };
+  cont.addEventListener('pointerdown', (e) => seguro('pressão (pointerdown)', () => {
     if (ini && e.pointerId !== ini.id) { cancelar(); return; } // segundo dedo: é gesto de zoom ou rotação
     if ((e.pointerType === 'mouse' && e.button !== 0) || !livre() || !noMapa(e)) return;
     const dur = pressaoMs();
     ini = { x: e.clientX, y: e.clientY, id: e.pointerId };
-    mostra = setTimeout(() => { if (ini) mostrarAnel(ini.x, ini.y, dur); }, PRESSAO_ATRASO_MS);
-    timer = setTimeout(() => {
+    mostra = setTimeout(() => seguro('pressão (anel)', () => { if (ini) mostrarAnel(ini.x, ini.y, dur); }), PRESSAO_ATRASO_MS);
+    timer = setTimeout(() => seguro('pressão (abrir o menu)', () => {
       if (!ini) return;
       const { x, y } = ini;
       cancelar(false); disparouEm = Date.now();
       E.cliqueSuprimidoAte = Date.now() + 700;
       vibrar(30);
       abrirEm(x, y);
-    }, dur);
-  });
+    }), dur);
+  }));
   cont.addEventListener('pointermove', (e) => { if (ini && e.pointerId === ini.id && Math.hypot(e.clientX - ini.x, e.clientY - ini.y) > PRESSAO_MOVE_PX) cancelar(); });
-  for (const ev of ['pointerup', 'pointercancel', 'pointerleave'] as const) cont.addEventListener(ev, () => cancelar());
+  // fim ou interrupção do gesto por qualquer caminho: soltar, cancelar, perder a captura, sair da tela, trocar de app ou perder o foco
+  for (const ev of ['pointerup', 'pointercancel', 'pointerleave', 'lostpointercapture', 'touchcancel'] as const) cont.addEventListener(ev, () => cancelar());
+  window.addEventListener('blur', () => cancelar());
+  document.addEventListener('visibilitychange', () => { if (document.hidden) cancelar(); });
   // o menu de contexto do navegador nunca aparece sobre o mapa; o botão direito do mouse abre o menu direto
   cont.addEventListener('contextmenu', (e) => {
     e.preventDefault();
@@ -590,7 +845,7 @@ export function initNotaRapida() {
 
 /** "Nota no meu local": abre o menu na posição do GPS. Sem GPS (negado, sem resposta em 8 s, erro ou precisão pior que 50 m), uma linha avisa e a pressão no mapa segue valendo. */
 export async function notaNoMeuLocal() {
-  if (menu) fecharMenu();
+  if (menu) fecharOuDescartar();
   const map = getMap(), r = await obterPosicao();
   if (!r.ok) { toast('Sem GPS. Segure no mapa no ponto desejado.', 5000); return; }
   map.jumpTo({ center: [r.pos.lon, r.pos.lat], zoom: Math.max(map.getZoom(), 17.5) });

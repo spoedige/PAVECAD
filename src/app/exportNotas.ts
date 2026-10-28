@@ -1,5 +1,7 @@
 import * as catalogo from '../dominio/catalogo';
-import { csvDeLinhas, juntarLinhas, linhasDeNotas, linhasDePropostas, nomeArquivoNotas, type ContextoNota, type ContextoProp, type NotaExport } from '../dominio/exportNotas';
+import { csvDeLinhas, fotosDeNotas, juntarLinhas, linhasDeNotas, linhasDePropostas, nomeArquivoNotas, type ContextoNota, type ContextoProp, type NotaExport } from '../dominio/exportNotas';
+import { jpegComGps } from '../dominio/exif';
+import { bytesDeDataUrlParaArray } from '../dominio/imagem';
 import { efeitoDe, type Proposta } from '../dominio/propostas';
 import { montarXlsx, type FflateLib, type XlsxLib } from '../dominio/xlsxNotas';
 import { parseKmTexto } from '../formats/km';
@@ -14,7 +16,8 @@ function contextoDe(n: NotaExport): ContextoNota | undefined {
   const km = (txt: string | null | undefined) => { if (!txt || !E.privacidade) return txt ?? ''; const v = parseKmTexto(txt); return v === null ? '' : kmFmt(v); };
   if (nota.rapida) {
     const r = nota.rapida;
-    return { rodovia: E.privacidade ? (p ? rodoviaNome(p.meta.uf) : '') : r.rodovia ?? '', planilha: E.privacidade ? (p ? projName(p) : '') : r.planilha ?? '', km: km(r.km) };
+    const nomeP = p?.meta.name ?? r.planilha ?? '', d = E.conservaDesde[nomeP], desde = d ? d.split('-').reverse().join('/') : '';
+    return { rodovia: E.privacidade ? (p ? rodoviaNome(p.meta.uf) : '') : r.rodovia ?? '', planilha: E.privacidade ? (p ? projName(p) : '') : r.planilha ?? '', km: km(r.km), desde };
   }
   if (!p) return E.privacidade ? { rodovia: '', planilha: '', km: '' } : undefined;
   // anotação antiga: a planilha dá rodovia e sentido
@@ -35,9 +38,26 @@ function contextoDaProposta(r: Proposta): ContextoProp | undefined {
   };
 }
 
+const opcoesNotas = () => ({ rotuloCat: (c: string) => NOTE_CATS[c as keyof typeof NOTE_CATS]?.l ?? c, contexto: contextoDe });
+
+/** Fotos das notas "Foto", com o nome da coluna "Arquivo da foto" e o EXIF GPS do ponto pressionado. */
+export function fotosAtuais(): { id: string; nome: string; bytes: Uint8Array }[] {
+  return fotosDeNotas(E.notes as NotaExport[], opcoesNotas()).map((f) => ({ id: f.id, nome: f.nome, bytes: jpegComGps(bytesDeDataUrlParaArray(f.data), f.lat, f.lon, new Date(f.t)) }));
+}
+
+/** Com fotos nas notas, a planilha sai num ZIP com a pasta fotos/; sem fotos, o arquivo segue como veio. */
+async function comFotos(arq: { nome: string; blob: Blob }, comNotas: boolean): Promise<{ nome: string; blob: Blob }> {
+  const fotos = comNotas ? fotosAtuais() : [];
+  if (!fotos.length) return arq;
+  const { zipSync } = await import('fflate');
+  const ent: Record<string, Uint8Array | [Uint8Array, { level: 0 }]> = { [arq.nome]: new Uint8Array(await arq.blob.arrayBuffer()) };
+  for (const f of fotos) ent['fotos/' + f.nome] = [f.bytes, { level: 0 }];
+  return { nome: arq.nome.replace(/\.(xlsx|csv)$/, '.zip'), blob: new Blob([zipSync(ent) as BlobPart], { type: 'application/zip' }) };
+}
+
 /** Notas (drenos e as da primeira versão) e alterações de solução, juntas e da mais antiga para a mais nova. */
 export const linhasAtuais = (comNotas = true) => juntarLinhas(
-  comNotas ? linhasDeNotas(E.notes as NotaExport[], { rotuloCat: (c) => NOTE_CATS[c as keyof typeof NOTE_CATS]?.l ?? c, contexto: contextoDe }) : [],
+  comNotas ? linhasDeNotas(E.notes as NotaExport[], opcoesNotas()) : [],
   linhasDePropostas(E.props, (r) => contextoDaProposta(r as Proposta)),
 );
 
@@ -66,9 +86,9 @@ const semNotas = (comNotas: boolean) => { if (!linhasAtuais(comNotas).length) { 
 export async function baixarXlsx(comNotas = true) {
   if (semNotas(comNotas)) return;
   try {
-    const nome = nomeArquivoNotas('xlsx');
-    baixar(new Blob([await gerarXlsx(comNotas) as BlobPart], { type: MIME_XLSX }), nome);
-    aposExportar(); toast(`${nome} gerado`, 4000);
+    const a = await comFotos({ nome: nomeArquivoNotas('xlsx'), blob: new Blob([await gerarXlsx(comNotas) as BlobPart], { type: MIME_XLSX }) }, comNotas);
+    baixar(a.blob, a.nome);
+    aposExportar(); toast(`${a.nome} gerado`, 4000);
   } catch { toast('Não foi possível gerar a planilha'); }
 }
 
@@ -76,9 +96,10 @@ export async function baixarXlsx(comNotas = true) {
 export function baixarCsv(comNotas = true) {
   if (semNotas(comNotas)) return;
   try {
-    const nome = nomeArquivoNotas('csv');
-    baixar(new Blob([csvDeLinhas(linhasAtuais(comNotas))], { type: 'text/csv;charset=utf-8' }), nome);
-    aposExportar(); toast(`${nome} gerado`, 4000);
+    void comFotos({ nome: nomeArquivoNotas('csv'), blob: new Blob([csvDeLinhas(linhasAtuais(comNotas))], { type: 'text/csv;charset=utf-8' }) }, comNotas).then((a) => {
+      baixar(a.blob, a.nome);
+      aposExportar(); toast(`${a.nome} gerado`, 4000);
+    }).catch(() => toast('Não foi possível gerar o CSV'));
   } catch { toast('Não foi possível gerar o CSV'); }
 }
 
@@ -86,8 +107,9 @@ export function baixarCsv(comNotas = true) {
 export async function compartilharNotas(comNotas = true) {
   if (semNotas(comNotas)) return;
   try {
-    const nome = nomeArquivoNotas('xlsx'), blob = new Blob([await gerarXlsx(comNotas) as BlobPart], { type: MIME_XLSX });
-    const arq = new File([blob], nome, { type: MIME_XLSX });
+    const a = await comFotos({ nome: nomeArquivoNotas('xlsx'), blob: new Blob([await gerarXlsx(comNotas) as BlobPart], { type: MIME_XLSX }) }, comNotas);
+    const nome = a.nome, blob = a.blob, tipo = blob.type;
+    const arq = new File([blob], nome, { type: tipo });
     if (navigator.canShare?.({ files: [arq] })) {
       await navigator.share({ files: [arq], title: 'Notas PAVECAD' });
       aposExportar();

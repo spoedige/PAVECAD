@@ -7,15 +7,16 @@ import { tituloDe } from '../dominio/titulo';
 import { atualizarRotulosKm, E, getP, kmVis, padraoAtivo, projName, rodoviaNome, visibleProjects, type AppProj } from './estado';
 import { abrirLidas, regeometrar, removerProjeto } from './projetos';
 import { renderDash, selo } from './dashboard';
-import { CHAVE_PRESSAO, PRESSAO_OPCOES, pressaoMs } from './notaRapida';
+import { CHAVE_PRESSAO, PRESSAO_OPCOES, confirmarAntes, definirConfirmarAntes, pressaoMs } from './notaRapida';
 import { ROTULO_CAMADA, atualizarChipCamada, guardarCamada } from './camadas';
 import { renderExp } from './exportar';
-import { abrirAlinhar, aoSairDeAlinhar, renderAlinhar } from './alinhar';
+import { aoSairDeAlinhar, renderAlinhar } from './alinhar';
 import { contadorSelecao, htmlSelecao, itemDe, ligarSelecao } from './selecaoPlanilhas';
 import { IC } from './icones';
 import { applyLayers, applyPaint, clearFocus, clearSel, fitAll, fitFocus, fitList, getMap, renderLegend, select, setBase, setFocus, setProjectData, stepSel, updateSelLayer, updateStakes, applyVisibility, temMapTiler } from './mapa';
 import { drawUni, renderGroups } from './unifilar';
 import { refreshProp, refreshPropLayers, renderNotes, resolveProps, startNote } from './revisao';
+import { renderDiagnostico } from './diagnostico';
 import { $, cssv, esc, fmt, syncAllSegs, syncSeg, toast, toastAcao } from './ui';
 
 const Q = () => (E.field ? Q5F : Q5);
@@ -27,11 +28,10 @@ const flyTo = (p: AppProj, i: number, zoom = 17.2) => { const r = p.rows[i]; get
 /* Abas                                                              */
 /* ---------------------------------------------------------------- */
 export function setTab(t: typeof E.tab) {
-  if (E.tab === 'al' && t !== 'al') aoSairDeAlinhar();
+  if (E.tab === 'aj' && t !== 'aj') aoSairDeAlinhar(); // o que o Alinhar não aplicou volta ao valor gravado
   E.tab = t;
   document.querySelectorAll<HTMLElement>('#tabs button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.t === t)));
-  for (const x of ['seg', 'ana', 'notas', 'exp', 'aj', 'al']) $(`#t-${x}`).hidden = x !== t;
-  if (t === 'al') renderAlinhar();
+  for (const x of ['seg', 'ana', 'notas', 'exp', 'aj']) $(`#t-${x}`).hidden = x !== t;
   syncSeg($('#tabs'));
   if (t === 'ana') renderAna();
   if (t === 'notas') renderNotes();
@@ -80,7 +80,6 @@ export function renderAll() {
   renderNotes();
   renderExp();
   renderAj();
-  if (E.tab === 'al') renderAlinhar();
   renderGroups();
   syncAllSegs();
   drawUni();
@@ -346,7 +345,7 @@ export function renderAj() {
   const sel = E.P.length ? `
     <div><div class="sect">Planilhas a ajustar <span class="num" id="a-cont">${contadorSelecao(E.settingsSel, E.P.length)}</span></div>
       ${htmlSelecao({ itens: lista, marcadas: E.settingsSel }, 'a-lista')}
-      <p class="note" style="margin-top:6px">${alvos.length ? 'Os campos abaixo valem para todas as marcadas.' : 'Marque ao menos uma planilha para ajustar.'} Para deslocar as coordenadas, use <button class="linkbtn" type="button" id="irAlinhar">Alinhar</button>.</p></div>` : '';
+      <p class="note" style="margin-top:6px">${alvos.length ? 'Os campos abaixo valem para todas as marcadas.' : 'Marque ao menos uma planilha para ajustar.'} O Alinhar fica mais abaixo, nesta mesma aba.</p></div>` : '';
   const opts = p ? `
     <div><div class="sect">Geometria ${alvos.length > 1 ? `das ${alvos.length} planilhas` : 'da planilha'}</div>
       <div class="list">
@@ -366,11 +365,13 @@ export function renderAj() {
       <div class="field"><div><div>Padrão além da cor</div><div class="note">Hachura nas classes críticas (RE, RP e as piores de IGG, FC e ATR). Liga sozinho no modo campo. O RP sempre tem hachura, até você desligar aqui</div></div><button class="sw2" id="s-pad" role="switch" aria-checked="${padraoAtivo()}" aria-label="Padrão além da cor"></button></div>
       <div class="field"><div><div>Modo privacidade</div><div class="note">Oculta nomes de planilha, rodovia e km na tela e nas exportações. Os dados no aparelho não mudam</div></div><button class="sw2" id="s-priv" role="switch" aria-checked="${E.privacidade}" aria-label="Modo privacidade"></button></div>
       <div class="field"><div><div>Duração da pressão no mapa</div><div class="note">Tempo segurando o dedo até abrir o menu de campo</div></div><div class="seg" id="s-press" role="group" aria-label="Duração da pressão">${PRESSAO_OPCOES.map((v) => `<button type="button" data-ms="${v}" aria-pressed="${pressaoMs() === v}">${v} ms</button>`).join('')}</div></div>
+      <div class="field"><div><div>Confirmar antes de gravar</div><div class="note">A roda de campo mostra Estender, Observação e Confirmar antes de gravar. Desligado, um toque grava e a roda mostra Estender, Observação e Desfazer</div></div><button class="sw2" id="s-conf" role="switch" aria-checked="${confirmarAntes()}" aria-label="Confirmar antes de gravar"></button></div>
       <div class="field"><div><div>Modo campo (sol)</div><div class="note">Contraste máximo, cores fortes, alvos de toque maiores</div></div><button class="sw2" id="s-field" role="switch" aria-checked="${E.field}" aria-label="Modo campo"></button></div></div></div>
     <div><div class="sect">Camadas</div><div class="list">
       ${([['drain', 'Drenos', 'Lado externo. Linha cheia tipo R, tracejada tipo P. Passe o mouse para ver detalhes'], ['poi', 'OAE e pedágio', 'Marcadores nos trechos observados'], ['km', 'Marcos e estacas', 'Estaca a cada 20 m com zoom máximo, 100 m e 500 m ao afastar'], ['notes', 'Anotações', '']] as const).map(([k, t, s]) => `<div class="field"><div><div>${t}</div>${s ? `<div class="note">${s}</div>` : ''}</div><button class="sw2" data-layer="${k}" role="switch" aria-checked="${E.layers[k]}" aria-label="${t}"></button></div>`).join('')}</div></div>
     ${sel}
     ${opts}
+    <div id="alSecWrap"><div class="sect" id="alSect">Alinhar planilhas</div><div id="t-al"></div></div>
     <div><div class="sect">Mapa</div><div class="list"><div class="field"><label for="a-base">Base</label><select id="a-base"><option value="none">Sem base</option><option value="osm">Ruas</option><option value="esri">Satélite</option></select></div></div>
       <p class="note" style="margin-top:7px">${temMapTiler() ? 'Base MapTiler ativa.' : 'Base reserva (OpenStreetMap e Esri). Para o MapTiler, defina VITE_MAPTILER_KEY no ambiente de build.'}</p></div>
     <details><summary>Como o cálculo é feito</summary><div class="formula">θ = atan2(ΔE, ΔN)   entre i−w e i+w, em metros UTM
@@ -379,7 +380,11 @@ e(n) = e0 + dir · Σ largura(1..n)
 P(n) = P + e(n) · (nE , nN)</div>
       <p class="note" style="margin-top:8px">O sentido decrescente usa o mesmo cálculo com a normal invertida, porque as linhas da planilha seguem a quilometragem crescente.</p></details>`;
   ligarSelecao(el, { itens: lista, marcadas: E.settingsSel, origem: p ? itemDe(p) : undefined, aoMudar: () => renderAj() });
-  document.getElementById('irAlinhar')?.addEventListener('click', () => abrirAlinhar());
+  renderAlinhar();
+  const diag = document.createElement('div');
+  diag.id = 'diagBox';
+  el.appendChild(diag);
+  renderDiagnostico(diag);
   if (p) {
     // seletores: mostra o valor comum; se as marcadas diferem, "vários"
     const set = (id: string, vals: string[]) => {
@@ -418,6 +423,7 @@ P(n) = P + e(n) · (nE , nN)</div>
   }));
   syncSeg($('#s-press'));
   $('#s-priv').onclick = () => setPrivacidade(!E.privacidade);
+  $('#s-conf').onclick = () => { const v = !confirmarAntes(); definirConfirmarAntes(v); $('#s-conf').setAttribute('aria-checked', String(v)); };
   $('#s-pad').onclick = () => {
     E.padrao = !padraoAtivo();
     try { localStorage.setItem('pavecad-padrao', E.padrao ? '1' : '0'); } catch { /* sem storage */ }

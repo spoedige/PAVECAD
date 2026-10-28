@@ -9,8 +9,9 @@ import {
   agendarReaplicar, marcosInfo, alignToRoad, applyLayers, clearSel, fitAll, getMap, goLabel, initMap, north, rotate, select, setBase, setNitidez, stepSel, syncNitidezUi, updateStakes,
 } from './app/mapa';
 import type { ModeKey } from './dominio/indicadores';
-import { abrirDb } from './app/persist';
+import { abrirDb, bancoIndisponivel, LIMITE_BANCO_MS } from './app/persist';
 import { gpsToggle } from './app/gps';
+import { iniciarDiagnostico, registrarErro, versaoApp } from './app/diagnostico';
 import { initOffline } from './app/offline';
 import { agendarPoda } from './app/tilesCache';
 import { initRevisao, onToolClick, refreshNotesLayer, refreshPropLayers, resolveProps, setTool } from './app/revisao';
@@ -19,16 +20,16 @@ import { abrirConfig, atualizarAviso, configAberta, initConfig } from './app/con
 import { focarAjustes, modosVisiveis, renderAll, renderSeg, setField, setMode, setTab, syncBaseSeg } from './app/paineis';
 import { blocosDoUnifilar, drawUni, lacunasDoUnifilar, planilhasDoUnifilar, initUnifilar } from './app/unifilar';
 import { ehCelular, ehCompacto, initLayout, setPainel } from './app/layout';
-import { alternarAlinhar } from './app/alinhar';
+import { abrirAlinhar } from './app/alinhar';
 import { alternarLimpo, initGrupos } from './app/grupos';
 import { initPinoNotas, verNotas } from './app/pinoNotas';
 import { alternarDash, fecharDash, initDash } from './app/dashboard';
 import { abrirCamadas, camadaSalva, fecharCamadas, initCamadas } from './app/camadas';
 import { fecharLegenda, initControles } from './app/controles';
 import { initCelular } from './app/celular';
-import { fecharNotaRapida, initNotaRapida, notaNoMeuLocal } from './app/notaRapida';
+import { fecharNotaRapida, initNotaRapida, notaNoMeuLocal, recuperarRascunho } from './app/notaRapida';
 import { clearFocus } from './app/mapa';
-import { $, observarHud, observarRolagem, observarRolagemH, syncAllSegs, syncSeg, toast } from './app/ui';
+import { $, observarHud, observarRolagem, observarRolagemH, syncAllSegs, syncSeg, toast, toastAcao } from './app/ui';
 
 async function carregarExemplos() {
   const { nomesExemplo, lerExemplo } = await import('./app/exemplo');
@@ -43,6 +44,8 @@ async function carregarExemplos() {
 
 /* ---- controles ---- */
 $('#btnFile').addEventListener('click', () => $('#file').click());
+$('#gavVer').textContent = 'v' + versaoApp().commit; // celular sem planilha: mostra qual versão está rodando
+$('#gavAbrir').addEventListener('click', () => $('#file').click()); // celular sem planilha: o botão fica à vista, sem depender do "⋯"
 $('#file').addEventListener('change', (e) => {
   const input = e.target as HTMLInputElement;
   const files = [...(input.files ?? [])];
@@ -59,7 +62,6 @@ document.querySelectorAll<HTMLButtonElement>('#tabs button').forEach((b) => b.ad
 document.querySelectorAll<HTMLButtonElement>('#base button').forEach((b) =>
   b.addEventListener('click', () => { setBase(b.dataset.b as typeof E.base); syncBaseSeg(); renderAll(); }));
 document.querySelectorAll<HTMLButtonElement>('#nitidez button').forEach((b) => b.addEventListener('click', () => setNitidez(b.dataset.n as 'maxima' | 'segura')));
-document.querySelectorAll<HTMLElement>('[data-alinhar]').forEach((b) => b.addEventListener('click', () => alternarAlinhar()));
 $('#rotL').addEventListener('click', () => rotate(-15));
 $('#rotR').addEventListener('click', () => rotate(15));
 $('#rotN').addEventListener('click', north);
@@ -115,7 +117,7 @@ window.addEventListener('keydown', (e) => {
   if (lk === 'q') { rotate(-15); return; }
   if (lk === 'e') { rotate(15); return; }
   if (lk === 'r') { alignToRoad(); return; }
-  if (lk === 'a') { alternarAlinhar(); return; }
+  if (lk === 'a') { abrirAlinhar(); return; }
   if (lk === 'g') { void gpsToggle(); return; }
   if (lk === 's') { setField(!E.field); return; }
   if (!E.sel) return;
@@ -145,28 +147,40 @@ if (import.meta.env.DEV) {
   };
 }
 
+/** Cada etapa da partida roda isolada: erro ou espera longa numa delas (banco, mapa) não deixa os botões sem ouvinte. */
+function passo(nome: string, f: () => unknown) {
+  try { f(); } catch (e) { registrarErro(e, 'partida:' + nome, e instanceof Error ? (e.stack ?? '') : ''); }
+}
+async function passoAsync(nome: string, f: () => Promise<unknown>, limiteMs = 6000) {
+  try { await Promise.race([f(), new Promise((r) => setTimeout(r, limiteMs))]); } catch (e) { registrarErro(e, 'partida:' + nome, e instanceof Error ? (e.stack ?? '') : ''); }
+}
+
 async function boot() {
-  E.mode = camadaSalva();
-  try { E.field = localStorage.getItem('pavecad-field') === '1'; } catch { /* sem storage */ }
-  try { E.privacidade = localStorage.getItem('pavecad-privacidade') === '1'; } catch { /* sem storage */ }
-  try { const v = localStorage.getItem('pavecad-padrao'); E.padrao = v === null ? null : v === '1'; } catch { /* sem storage */ }
-  if (E.field) { document.documentElement.setAttribute('data-contrast', 'field'); $('#btnField').setAttribute('aria-pressed', 'true'); }
-  await abrirDb();
-  await carregarConfig();
-  await initRevisao();
-  initUnifilar();
-  initConfig();
-  initOffline(() => abrirConfig('campo'));
-  agendarPoda();
-  try { void navigator.storage?.persist?.(); } catch { /* sem a API */ }
-  initLayout();
-  syncNitidezUi();
-  initGrupos(() => { drawUni(); agendarReaplicar(); });
-  observarHud(agendarReaplicar);
-  document.querySelectorAll<HTMLElement>('.tabbody').forEach(observarRolagem);
-  observarRolagemH($('#unigroups'));
-  renderAll();
-  initMap(() => {
+  passo('prefs', () => {
+    E.mode = camadaSalva();
+    try { E.field = localStorage.getItem('pavecad-field') === '1'; } catch { /* sem storage */ }
+    try { E.privacidade = localStorage.getItem('pavecad-privacidade') === '1'; } catch { /* sem storage */ }
+    try { const v = localStorage.getItem('pavecad-padrao'); E.padrao = v === null ? null : v === '1'; } catch { /* sem storage */ }
+    if (E.field) { document.documentElement.setAttribute('data-contrast', 'field'); $('#btnField').setAttribute('aria-pressed', 'true'); }
+  });
+  await passoAsync('banco', abrirDb, LIMITE_BANCO_MS + 500);
+  await passoAsync('config', carregarConfig);
+  await passoAsync('revisao', initRevisao);
+  passo('unifilar', initUnifilar);
+  passo('config-ui', initConfig);
+  passo('offline', () => initOffline(() => abrirConfig('campo')));
+  passo('poda', agendarPoda);
+  passo('persist', () => { void navigator.storage?.persist?.(); });
+  passo('layout', initLayout);
+  passo('nitidez', syncNitidezUi);
+  passo('grupos', () => initGrupos(() => { drawUni(); agendarReaplicar(); }));
+  passo('hud', () => observarHud(agendarReaplicar));
+  passo('rolagem', () => {
+    document.querySelectorAll<HTMLElement>('.tabbody').forEach(observarRolagem);
+    observarRolagemH($('#unigroups'));
+  });
+  passo('render', renderAll);
+  passo('mapa', () => initMap(() => {
     resolveProps();
     applyLayers();
     refreshNotesLayer();
@@ -174,23 +188,29 @@ async function boot() {
     renderAll();
     updateStakes();
     if (E.P.length) fitAll(true);
-  });
-  initNotaRapida(); // depois do initMap: precisa da instância do mapa
-  initPinoNotas();
-  initDash();
-  initCamadas();
-  initControles();
-  initCelular();
-  syncAllSegs();
-  const n = await restaurarProjetos();
-  if (n) toast(`${n} planilha(s) reaberta(s) deste aparelho`);
-  atualizarAviso();
+  }));
+  passo('nota-rapida', initNotaRapida); // depois do initMap: precisa da instância do mapa
+  passo('pino', initPinoNotas);
+  passo('dash', initDash);
+  passo('camadas', initCamadas);
+  passo('controles', initControles);
+  passo('celular', initCelular);
+  passo('segs', syncAllSegs);
+  if (bancoIndisponivel) toast('Armazenamento do navegador indisponível: nada será salvo neste aparelho');
+  await passoAsync('restaurar', async () => {
+    const n = await restaurarProjetos();
+    if (n) toast(`${n} planilha(s) reaberta(s) deste aparelho`);
+  }, 30000);
+  passo('aviso', atualizarAviso);
+  passo('rascunho', recuperarRascunho); // a observação que ficou pela metade volta ao reabrir
 }
+iniciarDiagnostico();
 void boot();
 
 /* PWA: cache do app para abrir sem rede. Só ativo no build (no dev não há service worker). */
-registerSW({
+const atualizarSW = registerSW({
   immediate: true,
+  onNeedRefresh: () => toastAcao('Nova versão disponível', 'Atualizar', () => void atualizarSW(true), 20000),
   onOfflineReady: () => toast('Pronto para uso sem internet', 4000),
   onRegisterError: (e) => console.warn('service worker:', e),
 });

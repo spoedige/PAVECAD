@@ -87,7 +87,8 @@ export function mapearCabecalhos(S: unknown[][]): Mapa {
       const s = sentidoDe(b)!, f = Number(/faixa\s*(\d)/i.exec(b)![1]), k = camadaDe(sub);
       if (k) (m.camada[s][f] ??= {})[k] = c;
     } else if (/acostamento/i.test(lb) && sentidoDe(b)) {
-      m.acost[sentidoDe(b)!] = c; // só a coluna de revestimento existe nesse bloco
+      // só a coluna de revestimento existe nesse bloco. `preencher` repete o rótulo nas células vazias à direita (mescladas): vale a primeira coluna, a que tem o texto de verdade
+      m.acost[sentidoDe(b)!] ??= c;
     } else if (/^drenos/i.test(lb)) {
       const s = sentidoDe(r5[c]);
       if (s) m.dreno[s] = c;
@@ -434,6 +435,12 @@ export const planservi: FormatDef = {
     cres.log.push(...logQualidade(qC, 'Crescente'));
     decr.log.push(...logQualidade(qD, 'Decrescente'));
     for (const p of [cres, decr]) {
+      // acostamento por sentido: um sentido sem nenhuma linha costuma ser coluna não lida, e fica visível no relatório de qualidade
+      const comCodigo = p.rows.filter((r) => r.shoulderCode && r.shoulderCode !== '-').length;
+      p.log.push({
+        level: comCodigo ? 'info' : 'warn', code: 'planservi-acostamento',
+        msg: `Acostamento: ${comCodigo} de ${p.rows.length} linhas com código diferente de "-" (${p.meta.travel > 0 ? 'Crescente' : 'Decrescente'})${comCodigo ? '' : '. Nenhuma linha: confira a coluna do acostamento deste sentido na planilha'}`,
+      });
       p.log.push({ level: 'info', code: 'planservi-larguras', msg: `Larguras assumidas, porque a planilha não traz: ${String(LARGURA_FAIXA_PADRAO).replace('.', ',')} m por faixa e ${String(LARGURA_ACOSTAMENTO_PADRAO).replace('.', ',')} m de acostamento. Ajuste em Configurações > Larguras` });
     }
     return [cres, decr];

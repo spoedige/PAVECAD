@@ -1,11 +1,12 @@
 /** Exportação das notas (rápidas e anotações antigas): linhas, resumo, CSV e nome de arquivo. Funções puras.
  *  O XLSX é montado em xlsxNotas.ts a partir destas mesmas linhas. */
 import { crsForZone, toUtm, zoneOf } from '../geometry/utm';
-import { TIPOS_RAPIDOS, type DadosRapida } from './notaRapida';
+import { TIPOS_RAPIDOS, situacaoConserva, type DadosRapida } from './notaRapida';
 
 export const COLUNAS = [
   'Data', 'Hora', 'Tipo', 'Rodovia', 'Planilha', 'Sentido', 'Faixa', 'Solução atual', 'Solução nova', 'Efeito', 'Extensão antes (m)', 'Extensão depois (m)', 'Km inicial', 'Km final',
   'Latitude', 'Longitude', 'UTM Leste', 'UTM Norte', 'Origem', 'Precisão (m)', 'Observação', 'Status',
+  'Desde', 'Até', 'Situação', 'Arquivo da foto',
 ] as const;
 
 export interface NotaExport {
@@ -16,10 +17,12 @@ export interface NotaExport {
   cat?: string;
   loc?: { pid: string; name: string; km: string; lane: number } | null;
   rapida?: DadosRapida;
+  /** Fotos da nota (data URL JPEG). */
+  photos?: string[];
 }
 
 /** O que o app sabe da nota e a nota sozinha não diz (anotação antiga, modo privacidade). */
-export interface ContextoNota { rodovia?: string; planilha?: string; sentido?: string; km?: string; faixa?: number | null }
+export interface ContextoNota { rodovia?: string; planilha?: string; sentido?: string; km?: string; faixa?: number | null; /** "Ver conserva": data do projeto (dd/mm/aaaa), a mesma para todas as notas da planilha. */ desde?: string }
 export interface OpcoesExport {
   /** Rótulo da categoria de uma anotação antiga ("Defeito"). */
   rotuloCat: (cat: string) => string;
@@ -54,6 +57,14 @@ export interface Linha {
   precisao: number | null;
   observacao: string;
   status: string;
+  /** "Ver conserva": início do período a conferir (data do projeto), ou vazio. */
+  desde: string;
+  /** "Ver conserva": data e hora da nota. */
+  ate: string;
+  /** "Ver conserva": Pendente ou Verificado. */
+  situacao: string;
+  /** Foto: nome do arquivo na pasta fotos/. */
+  arquivoFoto: string;
 }
 
 const z2 = (v: number) => String(v).padStart(2, '0');
@@ -61,8 +72,22 @@ const z2 = (v: number) => String(v).padStart(2, '0');
 export const serialDoDia = (d: Date) => Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86400000 + 25569;
 export const fracaoDoDia = (d: Date) => (d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds()) / 86400;
 
+const dataHoraTxt = (d: Date) => `${z2(d.getDate())}/${z2(d.getMonth() + 1)}/${d.getFullYear()} ${z2(d.getHours())}:${z2(d.getMinutes())}`;
+
+/** "km177+000_Fx2_20261026_143005.jpg": km do segmento, faixa (Fx1 a Fx6, Ac para o acostamento, sem faixa fica só o km), data e hora locais.
+ *  Repetido (mesmo segundo e mesmo local), ganha _2, _3... Sem km: "kmND". */
+export function nomeArquivoFoto(d: Date, km: string | null | undefined, faixa: number | string | null | undefined, usados?: Set<string>): string {
+  const f = faixa === null || faixa === undefined || faixa === '' ? '' : faixa === 0 || faixa === 'Acost.' ? '_Ac' : `_Fx${faixa}`;
+  const base = `km${(km || 'ND').replace(/[^0-9A-Za-z+]/g, '')}${f}_${d.getFullYear()}${z2(d.getMonth() + 1)}${z2(d.getDate())}_${z2(d.getHours())}${z2(d.getMinutes())}${z2(d.getSeconds())}`;
+  let nome = `${base}.jpg`;
+  for (let k = 2; usados?.has(nome); k++) nome = `${base}_${k}.jpg`;
+  usados?.add(nome);
+  return nome;
+}
+
 /** As notas viram linhas, da mais antiga para a mais nova. */
 export function linhasDeNotas(notas: NotaExport[], o: OpcoesExport): Linha[] {
+  const usados = new Set<string>();
   return [...notas].sort((a, b) => a.t.localeCompare(b.t)).map((n) => {
     const d = new Date(n.t), [lon, lat] = n.coords[0], zone = zoneOf(lon), [e, nn] = toUtm(crsForZone(zone), lat, lon);
     const r = n.rapida, ctx = o.contexto?.(n) ?? {};
@@ -82,8 +107,23 @@ export function linhasDeNotas(notas: NotaExport[], o: OpcoesExport): Linha[] {
       precisao: r?.precisao ?? null,
       observacao: n.text ?? '',
       status: r?.resolvida ? 'Resolvida' : 'Aberta',
+      desde: r?.tipo === 'conserva' ? ctx.desde ?? '' : '',
+      ate: r?.tipo === 'conserva' ? dataHoraTxt(d) : '',
+      situacao: r?.tipo === 'conserva' ? situacaoConserva(r) : '',
+      arquivoFoto: r?.tipo === 'foto' && n.photos?.length ? nomeArquivoFoto(d, ctx.km ?? r.km ?? n.loc?.km, ctx.faixa !== undefined ? ctx.faixa : r.faixa, usados) : '',
     };
   });
+}
+
+/** As fotos das notas "Foto", com o nome que a coluna "Arquivo da foto" traz (a mesma ordem e a mesma regra de nomes). */
+export function fotosDeNotas(notas: NotaExport[], o: OpcoesExport): { id: string; nome: string; data: string; lat: number; lon: number; t: string }[] {
+  const linhas = linhasDeNotas(notas, o), ordem = [...notas].sort((a, b) => a.t.localeCompare(b.t));
+  const out: { id: string; nome: string; data: string; lat: number; lon: number; t: string }[] = [];
+  ordem.forEach((n, i) => {
+    if (!linhas[i].arquivoFoto || !n.photos?.length) return;
+    out.push({ id: n.id, nome: linhas[i].arquivoFoto, data: n.photos[0], lon: n.coords[0][0], lat: n.coords[0][1], t: n.t });
+  });
+  return out;
 }
 
 /** Alteração de solução (a proposta, feita em campo ou na barra Propor) como linha da planilha de notas. */
@@ -115,6 +155,7 @@ export function linhasDePropostas(props: PropExport[], ctx: (p: PropExport) => C
       solucaoAtual: c.atual, solucaoNova: c.nova, efeito: c.efeito, extAntes: r.campo?.antes ?? 0, extDepois: r.campo?.depois ?? 0, kmIni: c.kmIni, kmFim: c.kmFim,
       lat: +lat.toFixed(6), lon: +lon.toFixed(6), utmE: +e.toFixed(2), utmN: +nn.toFixed(2), fuso: `${zone}S`,
       origem: r.campo ? (r.campo.origem === 'gps' ? 'GPS' : 'Pressão') : 'Manual', precisao: r.campo?.precisao ?? null, observacao: r.note ?? '', status: 'Aberta',
+      desde: '', ate: '', situacao: '', arquivoFoto: '',
     });
   }
   return out;
@@ -154,6 +195,7 @@ export function csvDeLinhas(linhas: Linha[], eol = '\r\n'): string {
     rows.push([
       l.dataTxt, l.horaTxt, q(l.tipo), q(l.rodovia), q(l.planilha), l.sentido, l.faixa, q(l.solucaoAtual), q(l.solucaoNova), l.efeito, l.extAntes === null ? '' : String(l.extAntes), l.extDepois === null ? '' : String(l.extDepois), l.kmIni, l.kmFim,
       dec(l.lat, 6), dec(l.lon, 6), dec(l.utmE, 2), dec(l.utmN, 2), l.origem, l.precisao === null ? '' : String(l.precisao), q(l.observacao), l.status,
+      l.desde, l.ate, l.situacao, q(l.arquivoFoto),
     ].join(';'));
   }
   return '﻿' + rows.join(eol);
