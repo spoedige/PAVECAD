@@ -10,7 +10,8 @@
     "test": "vitest run",
     "e2e": "node scripts/capturas/e2e.cjs",
     "capturas": "node scripts/capturas/run.cjs",
-    "auditoria-ui": "node scripts/auditoria-ui.cjs"
+    "auditoria-ui": "node scripts/auditoria-ui.cjs",
+    "build:demo": "vite build -c vite.demo.config.ts && node scripts/demo/embutir.cjs"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",
