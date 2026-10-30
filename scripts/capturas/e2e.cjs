@@ -1731,7 +1731,7 @@ const TESTES = {
       assert.ok(Math.abs(c1[0] - c0[0]) + Math.abs(c1[1] - c0[1]) > 1e-6, 'o mapa foi arrastado');
       // movimento de 5 px (abaixo de 8) não cancela
       const p2 = await centrarNaFaixa(pg, 0, 300, 1);
-      await pg.mouse.move(p2.x, p2.y); await pg.mouse.down(); await pg.mouse.move(p2.x + 5, p2.y, { steps: 2 }); await pg.waitForTimeout(700); await pg.mouse.up(); await pg.waitForTimeout(300);
+      await pg.mouse.move(p2.x, p2.y); await pg.mouse.down(); await pg.mouse.move(p2.x + 5, p2.y, { steps: 2 }); await pg.waitForSelector('#nr .nr-op', { timeout: 6000 }).catch(() => {}); await pg.waitForTimeout(150); await pg.mouse.up(); await pg.waitForTimeout(300); // segura até o menu abrir: no CI, com o mapa ocupado, o relógio de 500 ms pode atrasar
       assert.equal(await pg.locator('#nr .nr-op').count(), 8, 'tremida de 5 px ainda vale como pressão');
       await pg.keyboard.press('Escape'); await pg.waitForTimeout(200);
       assert.equal(await pg.locator('#nr .nr-op').count(), 0, 'Esc fecha');
