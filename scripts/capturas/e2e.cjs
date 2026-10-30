@@ -1682,7 +1682,7 @@ const TESTES = {
       assert.equal(await pg.locator('#nr input, #nr textarea, #nr select, #nr [role=switch]').count(), 0, 'o menu não tem campo, seletor nem chave');
       assert.equal(await pg.locator('#nr button').count(), 8, 'só as oito opções');
       const op = await pg.evaluate(() => [...document.querySelectorAll('#nr .nr-op')].map((e) => { const r = e.getBoundingClientRect(), s = document.querySelector('.stage').getBoundingClientRect(); return { t: e.dataset.t, w: Math.round(r.width), h: Math.round(r.height), dentro: r.left >= s.left && r.right <= s.right && r.top >= s.top && r.bottom <= s.bottom, txt: e.innerText.replace(/\s+/g, ' ').trim(), svg: !!e.querySelector('svg') }; }));
-      assert.deepEqual(op.map((x) => x.t), ['alterar', 'dreno_mais', 'dreno_menos', 'parametros', 'conserva', 'observacao', 'foto']);
+      assert.deepEqual(op.map((x) => x.t), ['alterar', 'dreno_mais', 'dreno_menos', 'parametros', 'conserva', 'observacao', 'foto', 'streetview']);
       assert.ok(op.every((x) => x.w === 56 && x.h === 56 && x.dentro && x.svg), 'oito alvos de 56 px, com ícone, dentro da tela: ' + JSON.stringify(op));
       assert.deepEqual(op.map((x) => x.txt), ['Alterar solução', 'Colocar dreno', 'Retirar dreno', 'Ver parâmetros', 'Ver conserva', 'Observação', 'Foto', 'Street View']);
       assert.match(await pg.textContent('#nr .nr-cap'), /km \d+\+\d{3} · Fx 1/);
@@ -1733,12 +1733,12 @@ const TESTES = {
       // movimento de 5 px (abaixo de 8) não cancela
       const p2 = await centrarNaFaixa(pg, 0, 300, 1);
       await pg.mouse.move(p2.x, p2.y); await pg.mouse.down(); await pg.mouse.move(p2.x + 5, p2.y, { steps: 2 }); await pg.waitForTimeout(700); await pg.mouse.up(); await pg.waitForTimeout(300);
-      assert.equal(await pg.locator('#nr .nr-op').count(), 7, 'tremida de 5 px ainda vale como pressão');
+      assert.equal(await pg.locator('#nr .nr-op').count(), 8, 'tremida de 5 px ainda vale como pressão');
       await pg.keyboard.press('Escape'); await pg.waitForTimeout(200);
       assert.equal(await pg.locator('#nr .nr-op').count(), 0, 'Esc fecha');
       const p3 = await centrarNaFaixa(pg, 0, 300, 1);
       await pg.mouse.click(p3.x, p3.y, { button: 'right' }); await pg.waitForTimeout(300);
-      assert.equal(await pg.locator('#nr .nr-op').count(), 7, 'botão direito abre o menu');
+      assert.equal(await pg.locator('#nr .nr-op').count(), 8, 'botão direito abre o menu');
       await pg.mouse.click(p3.x + 250, p3.y + 120); await pg.waitForTimeout(300);
       assert.equal(await pg.locator('#nr .nr-op').count(), 0, 'toque fora fecha');
       assert.equal(await pg.evaluate(() => window.__pavecad.E.notes.length), 0, 'nada gravado');
@@ -1762,14 +1762,14 @@ const TESTES = {
       await ctx.grantPermissions(['geolocation']);
       await ctx.setGeolocation({ latitude: alvo.lat, longitude: alvo.lon, accuracy: 9 });
       await noMeuLocal(); await pg.waitForTimeout(1200);
-      assert.equal(await pg.locator('#nr .nr-op').count(), 7, 'GPS bom: menu no meu local');
+      assert.equal(await pg.locator('#nr .nr-op').count(), 8, 'GPS bom: menu no meu local');
       await pg.click('#nr .nr-op[data-t=dreno_menos]'); await pg.waitForTimeout(400);
       const n = await pg.evaluate(() => window.__pavecad.E.notes.at(-1));
       assert.equal(n.rapida.origem, 'gps'); assert.equal(n.rapida.precisao, 9); assert.equal(n.rapida.tipo, 'dreno_menos'); assert.equal(n.rapida.estado, 'dentro');
       // 40 m: abre, com aviso na legenda
       await ctx.setGeolocation({ latitude: alvo.lat, longitude: alvo.lon, accuracy: 40 });
       await noMeuLocal(); await pg.waitForTimeout(1200);
-      assert.equal(await pg.locator('#nr .nr-op').count(), 7, 'precisão de 40 m ainda abre');
+      assert.equal(await pg.locator('#nr .nr-op').count(), 8, 'precisão de 40 m ainda abre');
       assert.match(await pg.textContent('#nr .nr-cap'), /GPS ±40 m/);
       assert.equal(await pg.locator('#nr .nr-cap.aviso').count(), 1, 'aviso em destaque');
       await pg.keyboard.press('Escape');
@@ -2011,7 +2011,7 @@ const TESTES = {
       await toque('touchStart', ponto.x, ponto.y); await pg.waitForTimeout(250);
       assert.equal(await pg.locator('#nr .nr-op').count(), 0, 'aos 250 ms ainda não abriu');
       await pg.waitForTimeout(450); await toque('touchEnd', ponto.x, ponto.y); await pg.waitForTimeout(300);
-      assert.equal(await pg.locator('#nr .nr-op').count(), 7, 'pressão por toque abre o menu');
+      assert.equal(await pg.locator('#nr .nr-op').count(), 8, 'pressão por toque abre o menu');
       assert.ok((await pg.evaluate(() => window.__vibrou)).length >= 1, 'vibra ao abrir');
       assert.equal(await pg.evaluate(() => !!window.__pavecad.E.sel), false, 'não seleciona o segmento por baixo');
       assert.equal(await pg.evaluate(() => document.querySelector('#nr .nr-op').getBoundingClientRect().width), 56);
@@ -2150,7 +2150,7 @@ const TESTES = {
       await pg.mouse.move(p.x, p.y); await pg.mouse.down(); await pg.waitForTimeout(500);
       assert.equal(await pg.locator('#nr .nr-op').count(), 0, 'aos 500 ms ainda não, com 700 ms configurados');
       await pg.waitForTimeout(500); await pg.mouse.up(); await pg.waitForTimeout(300);
-      assert.equal(await pg.locator('#nr .nr-op').count(), 7, 'aos 700 ms o menu abre'); assert.equal(await pg.isVisible('.nr-anel'), false);
+      assert.equal(await pg.locator('#nr .nr-op').count(), 8, 'aos 700 ms o menu abre'); assert.equal(await pg.isVisible('.nr-anel'), false);
       await pg.keyboard.press('Escape');
       // a duração é escolhida em Ajustes
       await aba(pg, 'aj');
@@ -2798,7 +2798,7 @@ const TESTES = {
       assert.deepEqual(e, { topo: false, gaveta: false, gps: true, sair: true }, JSON.stringify(e));
       const p = await centrarNaFaixa(pg, 0, 300, 1);
       await pg.mouse.move(p.x, p.y); await pg.mouse.down(); await pg.waitForTimeout(900); await pg.mouse.up(); await pg.waitForTimeout(350);
-      assert.equal(await pg.locator('#nr .nr-op').count(), 7, 'o menu abre na tela limpa');
+      assert.equal(await pg.locator('#nr .nr-op').count(), 8, 'o menu abre na tela limpa');
       await pg.keyboard.press('Escape'); await pg.waitForTimeout(150);
       await pg.click('#cLimpo'); await pg.waitForTimeout(350);
       assert.equal(await pg.isVisible('#topc'), true, 'sair da tela limpa');
@@ -2810,7 +2810,7 @@ const TESTES = {
       for (const [x, y] of pontos) {
         await pg.mouse.click(Math.round(x), Math.round(y), { button: 'right' }); await pg.waitForTimeout(300);
         const r = await pg.evaluate(() => { const b = [...document.querySelectorAll('#nr .nr-op')].map((e) => e.getBoundingClientRect()); return { n: b.length, fora: b.filter((q) => q.left < 0 || q.top < 0 || q.right > innerWidth || q.bottom > innerHeight).length, sob: b.some((q, i) => b.some((o, j) => j > i && q.left < o.right - 1 && q.right > o.left + 1 && q.top < o.bottom - 1 && q.bottom > o.top + 1)) }; });
-        assert.equal(r.n, 7, `menu em ${Math.round(x)},${Math.round(y)}`); assert.equal(r.fora, 0, `itens fora da tela em ${Math.round(x)},${Math.round(y)}`); assert.equal(r.sob, false, 'itens sobrepostos');
+        assert.equal(r.n, 8, `menu em ${Math.round(x)},${Math.round(y)}`); assert.equal(r.fora, 0, `itens fora da tela em ${Math.round(x)},${Math.round(y)}`); assert.equal(r.sob, false, 'itens sobrepostos');
         await pg.keyboard.press('Escape'); await pg.waitForTimeout(150);
       }
     }],
