@@ -5,7 +5,7 @@ import { deslocarLongitudinal, deslocZerado, type Desloc } from '../geometry/des
 import { fromUtm } from '../geometry/utm';
 import type { ParsedProject } from '../formats/types';
 import { carregarLido, lerPlanilha, recalcular } from '../mapa/cliente';
-import { aplicarGeometria, atualizarRotulosKm, baseOf, criarProjeto, E, H, novoId, type AppProj } from './estado';
+import { aplicarGeometria, atualizarRotulosKm, baseDoMapa, criarProjeto, E, H, novoId, type AppProj } from './estado';
 import { addProjectToMap, applyPaint, clearFocus, fitList, removeProjectFromMap, setProjectData, updateSelLayer, updateStakes } from './mapa';
 import * as db from './persist';
 import { renderAll } from './paineis';
@@ -67,7 +67,7 @@ export const esquecerProjeto = (nome: string) => db.apagar('projetos', nome);
 export async function regeometrar(p: AppProj, aviso = true) {
   try {
     if (aviso) toast('Recalculando a geometria...', 20000);
-    const r = await recalcular(p.id, baseOf(p), p.opts);
+    const r = await recalcular(p.id, baseDoMapa(p), p.opts);
     aplicarGeometria(p, r);
     if (E.focus) clearFocus();
     setProjectData(p);
@@ -131,10 +131,10 @@ async function finalizar(p: AppProj): Promise<void> {
   }
   const aj = E.ajustesSalvos[p.meta.name], ds = E.deslocSalvos[p.meta.name];
   if (ds && !deslocZerado(ds)) p.desloc = { ...ds };
-  if (aj?.length || !deslocZerado(p.desloc)) {
+  if (aj?.length || !deslocZerado(p.desloc) || E.suprimir.on) {
     p.ajustes = aj ?? [];
     atualizarLinhas(p);
-    const r = await recalcular(p.id, baseOf(p), p.opts);
+    const r = await recalcular(p.id, baseDoMapa(p), p.opts);
     aplicarGeometria(p, r);
   }
 }

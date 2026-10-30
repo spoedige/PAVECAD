@@ -14,7 +14,7 @@ import { selecionarPlanilhas } from './seletor';
 import { $, cssv, esc, fmt, syncSeg, toast, toastAcao } from './ui';
 import { Q5, Q5F } from '../dominio/indicadores';
 
-type Aba = 'sol' | 'larg' | 'lim' | 'dados' | 'campo';
+type Aba = 'sol' | 'lim' | 'dados' | 'campo';
 let aba: Aba = 'sol';
 let pidLarg: string | null = null;
 let kmPrevia: number | null = null;
@@ -51,7 +51,6 @@ function render() {
   const body = $('#cfgBody');
   body.innerHTML = '';
   if (aba === 'sol') renderSolucoes(body);
-  else if (aba === 'larg') renderLarguras(body);
   else if (aba === 'lim') renderLimiares(body);
   else if (aba === 'campo') { try { void renderCampo(body).catch((e) => mostrarFalha(body, e)); } catch (e) { mostrarFalha(body, e); } }
   else void renderDados(body);
@@ -168,14 +167,17 @@ function renderSolucoes(body: HTMLElement) {
 /* ---------------------------------------------------------------- */
 /* Larguras                                                          */
 /* ---------------------------------------------------------------- */
+/** Largura (px) do desenho da seção dentro do painel de Ajustes. */
+const LARGURA_PAINEL = 340;
 const nomeFaixa = (l: number) => (l ? `Fx ${l}` : 'Acostamento');
 const numStr = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-function previaSecao(p: AppProj, km: number): string {
+/** `W` é a largura do desenho: 640 na tela de Configurações; no painel de Ajustes, uma largura próxima da do painel, para o texto não encolher. */
+function previaSecao(p: AppProj, km: number, W = 640): string {
   let i = 0, bd = 1e9;
   p.kmNum.forEach((k, j) => { const d = Math.abs(k - km); if (d < bd) { bd = d; i = j; } });
   const plan = p.rowsPlanilha[i], ef = p.rows[i], md = p.model[i];
-  const W = 640, pad = 8, esc2 = (W - pad * 2) / Math.max(1, (plan.widths.reduce((a, b) => a + b, 0) + plan.shoulder), (ef.widths.reduce((a, b) => a + b, 0) + ef.shoulder));
+  const pad = 8, esc2 = (W - pad * 2) / Math.max(1, (plan.widths.reduce((a, b) => a + b, 0) + plan.shoulder), (ef.widths.reduce((a, b) => a + b, 0) + ef.shoulder));
   const none = cssv('--none');
   const barra = (r: typeof plan, y: number, rot: string, destaca: boolean) => {
     let x = pad, out = `<text class="mut" x="${pad}" y="${y - 5}">${rot}</text>`;
@@ -222,9 +224,10 @@ async function replicarAjustes(origem: AppProj, depois: () => void) {
   );
 }
 
-function renderLarguras(body: HTMLElement) {
+/** Largura das faixas. Vive em Ajustes (`fixo` = a planilha escolhida lá) e não tem mais aba em Configurações. */
+export function renderLarguras(body: HTMLElement, fixo: string | null = null) {
   if (!E.P.length) { body.innerHTML = '<div class="empty"><b>Nenhuma planilha aberta</b>Abra uma planilha no mapa para editar as larguras.</div>'; return; }
-  const p = getP(pidLarg ?? '') ?? getP(E.settingsPid ?? '') ?? E.P[0];
+  const p = getP(fixo ?? pidLarg ?? '') ?? getP(E.settingsPid ?? '') ?? E.P[0];
   pidLarg = p.id;
   const N = p.rowsPlanilha.reduce((m, r) => Math.max(m, r.widths.length), 0);
   const padrao = larguraPadrao(p.rowsPlanilha);
@@ -239,7 +242,7 @@ function renderLarguras(body: HTMLElement) {
     <div class="cfg-warn"><b>As quantidades da planilha original não mudam.</b><span class="note">Aba Quantidades e Orçamento seguem os valores do arquivo. Só o que o app calcula (mapa, áreas do Resumo e das propostas) usa as larguras ajustadas.</span></div>
     <div class="cfg-card">
       <div class="cfg-row">
-        <label>Planilha<select class="in" id="lgProj">${E.P.map((q) => `<option value="${q.id}">${esc(projName(q))}</option>`).join('')}</select></label>
+        ${fixo ? `<p class="note" style="margin:0">Planilha: <b>${esc(projName(p))}</b> (a primeira marcada acima)</p>` : `<label>Planilha<select class="in" id="lgProj">${E.P.map((q) => `<option value="${q.id}">${esc(projName(q))}</option>`).join('')}</select></label>`}
         <label>Coordenada está na<select class="in" id="lgOrg"><option value="edge">Borda da Fx 1 (0 m)</option><option value="axis">Eixo da Fx 1</option></select></label>
       </div>
       <div class="chips">${padrao.map((q) => `<span class="chip">${nomeFaixa(q.lane)} · ${numStr(q.largura)} m na planilha</span>`).join('')}</div>
@@ -265,23 +268,23 @@ function renderLarguras(body: HTMLElement) {
     </div>
     <div class="cfg-card"><div class="sect" style="margin:0">Pré-visualização da seção</div>
       <div class="cfg-row"><label>Km<input class="in" type="text" id="lgPv" value="${kmFmt(kmPrevia)}" style="width:120px"></label></div>
-      <div id="lgSvg">${previaSecao(p, kmPrevia)}</div></div>`;
+      <div id="lgSvg">${previaSecao(p, kmPrevia, fixo ? LARGURA_PAINEL : 640)}</div></div>`;
 
-  $<HTMLSelectElement>('#lgProj').value = p.id;
+  if (!fixo) $<HTMLSelectElement>('#lgProj').value = p.id;
   $<HTMLSelectElement>('#lgOrg').value = p.opts.origin;
-  $('#lgProj').onchange = (e) => { pidLarg = (e.target as HTMLSelectElement).value; kmPrevia = null; renderLarguras(body); };
-  $('#lgOrg').onchange = (e) => { p.opts.origin = (e.target as HTMLSelectElement).value as 'edge' | 'axis'; void regeometrar(p).then(() => renderLarguras(body)); };
+  if (!fixo) $('#lgProj').onchange = (e) => { pidLarg = (e.target as HTMLSelectElement).value; kmPrevia = null; renderLarguras(body); };
+  $('#lgOrg').onchange = (e) => { p.opts.origin = (e.target as HTMLSelectElement).value as 'edge' | 'axis'; void regeometrar(p).then(() => renderLarguras(body, fixo)); };
   $('#lgPv').onchange = (e) => {
     const k = parseKmTexto((e.target as HTMLInputElement).value);
     if (k === null) { toast('Use o formato 59+740 ou 59,74'); return; }
     kmPrevia = kmReal(k);
-    $('#lgSvg').innerHTML = previaSecao(p, k);
+    $('#lgSvg').innerHTML = previaSecao(p, k, fixo ? LARGURA_PAINEL : 640);
   };
   body.querySelectorAll<HTMLElement>('[data-del]').forEach((b) => (b.onclick = async () => {
     await aplicarAjustes(p, p.ajustes.filter((a) => a.id !== b.dataset.del));
-    renderLarguras(body);
+    renderLarguras(body, fixo);
   }));
-  $('#lgOutras').onclick = () => void replicarAjustes(p, () => renderLarguras(body));
+  $('#lgOutras').onclick = () => void replicarAjustes(p, () => renderLarguras(body, fixo));
   $('#lgAdd').onclick = async () => {
     const err = $('#lgErr'), t0 = $<HTMLInputElement>('#lgK0').value.trim(), t1 = $<HTMLInputElement>('#lgK1').value.trim();
     const r0 = t0 ? parseKmTexto(t0) : null, r1 = t1 ? parseKmTexto(t1) : null, km0 = r0 === null ? null : kmReal(r0), km1 = r1 === null ? null : kmReal(r1);
@@ -292,7 +295,7 @@ function renderLarguras(body: HTMLElement) {
     err.textContent = msg ?? '';
     if (msg) return;
     await aplicarAjustes(p, [...p.ajustes, novo]);
-    renderLarguras(body);
+    renderLarguras(body, fixo);
   };
 }
 

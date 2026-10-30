@@ -11,6 +11,7 @@ import { CHAVE_PRESSAO, PRESSAO_OPCOES, confirmarAntes, definirConfirmarAntes, p
 import { ROTULO_CAMADA, atualizarChipCamada, guardarCamada } from './camadas';
 import { renderExp } from './exportar';
 import { aoSairDeAlinhar, renderAlinhar } from './alinhar';
+import { renderLarguras } from './config';
 import { contadorSelecao, htmlSelecao, itemDe, ligarSelecao } from './selecaoPlanilhas';
 import { IC } from './icones';
 import { applyLayers, applyPaint, clearFocus, clearSel, fitAll, fitFocus, fitList, getMap, renderLegend, select, setBase, setFocus, setProjectData, stepSel, updateSelLayer, updateStakes, applyVisibility, temMapTiler } from './mapa';
@@ -377,6 +378,7 @@ export function renderAj() {
     ${sel}
     ${opts}
     <div id="alSecWrap"><div class="sect" id="alSect">Alinhar planilhas</div><div id="t-al"></div></div>
+    <div id="lgSecWrap"><div class="sect" id="lgSect">Largura das faixas</div><div id="t-lg" class="lgpainel"></div></div>
     <div><div class="sect">Mapa</div><div class="list"><div class="field"><label for="a-base">Base</label><select id="a-base"><option value="none">Sem base</option><option value="osm">Ruas</option><option value="esri">Satélite</option></select></div></div>
       <p class="note" style="margin-top:7px">${temMapTiler() ? 'Base MapTiler ativa.' : 'Base reserva (CARTO Voyager e Esri). Para o MapTiler, defina VITE_MAPTILER_KEY no ambiente de build.'}</p></div>
     <details><summary>Como o cálculo é feito</summary><div class="formula">θ = atan2(ΔE, ΔN)   entre i−w e i+w, em metros UTM
@@ -386,6 +388,7 @@ P(n) = P + e(n) · (nE , nN)</div>
       <p class="note" style="margin-top:8px">O sentido decrescente usa o mesmo cálculo com a normal invertida, porque as linhas da planilha seguem a quilometragem crescente.</p></details>`;
   ligarSelecao(el, { itens: lista, marcadas: E.settingsSel, origem: p ? itemDe(p) : undefined, aoMudar: () => renderAj() });
   renderAlinhar();
+  renderLarguras($('#t-lg'), p ? p.id : null);
   const diag = document.createElement('div');
   diag.id = 'diagBox';
   el.appendChild(diag);
@@ -435,7 +438,8 @@ P(n) = P + e(n) · (nE , nN)</div>
     $('#s-supun').setAttribute('aria-checked', String(E.suprimir.unir));
     el.querySelectorAll<HTMLElement>('#s-supkm button').forEach((x) => x.setAttribute('aria-pressed', String(Number(x.dataset.km) === E.suprimir.minKm)));
     syncSeg($('#s-supkm'));
-    if (E.mapReady) for (const q of E.P) setProjectData(q);
+    // as faixas suprimidas perdem a largura na geometria do mapa: as que sobram se encostam
+    void Promise.all(E.P.map((q) => regeometrar(q, false))).then(() => { renderAll(); toast('Mapa atualizado'); });
   };
   $('#s-sup').onclick = () => aplicarSup({ on: !E.suprimir.on });
   $('#s-supun').onclick = () => aplicarSup({ unir: !E.suprimir.unir });

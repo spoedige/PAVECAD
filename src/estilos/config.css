@@ -36,7 +36,7 @@
 .leg5 span{display:inline-flex;align-items:center;gap:5px}
 .leg5 i{width:10px;height:10px;border-radius:50%;display:inline-block}
 .xsvg{width:100%;height:auto;display:block}
-.xsvg text{font:500 11px var(--sans);fill:var(--fg)}
+.xsvg text{font:500 var(--fs-meta) var(--sans);fill:var(--fg)}
 .xsvg .mut{fill:var(--muted)}
 .cfg .tabs-lg{display:inline-flex}
 .cfg .seg button{padding:6px 14px}
@@ -77,3 +77,13 @@
 .cp-barra{height:10px;border-radius:999px;background:var(--fill);overflow:hidden}
 .cp-barra>div{height:100%;width:0;background:var(--accent);transition:width .15s linear}
 .cp-barra[hidden]{display:none}
+
+/* Largura das faixas dentro de Ajustes: o mesmo visual dos campos de Configurações, sem depender do .cfg */
+.lgpainel{display:flex;flex-direction:column;gap:12px}
+.lgpainel input[type=text].in,.lgpainel input[type=number].in,.lgpainel select.in{width:100%;min-width:90px;border:0;border-radius:8px;background:var(--fill);color:var(--fg);padding:6px 8px;min-height:var(--tap);outline:none;box-sizing:border-box}
+.lgpainel .in:focus{box-shadow:inset 0 0 0 2px var(--accent)}
+.lgpainel .cfg-row label{flex:1 1 120px}
+.lgpainel .cfg-row .in{width:100% !important}
+.lgpainel .ctable thead{display:none}
+.lgpainel .ctable tr{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:8px;border-top:var(--bw) solid var(--hair)}
+.lgpainel .ctable td{border:0;padding:2px}

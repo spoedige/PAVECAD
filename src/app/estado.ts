@@ -4,7 +4,7 @@ import type { Feature } from 'geojson';
 import type { GeoOptions } from '../geometry/build';
 import type { Project } from '../geometry/project';
 import type { Camadas } from '../mapa/camadas';
-import { SUPRESSAO_PADRAO, type OpcoesSupressao } from '../dominio/supressao';
+import { SUPRESSAO_PADRAO, linhasCompactadas, trechosSuprimidos, type OpcoesSupressao } from '../dominio/supressao';
 import type { Normais } from '../mapa/worker';
 import type { RowModel } from '../dominio/modelo';
 import type { IndKey, ModeKey } from '../dominio/indicadores';
@@ -193,6 +193,17 @@ export function criarProjeto(
 export function baseOf(p: AppProj): Project {
   const { meta, rows, log, codes, segs, segOf, crs, x, y, kmNum, kmLab } = p;
   return { meta, rows, log, codes, segs, segOf, crs, x, y, kmNum, kmLab };
+}
+
+/** (linha, faixa) suprimidos pelo ajuste "Suprimir trechos longos sem intervenção"; vazio quando desligado. */
+export function suprimidosDe(p: AppProj): Set<number> {
+  return E.suprimir.on ? trechosSuprimidos(p.model, p.rows.map((r) => r.hod), p.rows.map((r) => r.shoulder > 0), E.suprimir) : new Set();
+}
+
+/** O que vai ao worker para o MAPA: com a supressão ligada, as faixas suprimidas ficam sem largura e as demais se encostam. As exportações usam baseOf. */
+export function baseDoMapa(p: AppProj): Project {
+  const b = baseOf(p);
+  return E.suprimir.on ? { ...b, rows: linhasCompactadas(b.rows, suprimidosDe(p)) } : b;
 }
 
 /** Polígonos que falharam na validação ficam no log da planilha (um só registro, refeito a cada geometria). */

@@ -118,7 +118,7 @@ const TESTES = {
       assert.ok(m.painelGap >= 8, 'não cobre o painel direito: ' + m.painelGap);
       assert.equal(m.zoomX, m.maisX, 'o ⋯ alinha com o zoom');
       assert.ok(m.borda <= 20, 'barra lateral encostada na borda esquerda: ' + m.borda);
-      assert.equal(m.topo.filter((x) => !['btnAjuda', 'btnCfg', 'btnFile', 'btnGps', 'btnField', 'btnAlinhar', 'btnProjetos', 'prop', 'btnNotas', 'ocultar-ferramentas'].includes(x)).length, 0, 'topo com botão extra: ' + m.topo);
+      assert.equal(m.topo.filter((x) => !['btnAjuda', 'btnCfg', 'btnFile', 'btnGps', 'btnField', 'btnAlinhar', 'btnAbrirAjustes', 'btnProjetos', 'prop', 'btnNotas', 'ocultar-ferramentas'].includes(x)).length, 0, 'topo com botão extra: ' + m.topo);
       assert.equal(m.baseNoTopo, false, 'a escolha de base saiu do topo');
     }],
     ['gaveta ⋯ abre girar, norte e base; estado salvo; Satélite troca a base', TODOS, async (pg) => {
@@ -722,8 +722,8 @@ const TESTES = {
   ],
   t11: [
     ['larguras: "Aplicar a outras planilhas…" lista as outras com nome, rodovia e sentido, atalhos marcam o conjunto certo e só as marcadas mudam', '1366x768', async (pg) => {
-      await pg.click('#btnCfg'); await pg.click('#cfgTabs [data-ct=larg]'); await pg.waitForSelector('#lgProj');
-      const info = await pg.evaluate(() => { const E = window.__pavecad.E, pid = document.querySelector('#lgProj').value; return { pid, todas: E.P.map((p) => ({ id: p.id, travel: p.meta.travel, uf: p.meta.uf })) }; });
+      await aba(pg, 'aj'); await pg.waitForSelector('#lgAdd');
+      const info = await pg.evaluate(() => { const E = window.__pavecad.E, pid = document.querySelector('#a-lista input:checked').dataset.id; return { pid, todas: E.P.map((p) => ({ id: p.id, travel: p.meta.travel, uf: p.meta.uf })) }; });
       assert.ok(info.todas.length >= 4, 'esperava 4 planilhas, vieram ' + info.todas.length);
       assert.equal(await pg.isDisabled('#lgOutras'), true, 'sem ajustes, não há o que copiar');
       await pg.fill('#lgW', '3.2'); await pg.click('#lgAdd'); await pg.waitForFunction((pid) => window.__pavecad.E.P.find((p) => p.id === pid).ajustes.length === 1, info.pid);
@@ -760,11 +760,11 @@ const TESTES = {
       assert.equal(await pg.evaluate((pid) => window.__pavecad.E.P.find((p) => p.id === pid).ajustes.length, info.pid), 1, 'a origem continua com o ajuste');
     }, { exemplos: true }],
     ['larguras: faixas que o destino não tem são ignoradas e o aviso diz quais', '1366x768', async (pg) => {
-      await pg.click('#btnCfg'); await pg.click('#cfgTabs [data-ct=larg]'); await pg.waitForSelector('#lgProj');
-      const pid = await pg.inputValue('#lgProj');
+      await aba(pg, 'aj'); await pg.waitForSelector('#lgAdd');
+      const pid = await pg.evaluate(() => document.querySelector('#a-lista input:checked').dataset.id);
       // acrescenta um ajuste na Fx 6, que nenhuma planilha de exemplo possui
       await pg.evaluate(async (pid) => { const E = window.__pavecad.E, p = E.P.find((q) => q.id === pid); p.ajustes = [{ id: 'z1', pname: p.meta.name, lane: 1, km0: null, km1: null, largura: 3.3 }, { id: 'z2', pname: p.meta.name, lane: 6, km0: null, km1: null, largura: 3.1 }]; }, pid);
-      await pg.click('#cfgTabs [data-ct=dados]'); await pg.click('#cfgTabs [data-ct=larg]'); await pg.waitForSelector('#lgOutras:not([disabled])');
+      await pg.click('#t-aj [data-atalho=nenhuma]'); await pg.check(`#a-lista input[data-id="${pid}"]`); await pg.waitForSelector('#lgOutras:not([disabled])');
       await pg.click('#lgOutras'); await pg.waitForSelector('#seletor');
       const alvo = (await pg.locator('#seletor input[data-id]').first().getAttribute('data-id'));
       await pg.check(`#seletor input[data-id="${alvo}"]`);
@@ -1040,12 +1040,11 @@ const TESTES = {
     ['lixeira: remover mostra aviso com Desfazer; desfazer devolve a planilha na mesma posição, com ajustes de largura e propostas', '1366x768', async (pg) => {
       await criarProposta(pg, 'FSE', 'trecho de teste');
       const info = await pg.evaluate(() => { const E = window.__pavecad.E; const r = E.props[0]; return { pname: r.pname, n: E.P.length, nomes: E.P.map((p) => p.meta.name), idx: E.P.findIndex((p) => p.meta.name === r.pname), pid: E.P.find((p) => p.meta.name === r.pname).id }; });
-      // ajuste de largura na planilha da proposta, pela tela de Configurações
-      await pg.click('#btnCfg'); await pg.click('#cfgTabs [data-ct=larg]'); await pg.waitForSelector('#lgProj');
-      await pg.selectOption('#lgProj', info.pid);
+      // ajuste de largura na planilha da proposta, em Ajustes
+      await aba(pg, 'aj'); await pg.waitForSelector('#a-lista');
+      await pg.click('#t-aj [data-atalho=nenhuma]'); await pg.check(`#a-lista input[data-id="${info.pid}"]`); await pg.waitForSelector('#lgAdd');
       await pg.fill('#lgW', '3.2'); await pg.click('#lgAdd');
       await pg.waitForFunction((pid) => window.__pavecad.E.P.find((p) => p.id === pid).ajustes.length === 1, info.pid, { timeout: 20000 });
-      await pg.click('#cfgClose');
       await abrirProjetos(pg);
       // remove
       await pg.click(`#dash [data-del="${info.pid}"]`); await fecharProjetos(pg);
@@ -1732,7 +1731,7 @@ const TESTES = {
       assert.ok(Math.abs(c1[0] - c0[0]) + Math.abs(c1[1] - c0[1]) > 1e-6, 'o mapa foi arrastado');
       // movimento de 5 px (abaixo de 8) não cancela
       const p2 = await centrarNaFaixa(pg, 0, 300, 1);
-      await pg.mouse.move(p2.x, p2.y); await pg.mouse.down(); await pg.mouse.move(p2.x + 5, p2.y, { steps: 2 }); await pg.waitForTimeout(700); await pg.mouse.up(); await pg.waitForTimeout(300);
+      await pg.mouse.move(p2.x, p2.y); await pg.mouse.down(); await pg.mouse.move(p2.x + 5, p2.y, { steps: 2 }); await pg.waitForSelector('#nr .nr-op', { timeout: 6000 }).catch(() => {}); await pg.waitForTimeout(150); await pg.mouse.up(); await pg.waitForTimeout(300); // segura até o menu abrir: no CI, com o mapa ocupado, o relógio de 500 ms pode atrasar
       assert.equal(await pg.locator('#nr .nr-op').count(), 8, 'tremida de 5 px ainda vale como pressão');
       await pg.keyboard.press('Escape'); await pg.waitForTimeout(200);
       assert.equal(await pg.locator('#nr .nr-op').count(), 0, 'Esc fecha');
@@ -2219,7 +2218,7 @@ const TESTES = {
       });
       assert.ok(r.ocultar.length >= 5 && r.ocultar.every((x) => x.ok), 'todos os botões de ocultar usam o mesmo "–": ' + JSON.stringify(r.ocultar));
       assert.equal(r.eyeoff, 0, 'o olho riscado não é mais ícone de ocultar painel');
-      assert.ok(r.tb.every((b) => b.t), 'tooltip em todos'); assert.deepEqual(r.tb.filter((b) => b.rot).map((b) => b.rot), ['Posição', 'Propor', 'Campo', 'Projetos', 'Notas'], 'rótulo curto visível');
+      assert.ok(r.tb.every((b) => b.t), 'tooltip em todos'); assert.deepEqual(r.tb.filter((b) => b.rot).map((b) => b.rot), ['Posição', 'Propor', 'Campo', 'Projetos', 'Notas', 'Ajustes'], 'rótulo curto visível');
     }],
     ['botão Abrir planilhas: contorno quando há planilhas; azul sólido só na tela vazia', ['1366x768'], async (pg) => {
       const f = await pg.evaluate(() => { const cs = getComputedStyle(document.querySelector('#btnFile')); return { bg: cs.backgroundColor, bd: cs.borderTopWidth, cor: cs.color }; });
@@ -3405,24 +3404,81 @@ const TESTES = {
       const urls = await pg.evaluate(() => window.__pavecad.map().getStyle().sources.osm.tiles);
       assert.ok(urls.every((u) => /basemaps\.cartocdn\.com/.test(u) && !/openstreetmap/.test(u)), urls.join());
     }],
-    ['Suprimir trechos longos sem intervenção: tira do mapa só o que passa do limite, e Unir faixas exige as faixas livres juntas', ['1366x768'], async (pg) => {
-      // 100 linhas (2 km) sem intervenção em todas as faixas, mas o acostamento volta a ter solução nas últimas 60 (só 0,8 km livre nele)
+    ['Suprimir trechos longos sem intervenção: some só o que passa do limite, as faixas que sobram se encostam (sem vácuo) e Unir faixas exige as faixas livres juntas', ['1366x768'], async (pg) => {
+      // 100 linhas (2 km) sem intervenção nas faixas; o acostamento só está livre nas 40 primeiras (0,8 km) e volta a ter solução nas outras 60
       await pg.evaluate(() => {
         const E = window.__pavecad.E, p = E.P[0];
         p.model.forEach((md, k) => { md.tr.forEach((t) => { t.main = k < 100 ? '-' : 'X'; }); md.sh.main = k < 40 ? '-' : 'X'; });
       });
-      const n = () => pg.evaluate(() => { const E = window.__pavecad.E, m = window.__pavecad.map(); return m.getSource('poly-' + E.P[0].id)._data.features.length; });
-      const n0 = await n();
-      await aba(pg, 'aj'); await pg.waitForTimeout(300);
-      await pg.click('#s-sup'); await pg.waitForTimeout(500);
-      const n1 = await n();
-      assert.ok(n1 < n0, `suprimiu faixas livres: ${n0} -> ${n1}`);
-      await pg.click('#s-supun'); await pg.waitForTimeout(500);
-      assert.equal(await n(), n0, 'unindo, o acostamento com intervenção segura o trecho: nada some');
-      await pg.click('#s-supun'); await pg.click('#s-supkm button[data-km="5"]'); await pg.waitForTimeout(500);
-      assert.equal(await n(), n0, 'limite de 5 km: 2 km livres ficam');
-      await pg.click('#s-supkm button[data-km="1"]'); await pg.click('#s-sup'); await pg.waitForTimeout(500);
-      assert.equal(await n(), n0, 'desligado, tudo volta');
+      const info = () => pg.evaluate(() => {
+        const E = window.__pavecad.E, p = E.P[0], m = window.__pavecad.map();
+        const n = m.getSource('poly-' + p.id)._data.features.length;
+        const dist = (row) => { const f = p.polyByFid.get(row * 8 + 7); if (!f) return null; const c = f.geometry.coordinates[0][0], r = p.rows[row]; return Math.hypot((c[0] - r.lon) * 111320 * Math.cos((r.lat * Math.PI) / 180), (c[1] - r.lat) * 111132); };
+        return { n, acost60: dist(60), acost150: dist(150) };
+      });
+      const i0 = await info();
+      assert.ok(i0.acost60 > 3, 'antes, o acostamento está depois das faixas: ' + i0.acost60);
+      await aba(pg, 'aj'); await pg.waitForSelector('#s-sup');
+      await pg.click('#s-sup');
+      await pg.waitForFunction(() => { const E = window.__pavecad.E; return window.__pavecad.map().getSource('poly-' + E.P[0].id)._data.features.length > 0 && document.querySelector('#toast.on')?.textContent.includes('Mapa atualizado'); }, null, { timeout: 60000 });
+      const i1 = await info();
+      assert.ok(i1.n < i0.n, `suprimiu faixas livres: ${i0.n} -> ${i1.n}`);
+      assert.ok(i1.acost60 < 1, 'sem as faixas livres, o acostamento encosta no eixo (sem vácuo): ' + i1.acost60);
+      assert.ok(i1.acost150 > 3, 'fora do trecho suprimido nada muda: ' + i1.acost150);
+      await pg.click('#s-supun');
+      await pg.waitForFunction((n) => window.__pavecad.map().getSource('poly-' + window.__pavecad.E.P[0].id)._data.features.length === n, i0.n, { timeout: 60000 });
+      assert.ok((await info()).acost60 > 3, 'unindo, o acostamento com intervenção segura o trecho: nada some nem se move');
+      await pg.click('#s-supun'); await pg.click('#s-supkm button[data-km="5"]');
+      await pg.waitForFunction((n) => window.__pavecad.map().getSource('poly-' + window.__pavecad.E.P[0].id)._data.features.length === n, i0.n, { timeout: 60000 });
+      await pg.click('#s-supkm button[data-km="1"]'); await pg.click('#s-sup');
+      await pg.waitForFunction((n) => window.__pavecad.map().getSource('poly-' + window.__pavecad.E.P[0].id)._data.features.length === n, i0.n, { timeout: 60000 });
+      assert.ok((await info()).acost60 > 3, 'desligado, tudo volta');
+    }],
+  ],
+  // Ajustes: sempre acessível (botão na barra, Alinhar reabre o painel oculto) e com a Largura das faixas.
+  t31: [
+    ['painel oculto pelo "−": "Alinhar: abrir Ajustes" e o botão Ajustes da barra trazem o painel de volta, já em Ajustes', ['1366x768'], async (pg) => {
+      await pg.click('[data-ocultar=painel]'); await pg.waitForTimeout(300);
+      assert.equal(await pg.isVisible('#inspector'), false, 'painel oculto');
+      await abrirProjetos(pg);
+      await pg.click('[data-alinhar-p]'); await pg.waitForTimeout(500);
+      assert.equal(await pg.isVisible('#inspector'), true, 'o Alinhar reabre o painel');
+      assert.equal(await estado(pg, 'E => E.tab'), 'aj');
+      assert.equal(await pg.isVisible('#alSect'), true);
+      await pg.click('[data-ocultar=painel]'); await pg.waitForTimeout(300);
+      assert.equal(await pg.isVisible('#inspector'), false);
+      await pg.click('#btnAbrirAjustes'); await pg.waitForTimeout(500);
+      assert.equal(await pg.isVisible('#inspector'), true, 'o botão Ajustes reabre o painel');
+      assert.equal(await estado(pg, 'E => E.tab'), 'aj');
+      assert.equal(await pg.isVisible('#lgSect'), true, 'a Largura das faixas está em Ajustes');
+    }],
+    ['mapa limpo: o botão Ajustes sai do modo limpo e abre o painel em Ajustes', ['1366x768'], async (pg) => {
+      await pg.click('#btnLimpo'); await pg.waitForTimeout(300);
+      await pg.evaluate(() => document.querySelector('#btnAbrirAjustes').click()); await pg.waitForTimeout(500);
+      assert.equal(await pg.evaluate(() => document.documentElement.classList.contains('limpo')), false);
+      assert.equal(await pg.isVisible('#inspector'), true);
+      assert.equal(await estado(pg, 'E => E.tab'), 'aj');
+    }],
+    ['Largura das faixas em Ajustes: adiciona e remove o ajuste da planilha marcada; Configurações não tem mais a aba Larguras', ['1366x768'], async (pg) => {
+      await pg.click('#btnCfg'); await pg.waitForSelector('#cfgTabs');
+      assert.equal(await pg.locator('#cfgTabs [data-ct=larg]').count(), 0, 'sem a aba Larguras');
+      await pg.click('#cfgClose');
+      await aba(pg, 'aj'); await pg.waitForSelector('#lgAdd');
+      const pid = await pg.evaluate(() => document.querySelector('#a-lista input:checked').dataset.id);
+      await pg.fill('#lgW', '3.2'); await pg.click('#lgAdd');
+      await pg.waitForFunction((id) => window.__pavecad.E.P.find((p) => p.id === id).ajustes.length === 1, pid, { timeout: 20000 });
+      await pg.waitForSelector('#t-lg [data-del]', { timeout: 10000 });
+      assert.equal(await pg.locator('#t-lg [data-del]').count(), 1, 'o ajuste aparece na tabela');
+      await pg.click('#t-lg [data-del]');
+      await pg.waitForFunction((id) => window.__pavecad.E.P.find((p) => p.id === id).ajustes.length === 0, pid, { timeout: 20000 });
+    }],
+    ['celular: Alinhar abre Ajustes e a Largura das faixas cabe na gaveta sem rolagem lateral', ['cel-360x640'], async (pg) => {
+      await pg.evaluate(() => document.querySelector('#btnProjetos').click()); await pg.waitForTimeout(500);
+      await pg.evaluate(() => document.querySelector('[data-alinhar-p]').click()); await pg.waitForTimeout(700);
+      assert.equal(await estado(pg, 'E => E.tab'), 'aj');
+      await pg.evaluate(() => document.getElementById('lgSect').scrollIntoView()); await pg.waitForTimeout(300);
+      const m = await pg.evaluate(() => { const t = document.querySelector('#t-aj'), l = document.querySelector('#t-lg'); const r = l.getBoundingClientRect(); return { sobra: t.scrollWidth - t.clientWidth, w: Math.round(r.width), vw: innerWidth, dentro: r.right <= innerWidth + 1 }; });
+      assert.ok(m.sobra <= 1 && m.dentro, 'sem rolagem lateral: ' + JSON.stringify(m));
     }],
   ],
 };

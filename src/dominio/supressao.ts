@@ -1,4 +1,5 @@
 /** Supressão de longos trechos sem intervenção no mapa. Funções puras, sem DOM. */
+import type { Row } from '../formats/types';
 import type { RowModel } from './modelo';
 
 export interface OpcoesSupressao {
@@ -48,4 +49,15 @@ export function trechosSuprimidos(modelo: RowModel[], hod: number[], temAcost: b
     }
   }
   return out;
+}
+
+/** Linhas para desenhar o mapa com as faixas suprimidas sem largura: as que sobram ficam encostadas, sem o vácuo das suprimidas.
+ *  Só copia as linhas que mudam; a planilha e as áreas continuam com as larguras reais. */
+export function linhasCompactadas(rows: Row[], sup: Set<number>): Row[] {
+  if (!sup.size) return rows;
+  return rows.map((r, i) => {
+    const widths = r.widths.map((w, k) => (sup.has(chaveSup(i, k + 1)) ? 0 : w));
+    const shoulder = sup.has(chaveSup(i, 0)) ? 0 : r.shoulder;
+    return widths.some((w, k) => w !== r.widths[k]) || shoulder !== r.shoulder ? { ...r, widths, shoulder } : r;
+  });
 }

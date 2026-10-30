@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chaveSup, trechosSuprimidos } from '../src/dominio/supressao';
+import { chaveSup, linhasCompactadas, trechosSuprimidos } from '../src/dominio/supressao';
 import type { RowModel } from '../src/dominio/modelo';
 
 const sc = (main: string) => ({ main } as RowModel['sh']);
@@ -45,5 +45,13 @@ describe('supressão de trechos longos sem intervenção', () => {
     const f1 = livres(80), { modelo, temAcost } = monta(f1, f1);
     const hod = f1.map((_, i) => i * 0.02 + (i >= 40 ? 5 : 0));
     expect(trechosSuprimidos(modelo, hod, temAcost, { minKm: 1, unir: false }).size).toBe(0);
+  });
+  it('linhas compactadas: a faixa suprimida fica sem largura e as outras mantêm a sua', () => {
+    const rows = [{ widths: [3.6, 3.6], shoulder: 2.5 }, { widths: [3.6, 3.6], shoulder: 2.5 }] as never[];
+    const r = linhasCompactadas(rows, new Set([chaveSup(0, 1), chaveSup(0, 0)])) as { widths: number[]; shoulder: number }[];
+    expect(r[0].widths).toEqual([0, 3.6]);
+    expect(r[0].shoulder).toBe(0);
+    expect(r[1]).toBe(rows[1]); // linha sem mudança não é copiada
+    expect(linhasCompactadas(rows, new Set())).toBe(rows);
   });
 });

@@ -20,7 +20,7 @@ import { abrirConfig, atualizarAviso, configAberta, initConfig } from './app/con
 import { focarAjustes, modosVisiveis, renderAll, renderSeg, setField, setMode, setTab, syncBaseSeg } from './app/paineis';
 import { blocosDoUnifilar, drawUni, lacunasDoUnifilar, planilhasDoUnifilar, initUnifilar } from './app/unifilar';
 import { ehCelular, ehCompacto, initLayout, setPainel } from './app/layout';
-import { abrirAlinhar } from './app/alinhar';
+import { abrirAjustes, abrirAlinhar } from './app/alinhar';
 import { alternarLimpo, initGrupos } from './app/grupos';
 import { initPinoNotas, verNotas } from './app/pinoNotas';
 import { alternarDash, fecharDash, initDash } from './app/dashboard';
@@ -59,6 +59,7 @@ if (import.meta.env.DEV) {
   $('#btnExample').remove(); // só existe em desenvolvimento
 }
 document.querySelectorAll<HTMLButtonElement>('#tabs button').forEach((b) => b.addEventListener('click', () => setTab(b.dataset.t as typeof E.tab)));
+$('#btnAbrirAjustes').addEventListener('click', () => abrirAjustes());
 document.querySelectorAll<HTMLButtonElement>('#base button').forEach((b) =>
   b.addEventListener('click', () => { setBase(b.dataset.b as typeof E.base); syncBaseSeg(); renderAll(); }));
 document.querySelectorAll<HTMLButtonElement>('#nitidez button').forEach((b) => b.addEventListener('click', () => setNitidez(b.dataset.n as 'maxima' | 'segura')));

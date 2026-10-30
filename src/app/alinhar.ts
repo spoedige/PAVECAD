@@ -3,6 +3,7 @@ import { E, getP, type AppProj } from './estado';
 import { aplicarDesloc, salvarDesloc } from './projetos';
 import { alvosAjuste, setTab } from './paineis';
 import { ehCelular, setPainel } from './layout';
+import { setLimpo, setOculto } from './grupos';
 import { setGavetaCel } from './layout';
 import { projName } from './estado';
 import { $, toast, toastAcao } from './ui';
@@ -38,11 +39,17 @@ async function pedir(p: AppProj, d: Desloc, salvar = false) {
 const esperarFila = async () => { while (ocupado || fila.size) await new Promise((r) => setTimeout(r, 30)); };
 
 /** O Alinhar vive em Ajustes, numa seção própria: este atalho abre Ajustes (com a gaveta cheia no celular) e leva a vista até a seção. */
-export function abrirAlinhar() {
+export function abrirAlinhar() { abrirAjustes('alSect'); }
+
+/** Abre o painel em Ajustes, de qualquer estado: painel oculto pelo "−", mapa limpo, painel recolhido ou gaveta fechada no celular.
+ *  `secao` é o id de uma seção para onde rolar. */
+export function abrirAjustes(secao?: string) {
+  setOculto('painel', false);
+  setLimpo(false);
   setPainel(false, false); // expande o painel (no celular, abre a gaveta)
   if (ehCelular()) setGavetaCel('cheia');
   setTab('aj');
-  requestAnimationFrame(() => document.getElementById('alSect')?.scrollIntoView({ block: 'start' }));
+  if (secao) requestAnimationFrame(() => document.getElementById(secao)?.scrollIntoView({ block: 'start' }));
 }
 
 /** Chamado por setTab ao sair de Ajustes: o que não foi aplicado volta ao valor gravado. */
