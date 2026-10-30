@@ -4,6 +4,7 @@ import type { Feature } from 'geojson';
 import type { GeoOptions } from '../geometry/build';
 import type { Project } from '../geometry/project';
 import type { Camadas } from '../mapa/camadas';
+import { SUPRESSAO_PADRAO, type OpcoesSupressao } from '../dominio/supressao';
 import type { Normais } from '../mapa/worker';
 import type { RowModel } from '../dominio/modelo';
 import type { IndKey, ModeKey } from '../dominio/indicadores';
@@ -73,7 +74,9 @@ export const E = {
   sel: null as Sel | null,
   dim: new Set<string>(),
   field: false,
-  base: 'none' as BaseKey,
+  base: 'esri' as BaseKey,
+  /** Suprime no mapa os trechos longos sem intervenção. */
+  suprimir: { on: false, ...SUPRESSAO_PADRAO } as { on: boolean } & OpcoesSupressao,
   activeGroup: null as string | null,
   layers: { drain: true, km: true, poi: true, notes: true } as Record<'drain' | 'km' | 'poi' | 'notes', boolean>,
   mapReady: false,

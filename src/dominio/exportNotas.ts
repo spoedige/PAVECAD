@@ -201,7 +201,7 @@ export function csvDeLinhas(linhas: Linha[], eol = '\r\n'): string {
   return '﻿' + rows.join(eol);
 }
 
-/** "notas_PAVECAD_2026-10-19_1530.xlsx" (ou .csv), com a data e a hora locais. */
+/** "notas_PAVTRACK_2026-10-19_1530.xlsx" (ou .csv), com a data e a hora locais. */
 export function nomeArquivoNotas(ext: 'xlsx' | 'csv', d: Date = new Date()): string {
-  return `notas_PAVECAD_${d.getFullYear()}-${z2(d.getMonth() + 1)}-${z2(d.getDate())}_${z2(d.getHours())}${z2(d.getMinutes())}.${ext}`;
+  return `notas_PAVTRACK_${d.getFullYear()}-${z2(d.getMonth() + 1)}-${z2(d.getDate())}_${z2(d.getHours())}${z2(d.getMinutes())}.${ext}`;
 }

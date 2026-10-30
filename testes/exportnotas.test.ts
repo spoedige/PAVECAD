@@ -82,10 +82,10 @@ describe('CSV', () => {
 });
 
 describe('nome do arquivo', () => {
-  it('notas_PAVECAD_AAAA-MM-DD_HHmm', () => {
+  it('notas_PAVTRACK_AAAA-MM-DD_HHmm', () => {
     const d = new Date(2026, 9, 9, 7, 5);
-    expect(nomeArquivoNotas('xlsx', d)).toBe('notas_PAVECAD_2026-10-09_0705.xlsx');
-    expect(nomeArquivoNotas('csv', d)).toBe('notas_PAVECAD_2026-10-09_0705.csv');
+    expect(nomeArquivoNotas('xlsx', d)).toBe('notas_PAVTRACK_2026-10-09_0705.xlsx');
+    expect(nomeArquivoNotas('csv', d)).toBe('notas_PAVTRACK_2026-10-09_0705.csv');
   });
 });
 

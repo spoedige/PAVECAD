@@ -14,3 +14,4 @@ scripts/capturas/saida*
 # dados reais (nunca versionar): use scripts/anonimizar.cjs para gerar os fixtures
 /dados-reais/
 /referencia/fontes/index3.html
+dist-demo

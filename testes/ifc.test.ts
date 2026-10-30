@@ -51,7 +51,7 @@ describe('IFC: arquivo', () => {
     expect(t).toContain('IFCSIUNIT(*,.AREAUNIT.,$,.SQUARE_METRE.)');
     expect(t).toContain("IFCPROJECTEDCRS('EPSG:31982'");
     expect(t).toContain('IFCMAPCONVERSION(');
-    expect(t).toContain('PAVECAD_Projeto');
+    expect(t).toContain('PAVTRACK_Projeto');
     expect(t).toContain('Z = 0');
     expect(LIMITACAO_Z).toContain('Z = 0');
     expect(t).not.toMatch(/'Pset_|'Qto_/);

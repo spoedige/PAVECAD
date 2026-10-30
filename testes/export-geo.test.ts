@@ -93,8 +93,8 @@ describe('núcleo da exportação', () => {
     expect(opcoesEfetivas('kmz', { ...opcoesPadrao('kmz'), detalhe: 'completo' }).camadas.estacas).toBe(true);
   });
 
-  it('nome do arquivo no padrão PAVECAD_[planilha]_AAAA-MM-DD_HHmm', () => {
-    expect(nomeArquivo('PAVECAD', 'kmz', 'RD-001 · TH01 · Crescente', new Date(2026, 2, 5, 9, 7))).toBe('PAVECAD_RD-001-TH01-Crescente_2026-03-05_0907.kmz');
+  it('nome do arquivo no padrão PAVTRACK_[planilha]_AAAA-MM-DD_HHmm', () => {
+    expect(nomeArquivo('PAVTRACK', 'kmz', 'RD-001 · TH01 · Crescente', new Date(2026, 2, 5, 9, 7))).toBe('PAVTRACK_RD-001-TH01-Crescente_2026-03-05_0907.kmz');
   });
 
   it('a geometria usada é a da tela (buildGeometry)', () => {

@@ -164,7 +164,7 @@ export async function gerarKml(e: EntradaKml): Promise<string> {
   }
 
   const corpo = [...raiz.sub.values()].map((p) => p.xml()).join('') + (raiz.filhos.length ? raiz.filhos.join('') : '');
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>${esc(e.titulo)}</name><description>${esc('Exportado pelo PAVECAD. Geometria em metros sobre o plano UTM, a mesma da tela. Sem cota (Z = 0).')}</description>${[...estilos.values()].join('')}${corpo}</Document></kml>\n`;
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>${esc(e.titulo)}</name><description>${esc('Exportado pelo PAVTRACK. Geometria em metros sobre o plano UTM, a mesma da tela. Sem cota (Z = 0).')}</description>${[...estilos.values()].join('')}${corpo}</Document></kml>\n`;
 }
 
 /** Tamanho estimado em bytes do KML e do KMZ (compressão típica de 5:1 em XML de coordenadas). */

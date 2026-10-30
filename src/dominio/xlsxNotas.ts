@@ -59,7 +59,7 @@ export function montarXlsx(X: XlsxLib, F: FflateLib, linhas: Linha[]): Uint8Arra
   const wb = X.utils.book_new();
   X.utils.book_append_sheet(wb, ws, 'Notas');
   X.utils.book_append_sheet(wb, wr, 'Resumo');
-  wb.Props = { Title: 'Notas PAVECAD', Author: 'PAVECAD' };
+  wb.Props = { Title: 'Notas PAVTRACK', Author: 'PAVTRACK' };
   const bruto = new Uint8Array(X.write(wb, { type: 'array', bookType: 'xlsx', cellStyles: true }) as ArrayBuffer);
   return congelarCabecalho(F, bruto);
 }

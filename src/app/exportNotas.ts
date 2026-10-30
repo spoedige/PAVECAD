@@ -111,7 +111,7 @@ export async function compartilharNotas(comNotas = true) {
     const nome = a.nome, blob = a.blob, tipo = blob.type;
     const arq = new File([blob], nome, { type: tipo });
     if (navigator.canShare?.({ files: [arq] })) {
-      await navigator.share({ files: [arq], title: 'Notas PAVECAD' });
+      await navigator.share({ files: [arq], title: 'Notas PAVTRACK' });
       aposExportar();
       return;
     }

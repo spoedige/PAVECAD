@@ -501,7 +501,7 @@ export async function initRevisao() {
     fr.onload = async () => {
       try {
         const j = zip ? await lerBackupZip(fr.result as ArrayBuffer) : JSON.parse(String(fr.result));
-        if (j === null) { toast('O ZIP não é um backup do PAVECAD'); input.value = ''; return; }
+        if (j === null) { toast('O ZIP não é um backup do PAVTRACK'); input.value = ''; return; }
         const completo = await restaurarBackup(j);
         if (completo !== null) {
           refreshNotesLayer(); renderNotes();

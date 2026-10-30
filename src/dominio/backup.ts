@@ -1,4 +1,4 @@
-/** Backup completo do PAVECAD: planilhas, notas, propostas, catálogo e limiares, num único JSON para restaurar em qualquer aparelho. */
+/** Backup completo do PAVTRACK: planilhas, notas, propostas, catálogo e limiares, num único JSON para restaurar em qualquer aparelho. */
 
 export const TIPO_BACKUP = 'pavecad-backup';
 export const VERSAO_BACKUP = 2;
@@ -71,6 +71,6 @@ export function juntarFotos<T extends { photos?: string[] }>(notas: T[], ler: (n
 
 export const nomeArquivoBackup = (d: Date = new Date()): string => {
   const z = (v: number) => String(v).padStart(2, '0');
-  return `pavecad-backup-${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}.json`;
+  return `pavtrack-backup-${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}.json`;
 };
 export const nomeArquivoBackupZip = (d: Date = new Date()): string => nomeArquivoBackup(d).replace(/\.json$/, '.zip');

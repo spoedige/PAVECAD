@@ -10,14 +10,14 @@ export const LIMITES_MB = [100, 300, 600, 1000] as const;
 export type Provedor = 'osm' | 'esri' | 'mt-ruas' | 'mt-sat';
 
 export const NOME_PROVEDOR: Record<Provedor, string> = {
-  osm: 'OpenStreetMap (ruas)', esri: 'Esri World Imagery (satélite)', 'mt-ruas': 'MapTiler Streets (ruas)', 'mt-sat': 'MapTiler Satellite (satélite)',
+  osm: 'CARTO Voyager (ruas)', esri: 'Esri World Imagery (satélite)', 'mt-ruas': 'MapTiler Streets (ruas)', 'mt-sat': 'MapTiler Satellite (satélite)',
 };
 
 /** Peso médio de um tile 256 px (KB), por provedor. Serve só para a estimativa antes de baixar. */
 export const KB_POR_TILE: Record<Provedor, number> = { osm: 14, esri: 30, 'mt-ruas': 12, 'mt-sat': 30 };
 
-/** Máximo de tiles por preparação. O OpenStreetMap desencoraja download em massa: o teto dele é bem menor. */
-export const MAX_TILES: Record<Provedor, number> = { osm: 2000, esri: 25000, 'mt-ruas': 25000, 'mt-sat': 25000 };
+/** Máximo de tiles por preparação. O CARTO e a Esri limitam download em massa. */
+export const MAX_TILES: Record<Provedor, number> = { osm: 10000, esri: 25000, 'mt-ruas': 25000, 'mt-sat': 25000 };
 
 export interface Tile { z: number; x: number; y: number }
 

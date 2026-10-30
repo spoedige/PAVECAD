@@ -160,6 +160,7 @@ async function boot() {
     E.mode = camadaSalva();
     try { E.field = localStorage.getItem('pavecad-field') === '1'; } catch { /* sem storage */ }
     try { E.privacidade = localStorage.getItem('pavecad-privacidade') === '1'; } catch { /* sem storage */ }
+    try { const v = localStorage.getItem('pavecad-suprimir'); if (v) { const o = JSON.parse(v); Object.assign(E.suprimir, { on: o.on === true, unir: o.unir === true, minKm: [0.5, 1, 2, 5].includes(o.minKm) ? o.minKm : 1 }); } } catch { /* sem storage */ }
     try { const v = localStorage.getItem('pavecad-padrao'); E.padrao = v === null ? null : v === '1'; } catch { /* sem storage */ }
     if (E.field) { document.documentElement.setAttribute('data-contrast', 'field'); $('#btnField').setAttribute('aria-pressed', 'true'); }
   });

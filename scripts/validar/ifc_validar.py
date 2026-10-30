@@ -68,11 +68,11 @@ def main(caminho):
         import ifctester.ids
         import ifctester.reporter
 
-        ids = ifctester.ids.Ids(title="PAVECAD")
+        ids = ifctester.ids.Ids(title="PAVTRACK")
         spec = ifctester.ids.Specification(name="Pavimento com propriedades", ifcVersion=["IFC4X3_ADD2"], minOccurs=0)
         spec.applicability.append(ifctester.ids.Entity(name="IFCPAVEMENT"))
-        spec.requirements.append(ifctester.ids.Property(propertySet="PAVECAD_Trecho", baseName="Codigo", cardinality="required"))
-        spec.requirements.append(ifctester.ids.Property(propertySet="PAVECAD_Trecho", baseName="Area", cardinality="required"))
+        spec.requirements.append(ifctester.ids.Property(propertySet="PAVTRACK_Trecho", baseName="Codigo", cardinality="required"))
+        spec.requirements.append(ifctester.ids.Property(propertySet="PAVTRACK_Trecho", baseName="Area", cardinality="required"))
         spec.requirements.append(ifctester.ids.Material(cardinality="required"))
         ids.specifications.append(spec)
         ids.validate(f)

@@ -37,5 +37,5 @@ describe('backup completo', () => {
     expect(r.repetidos).toBe(1);
   });
 
-  it('nome do arquivo', () => expect(nomeArquivoBackup(new Date(2026, 2, 5))).toBe('pavecad-backup-2026-03-05.json'));
+  it('nome do arquivo', () => expect(nomeArquivoBackup(new Date(2026, 2, 5))).toBe('pavtrack-backup-2026-03-05.json'));
 });
