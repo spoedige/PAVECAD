@@ -2218,7 +2218,7 @@ const TESTES = {
       });
       assert.ok(r.ocultar.length >= 5 && r.ocultar.every((x) => x.ok), 'todos os botões de ocultar usam o mesmo "–": ' + JSON.stringify(r.ocultar));
       assert.equal(r.eyeoff, 0, 'o olho riscado não é mais ícone de ocultar painel');
-      assert.ok(r.tb.every((b) => b.t), 'tooltip em todos'); assert.deepEqual(r.tb.filter((b) => b.rot).map((b) => b.rot), ['Posição', 'Propor', 'Campo', 'Projetos', 'Notas'], 'rótulo curto visível');
+      assert.ok(r.tb.every((b) => b.t), 'tooltip em todos'); assert.deepEqual(r.tb.filter((b) => b.rot).map((b) => b.rot), ['Posição', 'Propor', 'Campo', 'Projetos', 'Notas', 'Ajustes'], 'rótulo curto visível');
     }],
     ['botão Abrir planilhas: contorno quando há planilhas; azul sólido só na tela vazia', ['1366x768'], async (pg) => {
       const f = await pg.evaluate(() => { const cs = getComputedStyle(document.querySelector('#btnFile')); return { bg: cs.backgroundColor, bd: cs.borderTopWidth, cor: cs.color }; });
