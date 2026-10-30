@@ -1563,6 +1563,7 @@ const TESTES = {
     }],
     ['Campo e offline em Ajustes: confirma o que está salvo, mostra o provedor, estima o tamanho e cancela o Preparar para campo', ['1366x768'], async (pg, { ctx }) => {
       await centrarNaFaixa(pg, 0, 300, 1);
+      await pg.evaluate(() => { document.querySelector('#base button[data-b=none]').click(); }); // o padrão agora é o satélite; o teste parte do Liso
       let pedidos = 0;
       await ctx.route(/server\.arcgisonline\.com/, async (rota) => {
         pedidos++;
