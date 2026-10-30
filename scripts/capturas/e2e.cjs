@@ -118,7 +118,7 @@ const TESTES = {
       assert.ok(m.painelGap >= 8, 'não cobre o painel direito: ' + m.painelGap);
       assert.equal(m.zoomX, m.maisX, 'o ⋯ alinha com o zoom');
       assert.ok(m.borda <= 20, 'barra lateral encostada na borda esquerda: ' + m.borda);
-      assert.equal(m.topo.filter((x) => !['btnAjuda', 'btnCfg', 'btnFile', 'btnGps', 'btnField', 'btnAlinhar', 'btnAjustes', 'btnProjetos', 'prop', 'btnNotas', 'ocultar-ferramentas'].includes(x)).length, 0, 'topo com botão extra: ' + m.topo);
+      assert.equal(m.topo.filter((x) => !['btnAjuda', 'btnCfg', 'btnFile', 'btnGps', 'btnField', 'btnAlinhar', 'btnAbrirAjustes', 'btnProjetos', 'prop', 'btnNotas', 'ocultar-ferramentas'].includes(x)).length, 0, 'topo com botão extra: ' + m.topo);
       assert.equal(m.baseNoTopo, false, 'a escolha de base saiu do topo');
     }],
     ['gaveta ⋯ abre girar, norte e base; estado salvo; Satélite troca a base', TODOS, async (pg) => {
@@ -3436,14 +3436,14 @@ const TESTES = {
       assert.equal(await pg.isVisible('#alSect'), true);
       await pg.click('[data-ocultar=painel]'); await pg.waitForTimeout(300);
       assert.equal(await pg.isVisible('#inspector'), false);
-      await pg.click('#btnAjustes'); await pg.waitForTimeout(500);
+      await pg.click('#btnAbrirAjustes'); await pg.waitForTimeout(500);
       assert.equal(await pg.isVisible('#inspector'), true, 'o botão Ajustes reabre o painel');
       assert.equal(await estado(pg, 'E => E.tab'), 'aj');
       assert.equal(await pg.isVisible('#lgSect'), true, 'a Largura das faixas está em Ajustes');
     }],
     ['mapa limpo: o botão Ajustes sai do modo limpo e abre o painel em Ajustes', ['1366x768'], async (pg) => {
       await pg.click('#btnLimpo'); await pg.waitForTimeout(300);
-      await pg.evaluate(() => document.querySelector('#btnAjustes').click()); await pg.waitForTimeout(500);
+      await pg.evaluate(() => document.querySelector('#btnAbrirAjustes').click()); await pg.waitForTimeout(500);
       assert.equal(await pg.evaluate(() => document.documentElement.classList.contains('limpo')), false);
       assert.equal(await pg.isVisible('#inspector'), true);
       assert.equal(await estado(pg, 'E => E.tab'), 'aj');

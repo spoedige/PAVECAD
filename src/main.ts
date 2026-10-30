@@ -59,7 +59,7 @@ if (import.meta.env.DEV) {
   $('#btnExample').remove(); // só existe em desenvolvimento
 }
 document.querySelectorAll<HTMLButtonElement>('#tabs button').forEach((b) => b.addEventListener('click', () => setTab(b.dataset.t as typeof E.tab)));
-$('#btnAjustes').addEventListener('click', () => abrirAjustes());
+$('#btnAbrirAjustes').addEventListener('click', () => abrirAjustes());
 document.querySelectorAll<HTMLButtonElement>('#base button').forEach((b) =>
   b.addEventListener('click', () => { setBase(b.dataset.b as typeof E.base); syncBaseSeg(); renderAll(); }));
 document.querySelectorAll<HTMLButtonElement>('#nitidez button').forEach((b) => b.addEventListener('click', () => setNitidez(b.dataset.n as 'maxima' | 'segura')));
