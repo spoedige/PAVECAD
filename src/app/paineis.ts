@@ -438,7 +438,8 @@ P(n) = P + e(n) · (nE , nN)</div>
     $('#s-supun').setAttribute('aria-checked', String(E.suprimir.unir));
     el.querySelectorAll<HTMLElement>('#s-supkm button').forEach((x) => x.setAttribute('aria-pressed', String(Number(x.dataset.km) === E.suprimir.minKm)));
     syncSeg($('#s-supkm'));
-    if (E.mapReady) for (const q of E.P) setProjectData(q);
+    // as faixas suprimidas perdem a largura na geometria do mapa: as que sobram se encostam
+    void Promise.all(E.P.map((q) => regeometrar(q, false))).then(() => { renderAll(); toast('Mapa atualizado'); });
   };
   $('#s-sup').onclick = () => aplicarSup({ on: !E.suprimir.on });
   $('#s-supun').onclick = () => aplicarSup({ unir: !E.suprimir.unir });

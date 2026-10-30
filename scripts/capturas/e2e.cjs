@@ -3404,24 +3404,35 @@ const TESTES = {
       const urls = await pg.evaluate(() => window.__pavecad.map().getStyle().sources.osm.tiles);
       assert.ok(urls.every((u) => /basemaps\.cartocdn\.com/.test(u) && !/openstreetmap/.test(u)), urls.join());
     }],
-    ['Suprimir trechos longos sem intervenção: tira do mapa só o que passa do limite, e Unir faixas exige as faixas livres juntas', ['1366x768'], async (pg) => {
-      // 100 linhas (2 km) sem intervenção em todas as faixas, mas o acostamento volta a ter solução nas últimas 60 (só 0,8 km livre nele)
+    ['Suprimir trechos longos sem intervenção: some só o que passa do limite, as faixas que sobram se encostam (sem vácuo) e Unir faixas exige as faixas livres juntas', ['1366x768'], async (pg) => {
+      // 100 linhas (2 km) sem intervenção nas faixas; o acostamento só está livre nas 40 primeiras (0,8 km) e volta a ter solução nas outras 60
       await pg.evaluate(() => {
         const E = window.__pavecad.E, p = E.P[0];
         p.model.forEach((md, k) => { md.tr.forEach((t) => { t.main = k < 100 ? '-' : 'X'; }); md.sh.main = k < 40 ? '-' : 'X'; });
       });
-      const n = () => pg.evaluate(() => { const E = window.__pavecad.E, m = window.__pavecad.map(); return m.getSource('poly-' + E.P[0].id)._data.features.length; });
-      const n0 = await n();
-      await aba(pg, 'aj'); await pg.waitForTimeout(300);
-      await pg.click('#s-sup'); await pg.waitForTimeout(500);
-      const n1 = await n();
-      assert.ok(n1 < n0, `suprimiu faixas livres: ${n0} -> ${n1}`);
-      await pg.click('#s-supun'); await pg.waitForTimeout(500);
-      assert.equal(await n(), n0, 'unindo, o acostamento com intervenção segura o trecho: nada some');
-      await pg.click('#s-supun'); await pg.click('#s-supkm button[data-km="5"]'); await pg.waitForTimeout(500);
-      assert.equal(await n(), n0, 'limite de 5 km: 2 km livres ficam');
-      await pg.click('#s-supkm button[data-km="1"]'); await pg.click('#s-sup'); await pg.waitForTimeout(500);
-      assert.equal(await n(), n0, 'desligado, tudo volta');
+      const info = () => pg.evaluate(() => {
+        const E = window.__pavecad.E, p = E.P[0], m = window.__pavecad.map();
+        const n = m.getSource('poly-' + p.id)._data.features.length;
+        const dist = (row) => { const f = p.polyByFid.get(row * 8 + 7); if (!f) return null; const c = f.geometry.coordinates[0][0], r = p.rows[row]; return Math.hypot((c[0] - r.lon) * 111320 * Math.cos((r.lat * Math.PI) / 180), (c[1] - r.lat) * 111132); };
+        return { n, acost60: dist(60), acost150: dist(150) };
+      });
+      const i0 = await info();
+      assert.ok(i0.acost60 > 3, 'antes, o acostamento está depois das faixas: ' + i0.acost60);
+      await aba(pg, 'aj'); await pg.waitForSelector('#s-sup');
+      await pg.click('#s-sup');
+      await pg.waitForFunction(() => { const E = window.__pavecad.E; return window.__pavecad.map().getSource('poly-' + E.P[0].id)._data.features.length > 0 && document.querySelector('#toast.on')?.textContent.includes('Mapa atualizado'); }, null, { timeout: 60000 });
+      const i1 = await info();
+      assert.ok(i1.n < i0.n, `suprimiu faixas livres: ${i0.n} -> ${i1.n}`);
+      assert.ok(i1.acost60 < 1, 'sem as faixas livres, o acostamento encosta no eixo (sem vácuo): ' + i1.acost60);
+      assert.ok(i1.acost150 > 3, 'fora do trecho suprimido nada muda: ' + i1.acost150);
+      await pg.click('#s-supun');
+      await pg.waitForFunction((n) => window.__pavecad.map().getSource('poly-' + window.__pavecad.E.P[0].id)._data.features.length === n, i0.n, { timeout: 60000 });
+      assert.ok((await info()).acost60 > 3, 'unindo, o acostamento com intervenção segura o trecho: nada some nem se move');
+      await pg.click('#s-supun'); await pg.click('#s-supkm button[data-km="5"]');
+      await pg.waitForFunction((n) => window.__pavecad.map().getSource('poly-' + window.__pavecad.E.P[0].id)._data.features.length === n, i0.n, { timeout: 60000 });
+      await pg.click('#s-supkm button[data-km="1"]'); await pg.click('#s-sup');
+      await pg.waitForFunction((n) => window.__pavecad.map().getSource('poly-' + window.__pavecad.E.P[0].id)._data.features.length === n, i0.n, { timeout: 60000 });
+      assert.ok((await info()).acost60 > 3, 'desligado, tudo volta');
     }],
   ],
   // Ajustes: sempre acessível (botão na barra, Alinhar reabre o painel oculto) e com a Largura das faixas.

@@ -68,6 +68,6 @@ export function buildCamadas(p: Project, g: Geometry, pid: string): Camadas {
       }
     }
   }
-  const invalidos = g.polys.filter((q) => q.invalido).map((q) => ({ row: q.row, lane: q.lane, motivo: q.invalido! }));
+  const invalidos = g.polys.filter((q) => q.invalido && q.e1 !== q.e0).map((q) => ({ row: q.row, lane: q.lane, motivo: q.invalido! }));
   return { polys, lines: { type: 'FeatureCollection', features: lines }, drains: drainsToGeoJSON(p, g.drains, pid), invalidos };
 }

@@ -4,7 +4,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import type { GeoJSONSource, MapMouseEvent, PointLike } from 'maplibre-gl';
 import { edgesOf, offsetLL } from '../geometry/build';
 import { ABREVIACOES_FAIXA, CLASSE_CRITICA, DESCRICAO_MODO, IND, INDICADORES_CRITICOS, PADRAO_DE_PAR, Q5, Q5F, SOLUCOES_CRITICAS, type IndKey } from '../dominio/indicadores';
-import { chaveSup, trechosSuprimidos } from '../dominio/supressao';
+import { chaveSup } from '../dominio/supressao';
 import { trColor, trLabel, trOrder, trShort } from '../dominio/solucoes';
 import type { Nota } from './estado';
 import { parseKmTexto } from '../formats/km';
@@ -12,7 +12,7 @@ import { codigosOriginais } from '../formats/planservi';
 import { baseSources, CHAVE_NITIDEZ, MAP_MAX_ZOOM, nitidezSalva, recarregarEsri, type Nitidez } from '../mapa/base';
 import { agendarRotulos, PRIO, prioDeEstaca, resolverRotulos } from './rotulos';
 import { ORCAMENTO, alinhado, cabeRotuloInterno, dentroDoOrcamento, direcaoNaTela, deslocamentoParaFora, metrosPorPixel, passoComOrcamento, PISTAS_JUNTAS_M, prioDoMarco, rotuloInterno, rumoDe } from '../mapa/marcos';
-import { E, H, NOTE_CATS, getP, kmFmt, kmReal, padraoAtivo, padraoDosPares, projName, visibleProjects, type AppProj, type FocoPred } from './estado';
+import { E, H, NOTE_CATS, getP, kmFmt, kmReal, padraoAtivo, padraoDosPares, projName, suprimidosDe, visibleProjects, type AppProj, type FocoPred } from './estado';
 import { ehCelular } from './layout';
 import { $, cssv, esc, fmt, syncSeg, toast } from './ui';
 
@@ -196,7 +196,7 @@ export function addProjectToMap(p: AppProj) {
 /** As feições da planilha sem os trechos suprimidos (longos trechos sem intervenção, nas Ajustes). */
 function camadasVisiveis(p: AppProj): { polys: Expr; lines: Expr } {
   if (!E.suprimir.on) return { polys: p.camadas.polys as Expr, lines: p.camadas.lines as Expr };
-  const sup = trechosSuprimidos(p.model, p.rows.map((r) => r.hod), p.rows.map((r) => r.shoulder > 0), E.suprimir);
+  const sup = suprimidosDe(p);
   const fora = (f: { properties: Record<string, unknown> }, a: number, b: number) => {
     const lane = f.properties.lane as number;
     for (let i = a; i <= b; i++) if (!sup.has(chaveSup(i, lane))) return false;
