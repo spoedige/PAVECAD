@@ -1534,7 +1534,7 @@ const TESTES = {
       await ctx.setGeolocation({ latitude: alvo.lat, longitude: alvo.lon, accuracy: 10 });
       // sem rede de verdade: o navegador diz offline e os tiles novos falham em sequência (só o aviso do navegador não basta)
       const semTiles = (r) => r.abort();
-      await ctx.route(/(tile\.openstreetmap\.org|server\.arcgisonline\.com|api\.maptiler\.com)/, semTiles);
+      await ctx.route(/(basemaps\.cartocdn\.com|server\.arcgisonline\.com|api\.maptiler\.com)/, semTiles);
       await ctx.setOffline(true);
       await pg.waitForSelector('#offBadge:not([hidden])', { timeout: 5000 });
       assert.equal(await pg.evaluate(() => window.__pavecad.E.base), 'esri', 'só o aviso do navegador não troca o fundo');
@@ -1546,17 +1546,17 @@ const TESTES = {
       await pg.click('#btnGps'); await pg.waitForSelector('#gRef', { timeout: 8000 });
       assert.match(await pg.textContent('#gRef'), /^km \d+\+\d{3} · a \d+ m do eixo · Fx \d$/, 'km e distância ao eixo sem rede');
       await pg.click('#btnGps');
-      await ctx.unroute(/(tile\.openstreetmap\.org|server\.arcgisonline\.com|api\.maptiler\.com)/, semTiles);
+      await ctx.unroute(/(basemaps\.cartocdn\.com|server\.arcgisonline\.com|api\.maptiler\.com)/, semTiles);
       await ctx.setOffline(false);
       await pg.waitForFunction(() => window.__pavecad.E.base === 'esri', null, { timeout: 5000 });
       assert.equal(await pg.isHidden('#offBadge'), true, 'o selo some ao voltar');
       assert.equal(await pg.evaluate(() => document.querySelector('#base [data-b=esri]').getAttribute('aria-pressed')), 'true');
       // se a pessoa escolheu outro fundo sem rede, a escolha dela vale ao voltar
-      await ctx.route(/(tile\.openstreetmap\.org|server\.arcgisonline\.com|api\.maptiler\.com)/, semTiles);
+      await ctx.route(/(basemaps\.cartocdn\.com|server\.arcgisonline\.com|api\.maptiler\.com)/, semTiles);
       await ctx.setOffline(true); await faltaDeTiles(pg);
       assert.equal(await pg.evaluate(() => [...document.querySelectorAll('#base button')].some((b) => b.disabled)), false, 'as opções de fundo nunca ficam desabilitadas');
       await pg.click('[data-b=osm]'); await pg.waitForTimeout(200);
-      await ctx.unroute(/(tile\.openstreetmap\.org|server\.arcgisonline\.com|api\.maptiler\.com)/, semTiles);
+      await ctx.unroute(/(basemaps\.cartocdn\.com|server\.arcgisonline\.com|api\.maptiler\.com)/, semTiles);
       await ctx.setOffline(false); await pg.waitForTimeout(400);
       assert.equal(await pg.evaluate(() => window.__pavecad.E.base), 'osm', 'a escolha manual não é desfeita');
       await pg.click('[data-b=none]');
@@ -1675,15 +1675,15 @@ const TESTES = {
       // solta só depois de o menu abrir (com folga para máquinas lentas)
       await pg.waitForSelector('#nr .nr-op', { timeout: 2500 }).catch(() => {}); await pg.waitForTimeout(150); await pg.mouse.up(); await pg.waitForTimeout(300);
       assert.equal(await pg.evaluate(() => window.__anelVisto), true, 'anel de progresso durante a pressão');
-      assert.equal(await pg.locator('#nr .nr-op').count(), 7, 'aos 700 ms o menu está aberto');
+      assert.equal(await pg.locator('#nr .nr-op').count(), 8, 'aos 700 ms o menu está aberto');
       assert.ok(!(await estado(pg, 'E => !!E.sel')), 'o clique que sobra da pressão não seleciona nada');
       // auditoria: nada obrigatório. Sem campo de texto, seletor nem confirmação
       assert.equal(await pg.locator('#nr input, #nr textarea, #nr select, #nr [role=switch]').count(), 0, 'o menu não tem campo, seletor nem chave');
-      assert.equal(await pg.locator('#nr button').count(), 7, 'só as sete opções');
+      assert.equal(await pg.locator('#nr button').count(), 8, 'só as oito opções');
       const op = await pg.evaluate(() => [...document.querySelectorAll('#nr .nr-op')].map((e) => { const r = e.getBoundingClientRect(), s = document.querySelector('.stage').getBoundingClientRect(); return { t: e.dataset.t, w: Math.round(r.width), h: Math.round(r.height), dentro: r.left >= s.left && r.right <= s.right && r.top >= s.top && r.bottom <= s.bottom, txt: e.innerText.replace(/\s+/g, ' ').trim(), svg: !!e.querySelector('svg') }; }));
       assert.deepEqual(op.map((x) => x.t), ['alterar', 'dreno_mais', 'dreno_menos', 'parametros', 'conserva', 'observacao', 'foto']);
-      assert.ok(op.every((x) => x.w === 56 && x.h === 56 && x.dentro && x.svg), 'sete alvos de 56 px, com ícone, dentro da tela: ' + JSON.stringify(op));
-      assert.deepEqual(op.map((x) => x.txt), ['Alterar solução', 'Colocar dreno', 'Retirar dreno', 'Ver parâmetros', 'Ver conserva', 'Observação', 'Foto']);
+      assert.ok(op.every((x) => x.w === 56 && x.h === 56 && x.dentro && x.svg), 'oito alvos de 56 px, com ícone, dentro da tela: ' + JSON.stringify(op));
+      assert.deepEqual(op.map((x) => x.txt), ['Alterar solução', 'Colocar dreno', 'Retirar dreno', 'Ver parâmetros', 'Ver conserva', 'Observação', 'Foto', 'Street View']);
       assert.match(await pg.textContent('#nr .nr-cap'), /km \d+\+\d{3} · Fx 1/);
       await pg.click('#nr .nr-op[data-t=dreno_menos]'); await pg.waitForTimeout(400);
       assert.equal(await pg.locator('#nr .nr-op[data-t]').count(), 0, 'um toque grava e o menu principal sai');
@@ -1751,7 +1751,7 @@ const TESTES = {
         if (!livre) continue; // coberto por um cartão da interface: o menu só abre sobre o mapa
         await pg.mouse.click(x, y, { button: 'right' }); await pg.waitForTimeout(250);
         const r = await dentro();
-        assert.equal(r.length, 7, `menu aberto em ${fx},${fy}`); assert.ok(r.every(Boolean), `os sete botões dentro da tela e com 56 px em ${fx},${fy}`);
+        assert.equal(r.length, 8, `menu aberto em ${fx},${fy}`); assert.ok(r.every(Boolean), `os oito botões dentro da tela e com 56 px em ${fx},${fy}`);
         await pg.keyboard.press('Escape'); await pg.waitForTimeout(150);
       }
     }],
@@ -1981,7 +1981,7 @@ const TESTES = {
         const livre = await pg.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.classList.contains('maplibregl-canvas'), { x, y });
         if (!livre) continue;
         await pg.mouse.click(x, y, { button: 'right' }); await pg.waitForTimeout(250);
-        await confere(`principal em ${fx},${fy}`, 7); abertos++;
+        await confere(`principal em ${fx},${fy}`, 8); abertos++;
         await pg.click('#nr .nr-op[data-t=alterar]'); await pg.waitForTimeout(250);
         const n = await pg.locator('#nr .nr-op').count();
         if (n) await confere(`soluções em ${fx},${fy}`, n);
@@ -2505,7 +2505,7 @@ const TESTES = {
       await aba(pg, 'exp'); await pg.waitForTimeout(500);
       const baixa = async (sel) => { const [d] = await Promise.all([pg.waitForEvent('download', { timeout: 60000 }), pg.click(sel)]); return { nome: d.suggestedFilename(), buf: fs.readFileSync(await d.path()) }; };
       const x = await baixa('#exXlsx');
-      assert.match(x.nome, /^notas_PAVECAD_.*\.zip$/, 'com fotos o XLSX sai em ZIP: ' + x.nome);
+      assert.match(x.nome, /^notas_PAVTRACK_.*\.zip$/, 'com fotos o XLSX sai em ZIP: ' + x.nome);
       const z = unzipSync(new Uint8Array(x.buf)), nomes = Object.keys(z);
       const xl = nomes.find((k) => /\.xlsx$/.test(k)), ft = nomes.filter((k) => /^fotos\/.+\.jpg$/.test(k));
       assert.ok(xl, 'a planilha vai dentro do ZIP'); assert.equal(ft.length, 1, 'uma foto na pasta fotos/: ' + nomes.join(', '));
@@ -2622,7 +2622,7 @@ const TESTES = {
       await pg.keyboard.press('Escape'); await pg.waitForTimeout(300); await respondem('depois do dreno');
       // 8b. as outras bolinhas da roda de 7: Ver conserva (com Confirmar), Observação (texto) e Foto (câmera)
       ponto = await centrarNaFaixa(pg, 0, 330, 1);
-      await pressionar(ponto.x, ponto.y, 850); assert.equal(await menuAberto(), 7, 'a roda tem 7 bolinhas no celular');
+      await pressionar(ponto.x, ponto.y, 850); assert.equal(await menuAberto(), 8, 'a roda tem 8 bolinhas no celular');
       await tocar('#nr .nr-op[data-t=conserva]', 'Ver conserva'); await tocar('#nr .nr-op[data-a=confirmar]', 'Confirmar'); await pg.waitForTimeout(400);
       assert.equal(await estadoApp('E => E.notes.filter((n) => n.rapida.tipo === "conserva").length'), 1, 'Ver conserva gravou com Confirmar');
       await pg.keyboard.press('Escape'); await pg.waitForTimeout(300);
@@ -2658,7 +2658,7 @@ const TESTES = {
       assert.match(await pg.textContent('#dgQtd'), /1 erro guardado/);
       await pg.click('#dgCopia'); await pg.waitForTimeout(300);
       const txt = await pg.evaluate(() => navigator.clipboard.readText().catch(() => ''));
-      if (txt) { assert.match(txt, /^PAVECAD versão /); assert.match(txt, /erro de teste do relatório/); }
+      if (txt) { assert.match(txt, /^PAVTRACK versão /); assert.match(txt, /erro de teste do relatório/); }
       // modo diagnóstico de toque: desligado por padrão; ligado, mostra o último evento e o elemento que o recebeu
       assert.equal(await pg.locator('#diagToque').count(), 0, 'desligado por padrão');
       await pg.click('#dgToque'); await pg.waitForSelector('#diagToque');
@@ -2884,7 +2884,7 @@ const TESTES = {
       await aba(pg, 'exp'); await pg.waitForTimeout(300);
       // .xlsx
       const [dx] = await Promise.all([pg.waitForEvent('download'), pg.click('#exXlsx')]);
-      assert.match(dx.suggestedFilename(), /^notas_PAVECAD_\d{4}-\d{2}-\d{2}_\d{4}\.xlsx$/);
+      assert.match(dx.suggestedFilename(), /^notas_PAVTRACK_\d{4}-\d{2}-\d{2}_\d{4}\.xlsx$/);
       const wb = XLSX.readFile(await dx.path(), { cellDates: true, cellStyles: true });
       assert.deepEqual(wb.SheetNames, ['Notas', 'Resumo']);
       const ws = wb.Sheets.Notas, linhas = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true });
@@ -2903,7 +2903,7 @@ const TESTES = {
       assert.equal(resumo.find((r) => r[0] === 'Total')[1], 4);
       // .csv
       const [dc] = await Promise.all([pg.waitForEvent('download'), pg.click('#exCsv')]);
-      assert.match(dc.suggestedFilename(), /^notas_PAVECAD_\d{4}-\d{2}-\d{2}_\d{4}\.csv$/);
+      assert.match(dc.suggestedFilename(), /^notas_PAVTRACK_\d{4}-\d{2}-\d{2}_\d{4}\.csv$/);
       const buf = require('fs').readFileSync(await dc.path());
       assert.deepEqual([...buf.slice(0, 3)], [0xef, 0xbb, 0xbf], 'BOM UTF-8');
       const csv = buf.slice(3).toString('utf8').split('\r\n');
@@ -2913,7 +2913,7 @@ const TESTES = {
       await pg.evaluate(() => { window.__shared = null; navigator.canShare = (d) => !!(d && d.files && d.files.length); navigator.share = async (d) => { window.__shared = { nome: d.files[0].name, tipo: d.files[0].type, tam: d.files[0].size }; }; });
       await pg.click('#exShare'); await pg.waitForTimeout(800);
       const sh = await pg.evaluate(() => window.__shared);
-      assert.ok(sh && /^notas_PAVECAD_.*\.xlsx$/.test(sh.nome) && /spreadsheetml/.test(sh.tipo) && sh.tam > 1000, 'Web Share recebeu a planilha: ' + JSON.stringify(sh));
+      assert.ok(sh && /^notas_PAVTRACK_.*\.xlsx$/.test(sh.nome) && /spreadsheetml/.test(sh.tipo) && sh.tam > 1000, 'Web Share recebeu a planilha: ' + JSON.stringify(sh));
       await pg.evaluate(() => { navigator.canShare = undefined; });
       const [dsh] = await Promise.all([pg.waitForEvent('download'), pg.click('#exShare')]);
       assert.match(dsh.suggestedFilename(), /\.xlsx$/, 'sem Web Share, baixa');
@@ -2930,7 +2930,7 @@ const TESTES = {
       assert.match(await pg.textContent('#xBackup h3'), /^Backup completo \(\.json\)$/);
       assert.equal(await pg.locator('#t-aj details.bk, #t-aj #bkDown').count(), 0, 'o backup saiu de Ajustes');
       const [d] = await Promise.all([pg.waitForEvent('download'), pg.click('#bkDown')]);
-      assert.match(d.suggestedFilename(), /^pavecad-backup-\d{4}-\d{2}-\d{2}\.json$/);
+      assert.match(d.suggestedFilename(), /^pavtrack-backup-\d{4}-\d{2}-\d{2}\.json$/);
       const gj = JSON.parse(require('fs').readFileSync(await d.path(), 'utf8'));
       assert.equal(gj.tipo, 'pavecad-backup'); assert.equal(gj.notas.length, 1); assert.equal(gj.notas[0].rapida.tipo, 'dreno_menos');
       assert.ok(Array.isArray(gj.planilhas) && Array.isArray(gj.propostas) && gj.catalogo, 'o backup é completo');
@@ -2951,7 +2951,7 @@ const TESTES = {
       const x = await baixa('#exXlsx'); assert.match(x.nome, /\.xlsx$/); assert.equal(x.buf.slice(0, 2).toString(), 'PK');
       const c = await baixa('#exCsv'); assert.match(c.nome, /\.csv$/);
       const kz = await baixa('#exKmz');
-      assert.match(kz.nome, /^PAVECAD_.+_\d{4}-\d{2}-\d{2}_\d{4}\.kmz$/);
+      assert.match(kz.nome, /^PAVTRACK_.+_\d{4}-\d{2}-\d{2}_\d{4}\.kmz$/);
       const kml = strFromU8(unzipSync(new Uint8Array(kz.buf))['doc.kml']);
       assert.ok(kml.startsWith('<?xml') && kml.includes('xmlns="http://www.opengis.net/kml/2.2"') && /<Placemark>/.test(kml));
       assert.ok(!kml.includes('Notas de campo'), 'KMZ sem notas por padrão');
@@ -3381,6 +3381,47 @@ const TESTES = {
       assert.equal(await pg.evaluate(() => matchMedia('(pointer: coarse)').matches), true);
       assert.equal(await pg.isVisible('#btnAjuda'), false);
       assert.equal(await pg.locator('.foot').count(), 0);
+    }],
+  ],
+  // PAVTRACK: Street View na roda, satélite como base padrão e supressão de trechos longos sem intervenção.
+  t30: [
+    ['Street View: a bolinha abre o panorama do Google no ponto pressionado, em outra aba, e não grava nada', ['1366x768'], async (pg, { ctx }) => {
+      await ctx.route(/google\.com/, (r) => r.fulfill({ status: 200, contentType: 'text/html', body: '<title>sv</title>' }));
+      const p = await centrarNaFaixa(pg, 0, 300, 1);
+      await pg.mouse.click(p.x, p.y, { button: 'right' }); await pg.waitForSelector('#nr .nr-op[data-t=streetview]', { timeout: 3000 }); await pg.waitForTimeout(200);
+      const [nova] = await Promise.all([ctx.waitForEvent('page', { timeout: 5000 }), pg.click('#nr .nr-op[data-t=streetview]')]);
+      assert.match(nova.url(), /^https:\/\/www\.google\.com\/maps\/@\?api=1&map_action=pano&viewpoint=-?\d+\.\d{6},-?\d+\.\d{6}$/);
+      assert.equal(await estado(pg, 'E => E.notes.length'), 0, 'não grava nota');
+      assert.equal(await pg.locator('#nr .nr-op').count(), 0, 'a roda fecha');
+    }],
+    ['A base padrão é o satélite, também no botão e na chave de Ajustes', ['1366x768'], async (pg) => {
+      assert.equal(await estado(pg, 'E => E.base'), 'esri');
+      assert.equal(await pg.evaluate(() => window.__pavecad.map().getLayoutProperty('esri', 'visibility')), 'visible');
+      assert.equal(await pg.getAttribute('#base button[data-b=esri]', 'aria-pressed'), 'true');
+      assert.equal(await pg.getAttribute('#base button[data-b=none]', 'aria-pressed'), 'false');
+    }],
+    ['Ruas usa o CARTO Voyager, não o servidor do OpenStreetMap', ['1366x768'], async (pg) => {
+      const urls = await pg.evaluate(() => window.__pavecad.map().getStyle().sources.osm.tiles);
+      assert.ok(urls.every((u) => /basemaps\.cartocdn\.com/.test(u) && !/openstreetmap/.test(u)), urls.join());
+    }],
+    ['Suprimir trechos longos sem intervenção: tira do mapa só o que passa do limite, e Unir faixas exige as faixas livres juntas', ['1366x768'], async (pg) => {
+      // 100 linhas (2 km) sem intervenção em todas as faixas, mas o acostamento volta a ter solução nas últimas 60 (só 0,8 km livre nele)
+      await pg.evaluate(() => {
+        const E = window.__pavecad.E, p = E.P[0];
+        p.model.forEach((md, k) => { md.tr.forEach((t) => { t.main = k < 100 ? '-' : 'X'; }); md.sh.main = k < 40 ? '-' : 'X'; });
+      });
+      const n = () => pg.evaluate(() => { const E = window.__pavecad.E, m = window.__pavecad.map(); return m.getSource('poly-' + E.P[0].id)._data.features.length; });
+      const n0 = await n();
+      await aba(pg, 'aj'); await pg.waitForTimeout(300);
+      await pg.click('#s-sup'); await pg.waitForTimeout(500);
+      const n1 = await n();
+      assert.ok(n1 < n0, `suprimiu faixas livres: ${n0} -> ${n1}`);
+      await pg.click('#s-supun'); await pg.waitForTimeout(500);
+      assert.equal(await n(), n0, 'unindo, o acostamento com intervenção segura o trecho: nada some');
+      await pg.click('#s-supun'); await pg.click('#s-supkm button[data-km="5"]'); await pg.waitForTimeout(500);
+      assert.equal(await n(), n0, 'limite de 5 km: 2 km livres ficam');
+      await pg.click('#s-supkm button[data-km="1"]'); await pg.click('#s-sup'); await pg.waitForTimeout(500);
+      assert.equal(await n(), n0, 'desligado, tudo volta');
     }],
   ],
 };

@@ -127,6 +127,6 @@ describe('backup com fotos', () => {
     expect(j[0].photos).toEqual(notas[0].photos);
     // referência sem arquivo é descartada
     expect(juntarFotos(s.notas, () => null)[0].photos).toEqual([]);
-    expect(nomeArquivoBackupZip(new Date(2026, 9, 5))).toBe('pavecad-backup-2026-10-05.zip');
+    expect(nomeArquivoBackupZip(new Date(2026, 9, 5))).toBe('pavtrack-backup-2026-10-05.zip');
   });
 });

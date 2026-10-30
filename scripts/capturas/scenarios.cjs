@@ -111,8 +111,8 @@ const CENARIOS = {
 
 CENARIOS.colunaEsquerda.exemplos = true;
 
-/** Planservi com os arquivos reais (TH38 e TH39, que não ficam no repositório). Caminho em PAVECAD_PLANSERVI (pasta com os .xlsx). */
-const PS = process.env.PAVECAD_PLANSERVI || '/root/.claude/uploads/cde62ba2-1e72-5783-bd3b-09396233492a';
+/** Planservi com os arquivos reais (TH38 e TH39, que não ficam no repositório). Caminho em PAVTRACK_PLANSERVI (pasta com os .xlsx). */
+const PS = process.env.PAVTRACK_PLANSERVI || '/root/.claude/uploads/cde62ba2-1e72-5783-bd3b-09396233492a';
 const psOpts = { arquivos: [`${PS}/86f46219-C0866_UNIFILAR_SOLU__ES_TH38_R02_1.xlsx`, `${PS}/c65a789d-C0867_UNIFILAR_SOLU__ES_TH39_R02_1.xlsx`], projetos: 4 };
 /** Vai ao km, aproxima até ver as faixas e escolhe a base lisa. */
 const psVai = async (pg, km, zoom = 17.3) => {

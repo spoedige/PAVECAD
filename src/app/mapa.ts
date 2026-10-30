@@ -4,6 +4,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import type { GeoJSONSource, MapMouseEvent, PointLike } from 'maplibre-gl';
 import { edgesOf, offsetLL } from '../geometry/build';
 import { ABREVIACOES_FAIXA, CLASSE_CRITICA, DESCRICAO_MODO, IND, INDICADORES_CRITICOS, PADRAO_DE_PAR, Q5, Q5F, SOLUCOES_CRITICAS, type IndKey } from '../dominio/indicadores';
+import { chaveSup, trechosSuprimidos } from '../dominio/supressao';
 import { trColor, trLabel, trOrder, trShort } from '../dominio/solucoes';
 import type { Nota } from './estado';
 import { parseKmTexto } from '../formats/km';
@@ -20,7 +21,7 @@ type Expr = any;
 const EMPTY: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] };
 
 /** Chave do MapTiler vem do ambiente (VITE_MAPTILER_KEY) e nunca do repositório.
- *  Sem chave, a base cai no OpenStreetMap (ruas) e na Esri (satélite). */
+ *  Sem chave, a base cai no CARTO Voyager (ruas) e na Esri (satélite). */
 const MT_KEY: string = (import.meta.env.VITE_MAPTILER_KEY ?? '').trim();
 export const temMapTiler = () => !!MT_KEY;
 /** Modelos de URL das fontes de tiles em uso (com a chave do MapTiler, se houver). */
@@ -94,6 +95,7 @@ export function initMap(onReady: () => void) {
     map.addLayer({ id: 'gps-acc', type: 'fill', source: 'gps', filter: ['==', ['geometry-type'], 'Polygon'], paint: { 'fill-color': ['match', ['get', 'tipo'], 'cinza', '#8e8e93', '#0a84ff'], 'fill-opacity': 0.15 } });
     map.addLayer({ id: 'gps-pt', type: 'circle', source: 'gps', filter: ['==', ['geometry-type'], 'Point'], paint: { 'circle-radius': 8, 'circle-color': ['match', ['get', 'tipo'], 'cinza', '#8e8e93', 'manual', '#ff9500', '#0a84ff'], 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 3 } });
     E.mapReady = true;
+    setBase(E.base);
     E.P.forEach(addProjectToMap);
     applyPaint();
     onReady();
@@ -173,8 +175,9 @@ export function addProjectToMap(p: AppProj) {
   const id = p.id, before = 'sel-halo';
   const offs: Expr = ['interpolate', ['linear'], ['zoom'], 9, ['*', ['get', 'k'], 2.7], 15, ['*', ['get', 'k'], 0.4], 16.2, 0];
   // tolerance 0: sem isso o MapLibre simplifica segmentos de 20 m a nada em zoom baixo.
-  map.addSource('poly-' + id, { type: 'geojson', tolerance: 0, promoteId: 'fid', data: p.camadas.polys as Expr });
-  map.addSource('lines-' + id, { type: 'geojson', tolerance: 0, promoteId: 'wid', data: p.camadas.lines as Expr });
+  const cv = camadasVisiveis(p);
+  map.addSource('poly-' + id, { type: 'geojson', tolerance: 0, promoteId: 'fid', data: cv.polys });
+  map.addSource('lines-' + id, { type: 'geojson', tolerance: 0, promoteId: 'wid', data: cv.lines });
   map.addSource('drain-' + id, { type: 'geojson', data: p.camadas.drains as Expr });
   map.addLayer({ id: 'lines-' + id, type: 'line', source: 'lines-' + id, maxzoom: 16.7, layout: { 'line-cap': 'butt' }, paint: { 'line-width': 2.4, 'line-offset': offs, 'line-color': '#888' } }, before);
   map.addLayer({ id: 'poly-' + id, type: 'fill', source: 'poly-' + id, minzoom: 14, paint: { 'fill-color': '#888', 'fill-opacity': 0.9 } }, before);
@@ -190,9 +193,25 @@ export function addProjectToMap(p: AppProj) {
   paintProject(p);
 }
 
+/** As feições da planilha sem os trechos suprimidos (longos trechos sem intervenção, nas Ajustes). */
+function camadasVisiveis(p: AppProj): { polys: Expr; lines: Expr } {
+  if (!E.suprimir.on) return { polys: p.camadas.polys as Expr, lines: p.camadas.lines as Expr };
+  const sup = trechosSuprimidos(p.model, p.rows.map((r) => r.hod), p.rows.map((r) => r.shoulder > 0), E.suprimir);
+  const fora = (f: { properties: Record<string, unknown> }, a: number, b: number) => {
+    const lane = f.properties.lane as number;
+    for (let i = a; i <= b; i++) if (!sup.has(chaveSup(i, lane))) return false;
+    return true;
+  };
+  const filtra = (fc: { features: { properties: Record<string, unknown> }[] }, ini: string, fim: string) =>
+    ({ ...fc, features: fc.features.filter((f) => !fora(f, f.properties[ini] as number, f.properties[fim] as number)) });
+  const polys = { ...p.camadas.polys, features: p.camadas.polys.features.filter((f) => !sup.has(chaveSup(f.properties!.row as number, f.properties!.lane as number))) };
+  return { polys: polys as Expr, lines: filtra(p.camadas.lines as never, 'r0', 'r1') as Expr };
+}
+
 export function setProjectData(p: AppProj) {
-  src('poly-' + p.id)?.setData(p.camadas.polys as Expr);
-  src('lines-' + p.id)?.setData(p.camadas.lines as Expr);
+  const c = camadasVisiveis(p);
+  src('poly-' + p.id)?.setData(c.polys);
+  src('lines-' + p.id)?.setData(c.lines);
   src('drain-' + p.id)?.setData(p.camadas.drains as Expr);
   buildMarkers(p);
   applyVisibility(p);

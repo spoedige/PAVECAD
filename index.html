@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>PaveCAD · Mapa de Soluções de Restauração</title>
+<title>PAVTRACK · Mapa de Soluções de Restauração</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="theme-color" content="#007aff">
@@ -34,7 +34,7 @@
     <div class="hud">
     <div class="leftcol">
       <div class="glass titlecard" id="titlecard">
-      <div class="title" id="titlebox"><div class="ttx"><b id="title">PaveCAD</b><button type="button" class="subbtn" id="subtitle" title="Abrir os projetos (planilhas)"></button></div><button class="iconbtn" id="btnOverview" type="button" aria-label="Visão geral" title="Visão geral: enquadra todas as planilhas"><svg class="i" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button><button class="gocultar" type="button" data-ocultar="titulo" aria-label="Ocultar título e busca" title="Ocultar título e busca"><svg class="i" viewBox="0 0 24 24"><path d="M5 12h14"/></svg></button></div>
+      <div class="title" id="titlebox"><div class="ttx"><b id="title">PAVTRACK</b><button type="button" class="subbtn" id="subtitle" title="Abrir os projetos (planilhas)"></button></div><button class="iconbtn" id="btnOverview" type="button" aria-label="Visão geral" title="Visão geral: enquadra todas as planilhas"><svg class="i" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button><button class="gocultar" type="button" data-ocultar="titulo" aria-label="Ocultar título e busca" title="Ocultar título e busca"><svg class="i" viewBox="0 0 24 24"><path d="M5 12h14"/></svg></button></div>
       <div class="search">
         <svg class="i" viewBox="0 0 24 24" style="color:var(--faint)"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
         <input id="gokm" class="num" placeholder="Ir para km" inputmode="decimal" aria-label="Ir para km">
@@ -72,9 +72,9 @@
           <button class="offbadge" id="offBadge" type="button" hidden title="Sem internet. Toque para ver o que está salvo neste aparelho">Offline</button>
           <div class="basegrp" id="basegrp">
             <div class="seg glass" id="base" role="group" aria-label="Base do mapa">
-              <button data-b="none" aria-pressed="true">Liso</button>
+              <button data-b="none" aria-pressed="false">Liso</button>
               <button data-b="osm" aria-pressed="false">Ruas</button>
-              <button data-b="esri" aria-pressed="false">Satélite</button>
+              <button data-b="esri" aria-pressed="true">Satélite</button>
             </div>
             <div class="nitidez" id="nitidezBox">
               <span class="nitidez-rot" id="nitidezRot">Nitidez do satélite</span>

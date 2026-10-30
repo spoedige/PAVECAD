@@ -31,7 +31,7 @@ export function textoRelatorio(): string {
   const v = versaoApp(), erros = errosGuardados();
   const sw = typeof navigator !== 'undefined' && navigator.serviceWorker?.controller ? 'ativo' : 'inativo';
   const linhas = [
-    `PAVECAD versão ${v.commit} (${v.data || 'sem data'})`,
+    `PAVTRACK versão ${v.commit} (${v.data || 'sem data'})`,
     `Aparelho: ${navigator.userAgent}`,
     `Tela: ${innerWidth}x${innerHeight} (DPR ${devicePixelRatio}), toque: ${navigator.maxTouchPoints}, online: ${navigator.onLine}, service worker: ${sw}`,
     `Classes: ${document.documentElement.className}`,

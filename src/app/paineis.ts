@@ -328,6 +328,8 @@ export function focarAjustes(pid: string) {
 }
 const iguais = <T,>(v: T[]) => v.every((x) => x === v[0]);
 
+const SUPRIMIR_KM = [0.5, 1, 2, 5];
+
 /** Liga ou desliga o modo privacidade: refaz rótulos de km, marcadores e painéis. A escolha fica no aparelho. */
 export function setPrivacidade(on: boolean) {
   E.privacidade = on;
@@ -366,6 +368,9 @@ export function renderAj() {
       <div class="field"><div><div>Modo privacidade</div><div class="note">Oculta nomes de planilha, rodovia e km na tela e nas exportações. Os dados no aparelho não mudam</div></div><button class="sw2" id="s-priv" role="switch" aria-checked="${E.privacidade}" aria-label="Modo privacidade"></button></div>
       <div class="field"><div><div>Duração da pressão no mapa</div><div class="note">Tempo segurando o dedo até abrir o menu de campo</div></div><div class="seg" id="s-press" role="group" aria-label="Duração da pressão">${PRESSAO_OPCOES.map((v) => `<button type="button" data-ms="${v}" aria-pressed="${pressaoMs() === v}">${v} ms</button>`).join('')}</div></div>
       <div class="field"><div><div>Confirmar antes de gravar</div><div class="note">A roda de campo mostra Estender, Observação e Confirmar antes de gravar. Desligado, um toque grava e a roda mostra Estender, Observação e Desfazer</div></div><button class="sw2" id="s-conf" role="switch" aria-checked="${confirmarAntes()}" aria-label="Confirmar antes de gravar"></button></div>
+      <div class="field"><div><div>Suprimir trechos longos sem intervenção</div><div class="note">Tira do mapa os trechos sem intervenção maiores que o limite abaixo. A planilha e as exportações não mudam</div></div><button class="sw2" id="s-sup" role="switch" aria-checked="${E.suprimir.on}" aria-label="Suprimir trechos longos sem intervenção"><span></span></button></div>
+      <div class="field"><div><div>Limite do trecho (km)</div><div class="note">Acima disso, o trecho sem intervenção sai do mapa</div></div><div class="seg" id="s-supkm" role="group" aria-label="Limite do trecho em km">${SUPRIMIR_KM.map((v) => `<button type="button" data-km="${v}" aria-pressed="${E.suprimir.minKm === v}">${v} km</button>`).join('')}</div></div>
+      <div class="field"><div><div>Unir faixas paralelas</div><div class="note">Só some o trecho em que todas as faixas e o acostamento estão sem intervenção ao mesmo tempo. Desligado, cada faixa é avaliada sozinha</div></div><button class="sw2" id="s-supun" role="switch" aria-checked="${E.suprimir.unir}" aria-label="Unir faixas paralelas"><span></span></button></div>
       <div class="field"><div><div>Modo campo (sol)</div><div class="note">Contraste máximo, cores fortes, alvos de toque maiores</div></div><button class="sw2" id="s-field" role="switch" aria-checked="${E.field}" aria-label="Modo campo"></button></div></div></div>
     <div><div class="sect">Camadas</div><div class="list">
       ${([['drain', 'Drenos', 'Lado externo. Linha cheia tipo R, tracejada tipo P. Passe o mouse para ver detalhes'], ['poi', 'OAE e pedágio', 'Marcadores nos trechos observados'], ['km', 'Marcos e estacas', 'Estaca a cada 20 m com zoom máximo, 100 m e 500 m ao afastar'], ['notes', 'Anotações', '']] as const).map(([k, t, s]) => `<div class="field"><div><div>${t}</div>${s ? `<div class="note">${s}</div>` : ''}</div><button class="sw2" data-layer="${k}" role="switch" aria-checked="${E.layers[k]}" aria-label="${t}"></button></div>`).join('')}</div></div>
@@ -373,7 +378,7 @@ export function renderAj() {
     ${opts}
     <div id="alSecWrap"><div class="sect" id="alSect">Alinhar planilhas</div><div id="t-al"></div></div>
     <div><div class="sect">Mapa</div><div class="list"><div class="field"><label for="a-base">Base</label><select id="a-base"><option value="none">Sem base</option><option value="osm">Ruas</option><option value="esri">Satélite</option></select></div></div>
-      <p class="note" style="margin-top:7px">${temMapTiler() ? 'Base MapTiler ativa.' : 'Base reserva (OpenStreetMap e Esri). Para o MapTiler, defina VITE_MAPTILER_KEY no ambiente de build.'}</p></div>
+      <p class="note" style="margin-top:7px">${temMapTiler() ? 'Base MapTiler ativa.' : 'Base reserva (CARTO Voyager e Esri). Para o MapTiler, defina VITE_MAPTILER_KEY no ambiente de build.'}</p></div>
     <details><summary>Como o cálculo é feito</summary><div class="formula">θ = atan2(ΔE, ΔN)   entre i−w e i+w, em metros UTM
 nE = cos θ , nN = −sin θ   (invertido no sentido decrescente)
 e(n) = e0 + dir · Σ largura(1..n)
@@ -423,6 +428,19 @@ P(n) = P + e(n) · (nE , nN)</div>
   }));
   syncSeg($('#s-press'));
   $('#s-priv').onclick = () => setPrivacidade(!E.privacidade);
+  const aplicarSup = (mudanca: Partial<typeof E.suprimir>) => {
+    Object.assign(E.suprimir, mudanca);
+    try { localStorage.setItem('pavecad-suprimir', JSON.stringify(E.suprimir)); } catch { /* sem storage */ }
+    $('#s-sup').setAttribute('aria-checked', String(E.suprimir.on));
+    $('#s-supun').setAttribute('aria-checked', String(E.suprimir.unir));
+    el.querySelectorAll<HTMLElement>('#s-supkm button').forEach((x) => x.setAttribute('aria-pressed', String(Number(x.dataset.km) === E.suprimir.minKm)));
+    syncSeg($('#s-supkm'));
+    if (E.mapReady) for (const q of E.P) setProjectData(q);
+  };
+  $('#s-sup').onclick = () => aplicarSup({ on: !E.suprimir.on });
+  $('#s-supun').onclick = () => aplicarSup({ unir: !E.suprimir.unir });
+  el.querySelectorAll<HTMLElement>('#s-supkm button').forEach((b) => (b.onclick = () => aplicarSup({ minKm: Number(b.dataset.km) })));
+  syncSeg($('#s-supkm'));
   $('#s-conf').onclick = () => { const v = !confirmarAntes(); definirConfirmarAntes(v); $('#s-conf').setAttribute('aria-checked', String(v)); };
   $('#s-pad').onclick = () => {
     E.padrao = !padraoAtivo();

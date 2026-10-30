@@ -27,7 +27,7 @@ async function abrir(browser, vp, opts = {}) {
   pg.on('console', (m) => { if (m.type() === 'error') log.erros.push(m.text()); });
   pg.on('pageerror', (e) => log.erros.push('PAGEERROR ' + e.message));
   // Sem rede para os provedores de tiles: devolve imagens sintéticas e registra o zoom pedido.
-  await ctx.route(/(tile\.openstreetmap\.org|server\.arcgisonline\.com|api\.maptiler\.com)/, (route) => {
+  await ctx.route(/(basemaps\.cartocdn\.com|server\.arcgisonline\.com|api\.maptiler\.com)/, (route) => {
     const u = route.request().url();
     const m = /\/(\d+)\/(\d+)\/(\d+)(\.\w+)?(\?|$)/.exec(u);
     log.tiles.push({ url: u, z: m ? +m[1] : null });

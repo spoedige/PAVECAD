@@ -153,7 +153,7 @@ async function gerar(fmt: 'kmz' | 'kml' | 'ifc', rerender: () => void) {
     if (fmt === 'ifc') {
       if (!modelo.faixas.length && !modelo.propostas.length) { toast('Nada para exportar com estas opções'); return; }
       const saida = await gerarIfc({ titulo, modelo, opcoes: o, info: infoIfc, crs: incluidas[0].base.crs, notas, ceder });
-      const nome = nomeArquivo('PAVECAD', 'ifc', titulo);
+      const nome = nomeArquivo('PAVTRACK', 'ifc', titulo);
       baixarArquivo(new Blob([saida.texto], { type: 'application/x-step' }), nome);
       const v = verificarIfc(saida.texto, saida);
       const r = { ...relatorioDe(modelo, { ok: v.ok, detalhe: v.detalhe }, saida.avisos), elementos: saida.pavimentos + saida.propostas + saida.anotacoes };
@@ -169,10 +169,10 @@ async function gerar(fmt: 'kmz' | 'kml' | 'ifc', rerender: () => void) {
         const ent: Record<string, Uint8Array | [Uint8Array, { level: 0 | 9 }]> = { 'doc.kml': [strToU8(kml), { level: 9 }] };
         for (const f of fotos) ent['fotos/' + f.nome] = [f.bytes, { level: 0 }];
         blob = new Blob([zipSync(ent) as BlobPart], { type: 'application/vnd.google-earth.kmz' });
-        nome = nomeArquivo('PAVECAD', 'kmz', titulo);
+        nome = nomeArquivo('PAVTRACK', 'kmz', titulo);
       } else {
         blob = new Blob([kml], { type: 'application/vnd.google-earth.kml+xml' });
-        nome = nomeArquivo('PAVECAD', 'kml', titulo);
+        nome = nomeArquivo('PAVTRACK', 'kml', titulo);
       }
       baixarArquivo(blob, nome);
       const r = { ...relatorioDe(modelo, { ok: v.ok, detalhe: v.detalhe }), elementos: totalFeicoes(modelo, o.notas ? notas.length : 0) };

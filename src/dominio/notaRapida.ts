@@ -40,6 +40,9 @@ export interface DadosRapida {
   gps?: { lat: number; lon: number; precisao: number | null } | null;
 }
 
+/** Link do Street View do Google no ponto (lat, lon em graus). Abre o panorama mais próximo, se houver. */
+export const urlStreetView = (lat: number, lon: number) => `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat.toFixed(6)},${lon.toFixed(6)}`;
+
 /** Situação de uma "Ver conserva". */
 export const situacaoConserva = (r: Pick<DadosRapida, 'resolvida'>) => (r.resolvida ? 'Verificado' : 'Pendente');
 

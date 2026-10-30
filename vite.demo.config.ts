@@ -3,7 +3,7 @@ import { execSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 /** Build de demonstração em um único .html (abre por duplo clique, sem servidor): sem service worker, worker embutido e todo o JS e CSS dentro do arquivo.
- *  Uso: npm run build:demo  (gera dist-demo/pavecad-demo.html). */
+ *  Uso: npm run build:demo  (gera dist-demo/pavtrack-demo.html). */
 const commit = (() => { try { return execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim(); } catch { return 'demo'; } })();
 
 /** O worker das planilhas vira um blob dentro do próprio arquivo (o navegador não carrega worker de file://). */

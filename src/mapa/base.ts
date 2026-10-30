@@ -39,7 +39,7 @@ export const MAPTILER_MAX = { ruas: 21, satelite: 20 };
  *  A chave vem do ambiente (VITE_MAPTILER_KEY) e nunca do repositório. */
 export function baseSources(key: string, nitidez: Nitidez = 'segura'): Record<string, RasterSourceSpecification> {
   const src: Record<string, RasterSourceSpecification> = {
-    osm: { type: 'raster', tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'], tileSize: 256, maxzoom: TILE_MAX_ZOOM, attribution: '© OpenStreetMap' },
+    osm: { type: 'raster', tiles: ['https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png'], tileSize: 256, maxzoom: TILE_MAX_ZOOM, attribution: '© OpenStreetMap contributors © CARTO' },
     esri: esriSource(nitidez),
   };
   if (key) {

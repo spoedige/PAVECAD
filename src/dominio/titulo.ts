@@ -2,7 +2,7 @@ import type { ProjectMeta } from '../formats/types';
 
 /** "BR-050 · MG". Com mais de um estado, "BR-050 · GO, MG". Com mais de uma rodovia, separadas por " + ". */
 export function tituloDe(lista: { meta: Pick<ProjectMeta, 'uf'> }[]): string {
-  if (!lista.length) return 'PaveCAD';
+  if (!lista.length) return 'PAVTRACK';
   const por = new Map<string, Set<string>>();
   for (const p of lista) {
     const [via, uf] = p.meta.uf.split('/');

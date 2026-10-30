@@ -160,7 +160,7 @@ export async function gerarIfc(e: EntradaIfc): Promise<SaidaIfc> {
   S.add(`IFCMAPCONVERSION(${ctx},${crsEnt},${real(E0)},${real(N0)},0.,1.,0.,1.)`);
 
   /* projeto, sítio */
-  const projeto = S.add(`IFCPROJECT('${gid(`projeto:${e.titulo}`)}',$,${stepTexto(e.titulo)},${stepTexto('Exportado pelo PAVECAD')},$,$,$,(${ctx}),${unidades})`);
+  const projeto = S.add(`IFCPROJECT('${gid(`projeto:${e.titulo}`)}',$,${stepTexto(e.titulo)},${stepTexto('Exportado pelo PAVTRACK')},$,$,$,(${ctx}),${unidades})`);
   const eixo = (x = 0, y = 0) => S.add(`IFCAXIS2PLACEMENT3D(${S.add(pt3(x, y, 0))},${dz},${dx})`);
   const pSite = S.add(`IFCLOCALPLACEMENT($,${eixo()})`);
   const site = S.add(`IFCSITE('${gid(`site:${e.titulo}`)}',$,${stepTexto(e.titulo)},$,$,${pSite},$,$,.ELEMENT.,$,$,$,$,$)`);
@@ -172,10 +172,10 @@ export async function gerarIfc(e: EntradaIfc): Promise<SaidaIfc> {
   /* propriedades do projeto */
   const psProj = (() => {
     const props = [
-      ['Gerador', 'IFCLABEL', 'PAVECAD'], ['SistemaCoordenadas', 'IFCLABEL', nomeCrs],
+      ['Gerador', 'IFCLABEL', 'PAVTRACK'], ['SistemaCoordenadas', 'IFCLABEL', nomeCrs],
       ['LimitacaoZ', 'IFCTEXT', LIMITACAO_Z], ['Posicionamento', 'IFCTEXT', MOTIVO_SEM_ALINHAMENTO],
     ].map(([n, t, v]) => S.add(`IFCPROPERTYSINGLEVALUE(${stepTexto(n)},$,${t}(${stepTexto(v)}),$)`));
-    return S.add(`IFCPROPERTYSET('${gid('pset:projeto')}',$,'PAVECAD_Projeto',$,${lista(props)})`);
+    return S.add(`IFCPROPERTYSET('${gid('pset:projeto')}',$,'PAVTRACK_Projeto',$,${lista(props)})`);
   })();
   S.add(`IFCRELDEFINESBYPROPERTIES('${gid('rel:pset:projeto')}',$,$,$,(${projeto}),${psProj})`);
 
@@ -262,12 +262,12 @@ export async function gerarIfc(e: EntradaIfc): Promise<SaidaIfc> {
       if (t.extra?.nota) props.push(['Nota', rotulo(String(t.extra.nota), 'IFCTEXT')]);
     }
     const ids = props.map(([n, v]) => S.add(`IFCPROPERTYSINGLEVALUE(${stepTexto(n)},$,${v},$)`));
-    const ps = S.add(`IFCPROPERTYSET('${gid(`pset:${chave}`)}',$,'PAVECAD_Trecho',$,${lista(ids)})`);
+    const ps = S.add(`IFCPROPERTYSET('${gid(`pset:${chave}`)}',$,'PAVTRACK_Trecho',$,${lista(ids)})`);
     S.add(`IFCRELDEFINESBYPROPERTIES('${gid(`relps:${chave}`)}',$,$,$,(${el}),${ps})`);
     const qc = S.add(`IFCQUANTITYLENGTH('Comprimento',$,$,${real(t.ext)},$)`);
     const qa = S.add(`IFCQUANTITYAREA('Area',$,$,${real(t.area)},$)`);
     const qv = S.add(`IFCQUANTITYVOLUME('Volume',$,$,${real(volume)},$)`);
-    const eq = S.add(`IFCELEMENTQUANTITY('${gid(`eq:${chave}`)}',$,'PAVECAD_Quantidades',$,$,${lista([qc, qa, qv])})`);
+    const eq = S.add(`IFCELEMENTQUANTITY('${gid(`eq:${chave}`)}',$,'PAVTRACK_Quantidades',$,$,${lista([qc, qa, qv])})`);
     S.add(`IFCRELDEFINESBYPROPERTIES('${gid(`releq:${chave}`)}',$,$,$,(${el}),${eq})`);
     return el;
   };
@@ -310,8 +310,8 @@ export async function gerarIfc(e: EntradaIfc): Promise<SaidaIfc> {
   const iso = `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}T${z(d.getHours())}:${z(d.getMinutes())}:${z(d.getSeconds())}`;
   const cab = [
     'ISO-10303-21;', 'HEADER;',
-    `FILE_DESCRIPTION(('ViewDefinition [ReferenceView]',${stepTexto(`PAVECAD: ${LIMITACAO_Z}`)}),'2;1');`,
-    `FILE_NAME(${stepTexto('PAVECAD.ifc')},'${iso}',(${stepTexto('PAVECAD')}),(${stepTexto('PAVECAD')}),${stepTexto('PAVECAD')},${stepTexto('PAVECAD')},'');`,
+    `FILE_DESCRIPTION(('ViewDefinition [ReferenceView]',${stepTexto(`PAVTRACK: ${LIMITACAO_Z}`)}),'2;1');`,
+    `FILE_NAME(${stepTexto('PAVTRACK.ifc')},'${iso}',(${stepTexto('PAVTRACK')}),(${stepTexto('PAVTRACK')}),${stepTexto('PAVTRACK')},${stepTexto('PAVTRACK')},'');`,
     "FILE_SCHEMA(('IFC4X3_ADD2'));", 'ENDSEC;', 'DATA;',
   ];
   const texto = [...cab, ...S.linhas, 'ENDSEC;', 'END-ISO-10303-21;', ''].join('\n');

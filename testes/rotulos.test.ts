@@ -20,6 +20,6 @@ describe('título da coluna esquerda', () => {
   it('uma rodovia, um estado', () => expect(tituloDe([m('BR-050/MG'), m('BR-050/MG')])).toBe('BR-050 · MG'));
   it('uma rodovia, vários estados', () => expect(tituloDe([m('BR-050/MG'), m('BR-050/GO')])).toBe('BR-050 · GO, MG'));
   it('várias rodovias', () => expect(tituloDe([m('BR-050/MG'), m('BR-153/SP')])).toBe('BR-050 · MG + BR-153 · SP'));
-  it('sem planilhas', () => expect(tituloDe([])).toBe('PaveCAD'));
+  it('sem planilhas', () => expect(tituloDe([])).toBe('PAVTRACK'));
   it('rodovia sem estado', () => expect(tituloDe([m('BR-050')])).toBe('BR-050'));
 });

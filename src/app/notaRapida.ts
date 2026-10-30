@@ -3,7 +3,7 @@ import { kmLabel } from '../formats';
 import * as catalogo from '../dominio/catalogo';
 import type { Local, LocP } from '../dominio/localizar';
 import {
-  TIPOS_RAPIDOS, dadosDeLocal, type DadosRapida, posicionarRoda, precisaLembrar, resolverLocal, type OrigemNota, type Resolucao, type TipoRapido,
+  TIPOS_RAPIDOS, dadosDeLocal, type DadosRapida, posicionarRoda, precisaLembrar, resolverLocal, urlStreetView, type OrigemNota, type Resolucao, type TipoRapido,
 } from '../dominio/notaRapida';
 import { efeitoDe, runAt, type Proposta } from '../dominio/propostas';
 import { trColor, trShort } from '../dominio/solucoes';
@@ -58,6 +58,7 @@ export const ICONE: Record<TipoRapido, string> = {
 const IC = {
   alterar: SVG('<path d="M3 15l9 4.5 9-4.5M3 11l9 4.5 9-4.5L12 6.5z"/><path d="M8 3.5h8m-2-2 2 2-2 2"/>'),
   parametros: SVG('<path d="M5 4h14v16H5z"/><path d="M8.5 9h7M8.5 12.5h7M8.5 16h4"/>'),
+  streetview: SVG('<circle cx="12" cy="5.5" r="2.5"/><path d="M7 21v-6.5a5 5 0 0 1 10 0V21M9.5 21v-4M14.5 21v-4"/>'),
   outros: SVG('<path d="M5 12h.01M12 12h.01M19 12h.01"/>'),
   estender: SVG('<path d="M3 12h18M7 8l-4 4 4 4M17 8l4 4-4 4"/>'),
   obs: SVG('<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>'),
@@ -198,6 +199,7 @@ function pintarPrincipal(m: Menu) {
     { id: 'Ver conserva', attr: 'data-t="conserva"', cls: 'nr-p', tam: t, html: ICONE.conserva + nomeBolha('Ver', 'conserva') },
     { id: 'Observação', attr: 'data-t="observacao"', cls: 'nr-p', tam: t, html: ICONE.observacao + '<span>Observação</span>' },
     { id: 'Foto', attr: 'data-t="foto"', cls: 'nr-p', tam: t, html: ICONE.foto + '<span>Foto</span>' },
+    { id: 'Street View', attr: 'data-t="streetview"', cls: 'nr-p', tam: t, html: IC.streetview + nomeBolha('Street', 'View') },
   ], '', { passoMin: 34 });
   alvoClique('.nr-op', (b) => {
     const t = b.dataset.t!;
@@ -205,8 +207,16 @@ function pintarPrincipal(m: Menu) {
     else if (t === 'parametros') abrirParametros();
     else if (t === 'observacao') abrirTexto();
     else if (t === 'foto') abrirFoto(b);
+    else if (t === 'streetview') abrirStreetView();
     else iniciarNota(t as 'dreno_mais' | 'dreno_menos' | 'conserva');
   });
+}
+
+/** Abre o Street View do Google no ponto pressionado, em outra aba. Não grava nada. */
+function abrirStreetView() {
+  const m = menu!, url = urlStreetView(m.lat, m.lng);
+  fecharMenu();
+  window.open(url, '_blank', 'noopener');
 }
 
 /* ---------------------------------------------------------------- */

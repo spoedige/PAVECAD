@@ -9,7 +9,7 @@ const commit = (() => {
   try { return execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim(); } catch { return 'dev'; }
 })();
 
-const TILES = /^https:\/\/(tile\.openstreetmap\.org|server\.arcgisonline\.com|api\.maptiler\.com)\//;
+const TILES = /^https:\/\/(basemaps\.cartocdn\.com|server\.arcgisonline\.com|api\.maptiler\.com)\//;
 
 export default defineConfig({
   define: { __APP_COMMIT__: JSON.stringify(commit), __APP_DATA__: JSON.stringify(new Date().toISOString()) },
@@ -19,8 +19,8 @@ export default defineConfig({
       registerType: 'autoUpdate', // o service worker novo assume sozinho e a página recarrega: no modo 'prompt' a versão antiga ficava em cache até alguém tocar em "Atualizar"
       includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
       manifest: {
-        name: 'PaveCAD · Mapa de Soluções de Restauração',
-        short_name: 'PaveCAD',
+        name: 'PAVTRACK · Mapa de Soluções de Restauração',
+        short_name: 'PAVTRACK',
         description: 'Mapa de soluções de restauração a partir de planilhas de unifilar. Funciona sem internet.',
         lang: 'pt-BR',
         start_url: '/',
